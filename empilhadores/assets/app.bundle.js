@@ -11,9 +11,9 @@ const AppState = (() => {
     empilhador:{label:'Emp', short:'EMP'}
   });
   const defaultUsers = [
-    { matricula:'admin', senhaHash:'842c737a37c5ff7809cb3685665e0ac2a6e3de8a11d4a84f089564513f9bb365', nome:'Técnico de Informática', role:'ti', active:true },
-    { matricula:'enc', senhaHash:'93e0f0155aa0b58e12a2b332044c0ceab97939fe7d75b18abac2889a32a1c1db', nome:'Encarregado', role:'encarregado', active:true },
-    { matricula:'emp', senhaHash:'3c8af6de909be8f82b3300bfcbe10e254ecffc696a1a5cff9fd67d43c490455d', nome:'Empilhador', role:'empilhador', active:true }
+    { matricula:'admin', senhaHash:'cda1b259ca70c7e1a3a7758fa8158a89558feba04e248cc3758bbc4fb2139548', nome:'Técnico de Informática', role:'ti', active:true },
+    { matricula:'enc', senhaHash:'d852650787abbcfb0f3cd23103143de6f5122b5ab11c76d74b07494b39b775e1', nome:'Encarregado', role:'encarregado', active:true },
+    { matricula:'emp', senhaHash:'b7edb939e180002433f566919b83f3b37422c85942a6211f5ceacb49aecbe844', nome:'Empilhador', role:'empilhador', active:true }
   ];
   async function sha256Hex(value){
     const bytes = new TextEncoder().encode(String(value || ''));
