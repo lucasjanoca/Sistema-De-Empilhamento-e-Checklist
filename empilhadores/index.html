@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>InfoTech • Sistema de Empilhadores</title>
+<style>
+:root{--bg:#071711;--panel:#102d22;--line:#285443;--green:#44d47e;--text:#eff8f2;--muted:#a5cbb7;--danger:#ff6b66}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(160deg,#071711,#0d261d);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif;display:grid;place-items:center;padding:20px}
+.shell{width:min(720px,100%)}.brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}.logo{width:50px;height:50px;border-radius:15px;background:var(--green);color:#082014;display:grid;place-items:center;font-weight:1000;font-size:21px}.brand h1{font-size:22px;margin:0}.brand small{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.3)}h2{margin:0 0 8px;font-size:26px}p{color:var(--muted);line-height:1.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.field{display:flex;flex-direction:column;gap:7px}.field.full{grid-column:1/-1}label{font-size:12px;font-weight:800;color:#c9e5d5;text-transform:uppercase;letter-spacing:.04em}input,select{width:100%;border:1px solid var(--line);background:#0a2118;color:#fff;border-radius:12px;padding:12px 14px;font:inherit}
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer;background:#1a4334;color:#fff}.btn.primary{background:var(--green);color:#082014}.actions{display:flex;gap:10px;flex-wrap:wrap}
+.codebox{margin-top:20px;padding:22px;border-radius:20px;background:#081d15;border:1px solid var(--line);text-align:center}.code{font-size:clamp(42px,10vw,72px);font-weight:1000;letter-spacing:.12em;color:var(--green);font-variant-numeric:tabular-nums}.timer{font-weight:800;margin-top:8px}.status{min-height:22px;margin-top:10px;color:var(--muted)}.danger{color:var(--danger)}.links{display:flex;justify-content:space-between;gap:12px;margin-top:18px;flex-wrap:wrap}.links a{color:var(--green);font-weight:800;text-decoration:none}.note{font-size:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+@media(max-width:620px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.card{padding:18px}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <div class="brand"><div class="logo">EP</div><div><h1>Sistema de Empilhadores</h1><small>InfoTech • acesso integrado ao Checklist</small></div></div>
+  <section class="card">
+    <h2>Código de acesso</h2>
+    <p>Gere um código temporário e digite-o no tablet do Checklist. O código tem 6 dígitos, vale por 2 minutos e só pode ser usado uma vez.</p>
+    <div class="grid">
+      <div class="field"><label for="matricula">Matrícula</label><input id="matricula" autocomplete="off" placeholder="Ex.: 017434-0"></div>
+      <div class="field"><label for="nome">Nome</label><input id="nome" autocomplete="name" placeholder="Nome do operador"></div>
+      <div class="field full"><label for="perfil">Perfil para teste</label><select id="perfil"><option value="emp">Empilhador / Operador</option><option value="adm">ADM / TI</option></select></div>
+    </div>
+    <div class="actions"><button class="btn primary" id="generate">Gerar código</button><button class="btn" id="copy" disabled>Copiar código</button><button class="btn" id="revoke" disabled>Cancelar código</button></div>
+    <div class="codebox">
+      <div class="code" id="code">--- ---</div>
+      <div class="timer" id="timer">Nenhum código ativo</div>
+      <div class="status" id="status">Preencha a identificação e gere um código.</div>
+    </div>
+    <div class="links"><a href="../">Abrir Checklist</a><a href="../checklist/">Abrir cópia do Checklist</a></div>
+    <p class="note">Modo de teste online: o código é compartilhado pelo navegador neste domínio. A próxima etapa será trocar o armazenamento pelo Supabase para funcionar entre dispositivos diferentes.</p>
+  </section>
+</main>
+<script src="../shared/access-code.js"></script>
+<script>
+const $=s=>document.querySelector(s);let tick=null,last='';
+function render(){
+ const s=InfoTechAccessCode.status();
+ if(s.state!=='active'){last='';$('#code').textContent='--- ---';$('#timer').textContent=s.state==='used'?'Código já utilizado':s.state==='expired'?'Código expirado':'Nenhum código ativo';$('#copy').disabled=true;$('#revoke').disabled=true;return}
+ last=s.record.code;$('#code').textContent=InfoTechAccessCode.formatCode(last);$('#copy').disabled=false;$('#revoke').disabled=false;
+ const sec=Math.max(0,Math.ceil(s.remainingMs/1000));$('#timer').textContent='Válido por '+String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
+ if(sec<=0)render();
+}
+$('#generate').addEventListener('click',()=>{
+ const matricula=$('#matricula').value.trim(),name=$('#nome').value.trim();
+ if(!matricula){$('#status').textContent='Informe a matrícula para gerar o código.';$('#status').className='status danger';return}
+ const r=InfoTechAccessCode.generate({matricula,name:name||'Operador',role:$('#perfil').value});
+ $('#status').textContent='Código criado. Digite-o no Checklist.';$('#status').className='status';last=r.code;render();
+});
+$('#copy').addEventListener('click',async()=>{if(!last)return;try{await navigator.clipboard.writeText(last);$('#status').textContent='Código copiado.'}catch{$('#status').textContent='Copie o código exibido acima.'}});
+$('#revoke').addEventListener('click',()=>{InfoTechAccessCode.revokeCode();$('#status').textContent='Código cancelado.';render()});
+render();tick=setInterval(render,500);
+</script>
+</body></html>
