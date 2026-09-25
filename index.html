@@ -45,17 +45,16 @@ dialog{width:min(580px,calc(100vw - 24px));border:1px solid var(--line);border-r
 
 <section class="login-shell" id="loginScreen">
   <div class="login-card">
-    <div class="login-brand"><div class="login-logo">CK</div><div><h1>Checklist Operacional CD</h1><small>InfoTech • ambiente de testes</small></div></div>
-    <h2>Entrar</h2>
-    <p>Use um dos acessos de teste para visualizar o sistema completo por perfil.</p>
+    <div class="login-brand"><div class="login-logo">CK</div><div><h1>Checklist Operacional CD</h1><small>InfoTech • acesso integrado</small></div></div>
+    <h2>Acesso por código</h2>
+    <p>Digite o código temporário de 6 dígitos gerado no Sistema de Empilhadores.</p>
     <form id="loginForm">
-      <div class="field"><label>Usuário</label><input id="loginUser" autocomplete="username" placeholder="Ex.: Lucas"></div>
-      <div class="field"><label>Senha</label><input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
-      <button class="btn primary" style="width:100%" type="submit">Entrar</button>
-      <div class="login-error hidden" id="loginError">Usuário ou senha incorretos.</div>
+      <div class="field"><label>Código temporário</label><input id="accessCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" style="text-align:center;font-size:28px;font-weight:900;letter-spacing:.12em"></div>
+      <button class="btn primary" style="width:100%" type="submit">Entrar no Checklist</button>
+      <div class="login-error hidden" id="loginError">Código inválido.</div>
     </form>
-    <div class="demo-hint"><b>Acessos de teste:</b><br>ADM: Lucas / lucas123<br>Empilhador: Igor / igor123<br><br>Este arquivo é somente para visualização e testes locais.</div>
-    <div class="version">Secure Checklist 2.0.5 • protótipo completo de teste</div>
+    <div class="demo-hint"><b>Como funciona:</b><br>1. Abra o Sistema de Empilhadores.<br>2. Gere um código de 6 dígitos.<br>3. Digite o código aqui em até 2 minutos.<br><br><a href="empilhadores/" style="color:var(--green);font-weight:900">Gerar código no Sistema de Empilhadores →</a></div>
+    <div class="version">Integração por código • válido por 2 minutos • uso único</div>
   </div>
 </section>
 
@@ -232,6 +231,7 @@ dialog{width:min(580px,calc(100vw - 24px));border:1px solid var(--line);border-r
 
 <div class="toast" id="toast"></div>
 
+<script src="shared/access-code.js"></script>
 <script>
 (()=>{
 const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>Array.from(p.querySelectorAll(s));
@@ -282,7 +282,17 @@ let audit=[
 ];
 let currentUser=null,currentTab='bateria',currentAdminPage='overview',editingEquipmentId=null;
 
-function login(user,pass){return users.find(u=>u.active&&u.username.toLowerCase()===user.trim().toLowerCase()&&u.password===pass)}
+function enterWithIdentity(identity){
+  const role=identity?.role==='adm'?'adm':'emp';
+  currentUser={id:'code_'+(identity?.matricula||Date.now()),name:identity?.name||identity?.matricula||'Operador',username:identity?.matricula||'codigo',role,active:true};
+  $('#loginError').classList.add('hidden');
+  $('#loginScreen').classList.add('hidden');
+  $('#appScreen').classList.remove('hidden');
+  applyUser();
+  audit.unshift({at:new Date().toISOString(),user:currentUser.name,event:'LOGIN_SUCCESS',origin:role==='adm'?'ADM':'Operação',detail:'Acesso por código temporário'+(identity?.matricula?' • matrícula '+identity.matricula:'')});
+  $('#ckOperator').value=currentUser.name;
+  calcKPIs();renderEquipment();renderHistory();renderAdmin();showOperation();
+}
 function applyUser(){
   $('#userName').textContent=currentUser.name;
   $('#roleName').textContent=currentUser.role==='adm'?'ADM / TI':'Empilhador';
@@ -291,7 +301,7 @@ function applyUser(){
   $('#sideRole').textContent=currentUser.role==='adm'?'Administrador / TI':'Operador';
   if(currentUser.role!=='adm') closeSidebar();
 }
-function logout(){currentUser=null;$('#appScreen').classList.add('hidden');$('#loginScreen').classList.remove('hidden');$('#loginPass').value='';closeSidebar();}
+function logout(){currentUser=null;InfoTechAccessCode.clearSession();$('#appScreen').classList.add('hidden');$('#loginScreen').classList.remove('hidden');$('#accessCode').value='';closeSidebar();}
 
 function openSidebar(){if(currentUser?.role!=='adm')return;$('#sidebar').classList.add('open');$('#backdrop').classList.add('show')}
 function closeSidebar(){$('#sidebar').classList.remove('open');$('#backdrop').classList.remove('show')}
@@ -382,7 +392,18 @@ function saveUser(ev){ev.preventDefault();const name=$('#usrName').value.trim(),
 function openIssue(id){const i=issues.find(x=>x.id===id);if(!i)return;$('#issueId').value=i.id;$('#issueEquipment').value=`${i.code} · ${i.name}`;$('#issueStatus').value=i.status;$('#issueResolution').value=i.resolution||'';$('#issueDialog').showModal()}
 function saveIssue(ev){ev.preventDefault();const i=issues.find(x=>x.id===$('#issueId').value);if(!i)return;i.status=$('#issueStatus').value;i.resolution=$('#issueResolution').value.trim();audit.unshift({at:new Date().toISOString(),user:currentUser.name,event:'ISSUE_UPDATED',origin:'ADM',detail:`${i.code} • ${i.status}`});$('#issueDialog').close();renderAdmin();toast('Pendência atualizada.')}
 
-$('#loginForm').addEventListener('submit',e=>{e.preventDefault();const u=login($('#loginUser').value,$('#loginPass').value);if(!u){$('#loginError').classList.remove('hidden');return}$('#loginError').classList.add('hidden');currentUser=u;$('#loginScreen').classList.add('hidden');$('#appScreen').classList.remove('hidden');applyUser();audit.unshift({at:new Date().toISOString(),user:u.name,event:'LOGIN_SUCCESS',origin:u.role==='adm'?'ADM':'Operação',detail:'Acesso de teste'});$('#ckOperator').value=u.name;calcKPIs();renderEquipment();renderHistory();renderAdmin();showOperation()});
+$('#accessCode').addEventListener('input',e=>{const v=InfoTechAccessCode.normalizeCode(e.target.value);e.target.value=InfoTechAccessCode.formatCode(v)});
+$('#loginForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const result=InfoTechAccessCode.validate($('#accessCode').value);
+  if(!result.ok){
+    const messages={invalid_format:'Digite os 6 dígitos do código.',locked:'Muitas tentativas. Aguarde 1 minuto.',used:'Esse código já foi utilizado.',expired:'Esse código expirou. Gere outro no Sistema de Empilhadores.',not_found:'Nenhum código ativo foi encontrado.',wrong:'Código incorreto.'};
+    $('#loginError').textContent=messages[result.reason]||'Código inválido.';
+    $('#loginError').classList.remove('hidden');
+    return;
+  }
+  enterWithIdentity(result.identity);
+});
 $('#menuBtn').addEventListener('click',openSidebar);$('#closeSidebar').addEventListener('click',closeSidebar);$('#backdrop').addEventListener('click',closeSidebar);$('#logoutBtn').addEventListener('click',logout);$('#sideLogout').addEventListener('click',logout);$('#backToOperation').addEventListener('click',showOperation);
 $('#sideNav').addEventListener('click',e=>{const b=e.target.closest('[data-admin-page]');if(b)showAdmin(b.dataset.adminPage)});
 document.addEventListener('click',e=>{const j=e.target.closest('[data-admin-page-jump]');if(j)showAdmin(j.dataset.adminPageJump);const oc=e.target.closest('[data-open-checklist]');if(oc)openChecklist();const c=e.target.closest('[data-check]');if(c)openChecklist(c.dataset.check);const ac=e.target.closest('[data-admin-check]');if(ac)openChecklist(ac.dataset.adminCheck);const ed=e.target.closest('[data-edit-equipment]');if(ed)openEquipmentDialog(ed.dataset.editEquipment);const te=e.target.closest('[data-toggle-equipment]');if(te){const item=equipment.find(x=>x.id===te.dataset.toggleEquipment);item.active=!item.active;audit.unshift({at:new Date().toISOString(),user:currentUser.name,event:'EQUIPMENT_'+(item.active?'ACTIVATED':'DEACTIVATED'),origin:'ADM',detail:item.code});calcKPIs();renderEquipment();renderAdmin();toast(item.active?'Equipamento ativado.':'Equipamento desativado sem apagar histórico.')}const tr=e.target.closest('[data-treat-issue]');if(tr)openIssue(tr.dataset.treatIssue);const ru=e.target.closest('[data-reset-user]');if(ru){const u=users.find(x=>x.id===ru.dataset.resetUser);const p=prompt('Nova senha temporária para '+u.name+':',u.password);if(p){u.password=p;audit.unshift({at:new Date().toISOString(),user:currentUser.name,event:'PASSWORD_RESET',origin:'ADM',detail:u.username});toast('Senha de teste atualizada.')}}const tu=e.target.closest('[data-toggle-user]');if(tu){const u=users.find(x=>x.id===tu.dataset.toggleUser);if(u.id===currentUser.id){toast('Não bloqueie o próprio acesso durante o teste.');return}u.active=!u.active;renderAdmin();toast(u.active?'Usuário ativado.':'Usuário bloqueado.')}const tc=e.target.closest('[data-template-edit]');if(tc){toast('Modelo '+typeLabel[tc.dataset.templateEdit]+': nesta prévia a edição detalhada fica simulada.')}const cl=e.target.closest('[data-close]');if(cl)$('#'+cl.dataset.close).close()});
@@ -391,7 +412,7 @@ $('#goOperationBtn').addEventListener('click',showOperation);$('#addEquipmentBtn
 $('#resolveAllDemo').addEventListener('click',()=>{issues.forEach(i=>{if(i.status!=='resolved'){i.status='resolved';i.resolution='Resolvida em lote na demonstração.'}});renderAdmin();toast('Pendências de teste resolvidas.')} );
 $('#downloadAudit').addEventListener('click',()=>toast('Visualização: exportação de auditoria depende do servidor.'));$('#newTemplateBtn').addEventListener('click',()=>toast('Nova versão de modelo simulada.'));$('#reportCsv').addEventListener('click',()=>toast('Visualização: CSV depende do servidor.'));$('#reportPdf').addEventListener('click',()=>window.print());$('#backupBtn').addEventListener('click',()=>toast('Backup de teste concluído (simulação).'));$('#healthBtn').addEventListener('click',()=>{$('#healthResult').textContent='Interface: OK • Dados locais: OK • Perfis: OK • Histórico: OK • Backend: não conectado (modo visualização)'});$('#saveUiSettings').addEventListener('click',()=>{const n=$('#gridSetting').value;document.documentElement.style.setProperty('--battery-cols',n);toast('Preferência visual salva somente nesta sessão de teste.')});
 
-$('#todayText').textContent=now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$('#serverTime').textContent='servidor '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});refreshEquipmentSelect('bateria','bat01');calcKPIs();renderEquipment();renderHistory();renderAdmin();
+$('#todayText').textContent=now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$('#serverTime').textContent='servidor '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});refreshEquipmentSelect('bateria','bat01');calcKPIs();renderEquipment();renderHistory();renderAdmin();const restoredSession=InfoTechAccessCode.currentSession();if(restoredSession?.identity)enterWithIdentity(restoredSession.identity);
 })();
 </script>
 </body>
