@@ -2,7 +2,7 @@ const AppState = (() => {
   const STORAGE_KEY = 'empilhamento_2_0_state_entrega_v2';
   const SESSION_KEY = 'empilhamento_2_0_user_entrega_v2';
   const TABLET_SESSION_KEY = 'empilhamento_2_0_tablet_entrega_v2';
-  const USERS_KEY = 'empilhamento_2_0_users_secure_v2';
+  const USERS_KEY = 'empilhamento_2_0_users_secure_v3';
   const LEGACY_STATE_KEYS = [];
   const LEGACY_USER_KEYS = [];
   const roleMeta = Object.freeze({
