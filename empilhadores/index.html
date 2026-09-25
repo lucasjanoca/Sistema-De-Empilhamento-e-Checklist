@@ -3,56 +3,203 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>InfoTech • Sistema de Empilhadores</title>
+<title>Empilhamento 2.0 • InfoTech</title>
 <style>
-:root{--bg:#071711;--panel:#102d22;--line:#285443;--green:#44d47e;--text:#eff8f2;--muted:#a5cbb7;--danger:#ff6b66}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(160deg,#071711,#0d261d);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif;display:grid;place-items:center;padding:20px}
-.shell{width:min(720px,100%)}.brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}.logo{width:50px;height:50px;border-radius:15px;background:var(--green);color:#082014;display:grid;place-items:center;font-weight:1000;font-size:21px}.brand h1{font-size:22px;margin:0}.brand small{color:var(--muted)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.3)}h2{margin:0 0 8px;font-size:26px}p{color:var(--muted);line-height:1.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.field{display:flex;flex-direction:column;gap:7px}.field.full{grid-column:1/-1}label{font-size:12px;font-weight:800;color:#c9e5d5;text-transform:uppercase;letter-spacing:.04em}input,select{width:100%;border:1px solid var(--line);background:#0a2118;color:#fff;border-radius:12px;padding:12px 14px;font:inherit}
-.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer;background:#1a4334;color:#fff}.btn.primary{background:var(--green);color:#082014}.actions{display:flex;gap:10px;flex-wrap:wrap}
-.codebox{margin-top:20px;padding:22px;border-radius:20px;background:#081d15;border:1px solid var(--line);text-align:center}.code{font-size:clamp(42px,10vw,72px);font-weight:1000;letter-spacing:.12em;color:var(--green);font-variant-numeric:tabular-nums}.timer{font-weight:800;margin-top:8px}.status{min-height:22px;margin-top:10px;color:var(--muted)}.danger{color:var(--danger)}.links{display:flex;justify-content:space-between;gap:12px;margin-top:18px;flex-wrap:wrap}.links a{color:var(--green);font-weight:800;text-decoration:none}.note{font-size:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
-@media(max-width:620px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.card{padding:18px}}
+:root{
+ --bg:#071018;--bg2:#091621;--panel:#0c1720;--panel2:#0f1e29;--line:#20313c;
+ --green:#26b65f;--green2:#168a46;--text:#f4f7f8;--muted:#94a5af;
+ --yellow:#ffd331;--yellow2:#f2ba18;--red:#e23a36;--red2:#b92424;
+ --purple:#7d4de8;--shadow:0 18px 50px rgba(0,0,0,.28)
+}
+*{box-sizing:border-box}html,body{margin:0;background:radial-gradient(circle at 70% 0,#0c2029 0,#071018 42%,#050c12 100%);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}body{min-height:100vh}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+.app{display:grid;grid-template-columns:292px 1fr;min-height:100vh}
+.sidebar{border-right:1px solid #162832;background:linear-gradient(180deg,#071018,#08141c);position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{height:106px;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid #162832}.fork{font-size:44px;color:var(--green)}.brand b{font-size:22px;line-height:1.08}.brand span{display:block}
+.nav{padding:18px 12px;display:grid;gap:8px}.nav button{border:0;background:transparent;color:#b8c4cb;text-align:left;padding:17px 22px;border-radius:8px;font-size:17px;display:flex;gap:16px;align-items:center;border-left:5px solid transparent}.nav button.active{background:#0e1d27;color:#34cf72;border-left-color:#34cf72}.nav button:hover{background:#0d1a23}
+.nav .ico{width:26px;text-align:center;font-size:22px}
+.shift-card{margin:auto 18px 18px;padding:18px;border:1px solid #1a7e45;border-radius:10px;color:#d7e3df}.shift-card .dot{display:inline-block;width:12px;height:12px;background:var(--green);border-radius:50%;margin-right:10px}.shift-card small{display:block;color:#a6b6bf;margin:12px 0 4px}.swap-user{margin:0 18px 34px;border:1px solid #41515b;background:transparent;color:#d8e1e6;border-radius:9px;padding:15px;font-weight:700}
+.main{min-width:0}.topbar{height:106px;border-bottom:1px solid #182b36;display:flex;align-items:center;justify-content:space-between;padding:0 28px;gap:18px}
+.turn-card{border:1px solid #1e3039;border-radius:10px;padding:13px 18px;display:flex;align-items:center;gap:18px;min-width:610px}.turn-info{flex:1}.turn-info b{display:block;font-size:15px}.turn-info small{color:#9babb4}.dot{width:13px;height:13px;background:#2fc66a;border-radius:50%}.end-turn{border:0;background:linear-gradient(180deg,#1da054,#188644);color:#fff;padding:13px 28px;border-radius:8px;font-weight:800}
+.userbox{display:flex;align-items:center;gap:13px;min-width:250px;justify-content:flex-end}.avatar{width:50px;height:50px;border-radius:50%;background:#26b65f;display:grid;place-items:center;color:#082113;font-size:24px}.userbox b{display:block;font-size:18px}.userbox small{color:#49d980}
+.content{padding:18px 16px 62px}.section{border:1px solid var(--line);background:linear-gradient(180deg,rgba(10,25,34,.94),rgba(8,20,28,.94));border-radius:12px;box-shadow:var(--shadow)}
+.section-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.section-head h2{font-size:21px;margin:0;display:flex;gap:12px;align-items:center}.section-head .green{color:#35c970}
+.request-btn{border:0;background:linear-gradient(180deg,#21a75a,#168a46);color:#fff;border-radius:8px;padding:13px 22px;font-weight:900}
+.filters{padding:16px 16px 13px}.filters-title{font-weight:800;margin-bottom:10px}.filter-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.corridor{border:1px solid #21523a;background:#0a1720;color:#fff;border-radius:8px;padding:10px 23px;font-weight:800}.corridor.active{background:linear-gradient(180deg,#2ac86b,#1aa453);border-color:#2ac86b}.search{margin-left:auto;position:relative}.search input{width:305px;border:1px solid #2b3d48;background:#0b151d;color:#fff;border-radius:8px;padding:11px 14px 11px 42px}.search span{position:absolute;left:13px;top:10px;color:#81919b}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.panel{border:1px solid var(--line);border-radius:11px;background:#09151d;min-height:420px}.panel-title{padding:17px 18px;font-weight:1000;letter-spacing:.02em}.panel-title.yellow{color:#2fd06f}.panel-title.red{color:#ff4b47}.list{display:grid;gap:8px;padding:0 14px 14px;max-height:370px;overflow:auto}.card{border-radius:10px;padding:14px 14px;display:grid;grid-template-columns:1.15fr .95fr .55fr 28px;align-items:center;gap:12px;font-weight:700;box-shadow:inset 0 1px rgba(255,255,255,.14)}.card.yellow{background:linear-gradient(135deg,#ffdb47,#ffc523);color:#081018}.card.red{background:linear-gradient(135deg,#d43431,#b92b2a);color:white}.card.green{background:linear-gradient(135deg,#1c9360,#15774e);color:white}.card.purple{background:linear-gradient(135deg,#7b4be5,#5d32c5);color:white}.code{font-size:25px;font-weight:1000}.meta{font-size:14px;font-weight:500;margin-top:6px}.label{font-size:12px;opacity:.82;font-weight:700}.value{font-size:14px;margin-top:6px}.arrow{font-size:30px;text-align:center}.badge{display:inline-block;padding:4px 8px;border-radius:7px;font-size:11px;font-weight:900;margin-left:7px;background:rgba(255,255,255,.18)}.badge.wait{background:#f0c133;color:#503500}.badge.ok{background:#4bd781;color:#07361d}.badge.exp{background:#a987ff;color:#24114e}
+.summary{margin-top:14px;padding:16px 12px 12px}.summary h3{margin:0 0 14px;color:#36c771;font-size:16px}.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.sum{border:1px solid #2d3d47;border-radius:10px;padding:16px 24px;display:flex;align-items:center;justify-content:center;gap:26px}.sum.yellow{border-color:#d4af0f}.sum.red{border-color:#b83232}.sum.green{border-color:#1d8f4f}.sum .icon{font-size:42px}.sum .num{font-size:30px;font-weight:1000;text-align:center}.sum small{display:block;text-align:center;font-size:15px}.bottom{position:fixed;left:292px;right:0;bottom:0;height:55px;background:#08141c;border-top:1px solid #1b2d37;display:flex;align-items:center;justify-content:space-between;padding:0 24px;color:#9babb4;z-index:5}.online{color:#47d877;font-weight:800}.online:before{content:"";display:inline-block;width:12px;height:12px;background:#2bc965;border-radius:50%;margin-right:10px}.version{color:#9baab3}
+.hidden{display:none!important}
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.62);display:grid;place-items:center;padding:18px;z-index:20}.modal{width:min(640px,100%);background:#0c1720;border:1px solid #273b47;border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.5);padding:22px}.modal h3{margin:0 0 8px;font-size:23px}.modal p{color:#9fb0b9;line-height:1.5}.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:#a9bbc4;font-weight:900;text-transform:uppercase}.field input,.field select,.field textarea{border:1px solid #2b414d;background:#08131a;color:#fff;border-radius:9px;padding:11px 12px}.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.btn{border:0;border-radius:9px;padding:11px 16px;font-weight:900}.btn.ghost{background:#14252f;color:#fff}.btn.primary{background:#24b760;color:#071b11}.countdown{text-align:center;font-size:52px;font-weight:1000;color:#ffd32f;margin:14px 0}.modal-code{font-size:42px;letter-spacing:.12em;text-align:center;color:#41d878;font-weight:1000;background:#08131a;border:1px solid #214232;border-radius:12px;padding:14px}.tabs-content{display:none}.tabs-content.active{display:block}
+.history-table{width:100%;border-collapse:collapse}.history-table th,.history-table td{padding:13px 12px;border-bottom:1px solid #1d303a;text-align:left;font-size:14px}.history-table th{color:#8fa1ab}.empty{color:#91a1aa;text-align:center;padding:38px}
+@media(max-width:1050px){.app{grid-template-columns:86px 1fr}.sidebar .brand b,.nav button span:not(.ico),.shift-card,.swap-user{display:none}.brand{justify-content:center;padding:0}.nav button{justify-content:center;padding:16px}.bottom{left:86px}.turn-card{min-width:0;flex:1}.userbox{min-width:180px}.columns{grid-template-columns:1fr}.summary-grid{grid-template-columns:1fr}.search{margin-left:0}.search input{width:100%}}
+@media(max-width:720px){.app{display:block}.sidebar{display:none}.bottom{left:0}.topbar{height:auto;padding:12px;flex-direction:column}.turn-card,.userbox{width:100%;min-width:0}.content{padding:10px 10px 74px}.filter-row{display:grid;grid-template-columns:repeat(3,1fr)}.corridor{padding:9px 7px}.search{grid-column:1/-1}.card{grid-template-columns:1fr 1fr}.card .arrow{display:none}.summary-grid{gap:10px}.section-head{padding:12px}.section-head h2{font-size:18px}}
 </style>
 </head>
 <body>
-<main class="shell">
-  <div class="brand"><div class="logo">EP</div><div><h1>Sistema de Empilhadores</h1><small>InfoTech • acesso integrado ao Checklist</small></div></div>
-  <section class="card">
-    <h2>Código de acesso</h2>
-    <p>Gere um código temporário e digite-o no tablet do Checklist. O código tem 6 dígitos, vale por 2 minutos e só pode ser usado uma vez.</p>
-    <div class="grid">
-      <div class="field"><label for="matricula">Matrícula</label><input id="matricula" autocomplete="off" placeholder="Ex.: 017434-0"></div>
-      <div class="field"><label for="nome">Nome</label><input id="nome" autocomplete="name" placeholder="Nome do operador"></div>
-      <div class="field full"><label for="perfil">Perfil para teste</label><select id="perfil"><option value="emp">Empilhador / Operador</option><option value="adm">ADM / TI</option></select></div>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="fork">♜</div><b>EMPILHAMENTO<span>2.0</span></b></div>
+  <nav class="nav">
+    <button class="active" data-page="mov"><span class="ico">♜</span><span>Movimentação</span></button>
+    <button data-page="hist"><span class="ico">◷</span><span>Histórico</span></button>
+    <button data-page="meus"><span class="ico">▦</span><span>Meus Paletes</span></button>
+    <button data-page="rel"><span class="ico">▥</span><span>Relatórios</span></button>
+    <button data-page="cfg"><span class="ico">⚙</span><span>Configurações</span></button>
+  </nav>
+  <div class="shift-card"><div><span class="dot"></span>Turno ativo</div><small>Iniciado em:</small><b id="sideStart">25/09/2026 21:30</b><small>Por:</small><b id="sideUser">Lucas Empilhador</b></div>
+  <button class="swap-user" id="swapUser">⇄ &nbsp; Trocar Usuário</button>
+</aside>
+
+<main class="main">
+<header class="topbar">
+  <div class="turn-card"><span class="dot"></span><div class="turn-info"><b>TURNO ATIVO</b><small>Iniciado em: <span id="turnStart">25/09/2026 21:30</span></small></div><button class="end-turn" id="endTurn">◉ &nbsp; Encerrar Turno</button></div>
+  <div class="userbox"><div class="avatar">●</div><div><b id="topUser">Lucas Empilhador</b><small>Empilhador</small></div><div>⌄</div></div>
+</header>
+
+<section class="content">
+<div id="mov" class="tabs-content active">
+  <section class="section">
+    <div class="section-head"><h2><span class="green">▣</span> PALETES</h2><button class="request-btn" id="requestBtn">⊕ &nbsp; Pedir Palete</button></div>
+    <div class="filters">
+      <div class="filters-title">Selecione os corredores</div>
+      <div class="filter-row" id="corridors"></div>
     </div>
-    <div class="actions"><button class="btn primary" id="generate">Gerar código</button><button class="btn" id="copy" disabled>Copiar código</button><button class="btn" id="revoke" disabled>Cancelar código</button></div>
-    <div class="codebox">
-      <div class="code" id="code">--- ---</div>
-      <div class="timer" id="timer">Nenhum código ativo</div>
-      <div class="status" id="status">Preencha a identificação e gere um código.</div>
-    </div>
-    <div class="links"><a href="../">Abrir Checklist</a><a href="../checklist/">Abrir cópia do Checklist</a></div>
-    <p class="note">Modo de teste online: o código é compartilhado pelo navegador neste domínio. A próxima etapa será trocar o armazenamento pelo Supabase para funcionar entre dispositivos diferentes.</p>
   </section>
+
+  <div class="columns">
+    <section class="panel">
+      <div class="panel-title yellow">↕ &nbsp; PALETES PARA BAIXAR</div>
+      <div class="list" id="toDown"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-title red">↓ &nbsp; PALETES ABAIXADOS</div>
+      <div class="list" id="downed"></div>
+    </section>
+  </div>
+
+  <section class="section summary">
+    <h3>QUANTIDADE DE PALETES</h3>
+    <div class="summary-grid">
+      <div class="sum yellow"><div class="icon">⇩</div><div><small>Para baixar</small><div class="num" id="sumDown">0</div><small>paletes</small></div></div>
+      <div class="sum red"><div class="icon">⇩</div><div><small>Abaixados</small><div class="num" id="sumDowned">0</div><small>paletes</small></div></div>
+      <div class="sum green"><div class="icon">↑</div><div><small>Para subir</small><div class="num" id="sumUp">0</div><small>paletes</small></div></div>
+    </div>
+  </section>
+</div>
+
+<div id="hist" class="tabs-content">
+  <section class="section"><div class="section-head"><h2>◷ HISTÓRICO</h2></div><div style="padding:14px"><table class="history-table"><thead><tr><th>Horário</th><th>Palete</th><th>Ação</th><th>Operador</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
+</div>
+<div id="meus" class="tabs-content"><section class="section"><div class="section-head"><h2>▦ MEUS PALETES</h2></div><div id="myPallets" style="padding:14px"></div></section></div>
+<div id="rel" class="tabs-content"><section class="section"><div class="section-head"><h2>▥ RELATÓRIOS</h2></div><div style="padding:22px;color:#a7b5bd">Resumo do turno: solicitações, abaixados, liberados e tempo de atendimento.</div></section></div>
+<div id="cfg" class="tabs-content"><section class="section"><div class="section-head"><h2>⚙ CONFIGURAÇÕES</h2></div><div style="padding:22px;color:#a7b5bd">Configurações do ambiente de teste e integração com o Checklist.</div></section></div>
+</section>
 </main>
+</div>
+
+<footer class="bottom"><div><span class="online">Online</span> &nbsp;&nbsp; Última atualização: <span id="lastUpdate"></span></div><div class="version">Empilhamento 2.0 &nbsp; • &nbsp; Versão 1.2.0</div></footer>
+
+<div class="modal-wrap hidden" id="modalWrap">
+  <div class="modal" id="modal"></div>
+</div>
+
 <script src="../shared/access-code.js"></script>
 <script>
-const $=s=>document.querySelector(s);let tick=null,last='';
-function render(){
- const s=InfoTechAccessCode.status();
- if(s.state!=='active'){last='';$('#code').textContent='--- ---';$('#timer').textContent=s.state==='used'?'Código já utilizado':s.state==='expired'?'Código expirado':'Nenhum código ativo';$('#copy').disabled=true;$('#revoke').disabled=true;return}
- last=s.record.code;$('#code').textContent=InfoTechAccessCode.formatCode(last);$('#copy').disabled=false;$('#revoke').disabled=false;
- const sec=Math.max(0,Math.ceil(s.remainingMs/1000));$('#timer').textContent='Válido por '+String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
- if(sec<=0)render();
+(()=>{
+const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>Array.from(p.querySelectorAll(s));
+const corridors=['Todos','1-2','3-4','5-6','7-8','9-10','11-12','13-14','15-16','17-18','19-20','21-22','23-24','24-25','27-28','29-30'];
+let activeCorridor='Todos', query='';
+let user={name:'Lucas Empilhador',matricula:'017434-0',role:'emp'};
+let toDown=[
+ {id:'p1',addr:'03-032-2',by:'cd.ljano',at:'22:36',qty:2,corridor:'3-4',area:''},
+ {id:'p2',addr:'20-006-3',by:'cd.arleq',at:'22:36',qty:1,corridor:'19-20',area:''},
+ {id:'p3',addr:'20-009-3',by:'cd.arleq',at:'22:36',qty:1,corridor:'19-20',area:'EXP-PIC'},
+ {id:'p4',addr:'21-003-3',by:'cd.arleq',at:'22:36',qty:1,corridor:'21-22',area:''},
+ {id:'p5',addr:'23-004-3',by:'cd.ljano',at:'22:41',qty:1,corridor:'23-24',area:''}
+];
+let downed=[
+ {id:'d1',addr:'03-034-3',by:'cd.ljano',at:'22:51',qty:3,corridor:'3-4',state:'wait',area:''},
+ {id:'d2',addr:'10-050-2',by:'emp9',at:'22:55',qty:2,corridor:'9-10',state:'wait',area:''},
+ {id:'d3',addr:'19-003-4',by:'cd.arleq',at:'22:58',qty:1,corridor:'19-20',state:'wait',area:''},
+ {id:'d4',addr:'21-007-4',by:'cd.arleq',at:'23:02',qty:1,corridor:'21-22',state:'ready',area:''}
+];
+let history=[
+ {time:'22:51',addr:'03-034-3',action:'Palete abaixado',by:'Lucas Empilhador'},
+ {time:'22:55',addr:'10-050-2',action:'Palete abaixado',by:'Lucas Empilhador'},
+ {time:'23:02',addr:'21-007-4',action:'Liberado para subir',by:'cd.arleq'}
+];
+
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function timeNow(){return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+function closeModal(){$('#modalWrap').classList.add('hidden');$('#modal').innerHTML=''}
+function openModal(html){$('#modal').innerHTML=html;$('#modalWrap').classList.remove('hidden')}
+function log(addr,action,by=user.name){history.unshift({time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),addr,action,by});renderHistory()}
+function filter(x){const c=activeCorridor==='Todos'||x.corridor===activeCorridor;const q=!query||(`${x.addr} ${x.by} ${x.area||''}`).toLowerCase().includes(query.toLowerCase());return c&&q}
+
+function renderCorridors(){
+ $('#corridors').innerHTML=corridors.map(c=>`<button class="corridor ${c===activeCorridor?'active':''}" data-c="${c}">${c}</button>`).join('')+`<div class="search"><span>⌕</span><input id="searchInput" placeholder="Buscar palete ou endereço" value="${esc(query)}"></div>`;
+ $('#searchInput').addEventListener('input',e=>{query=e.target.value;renderLists()});
 }
-$('#generate').addEventListener('click',()=>{
- const matricula=$('#matricula').value.trim(),name=$('#nome').value.trim();
- if(!matricula){$('#status').textContent='Informe a matrícula para gerar o código.';$('#status').className='status danger';return}
- const r=InfoTechAccessCode.generate({matricula,name:name||'Operador',role:$('#perfil').value});
- $('#status').textContent='Código criado. Digite-o no Checklist.';$('#status').className='status';last=r.code;render();
-});
-$('#copy').addEventListener('click',async()=>{if(!last)return;try{await navigator.clipboard.writeText(last);$('#status').textContent='Código copiado.'}catch{$('#status').textContent='Copie o código exibido acima.'}});
-$('#revoke').addEventListener('click',()=>{InfoTechAccessCode.revokeCode();$('#status').textContent='Código cancelado.';render()});
-render();tick=setInterval(render,500);
+function cardDown(p){
+ const cls=p.area==='EXP-PIC'?'purple':'yellow';
+ return `<div class="card ${cls}" data-down="${p.id}"><div><div class="code">${esc(p.addr)}${p.area?'<span class="badge exp">'+esc(p.area)+'</span>':''}</div><div class="meta">Solicitado por: ${esc(p.by)}</div></div><div><div class="label">Solicitado em:</div><div class="value">${esc(p.at)}</div></div><div><div class="label">Qtd. Paletes</div><div class="value">${p.qty}</div></div><div class="arrow">›</div></div>`
+}
+function cardDowned(p){
+ const cls=p.state==='ready'?'green':'red';
+ const badge=p.state==='ready'?'<span class="badge ok">Liberado</span>':'<span class="badge wait">Aguard. CK3</span>';
+ return `<div class="card ${cls}" data-return="${p.id}"><div><div class="code">${esc(p.addr)}</div><div class="meta">${p.state==='ready'?'Liberado para subir':'Aguardando retorno (CK3)'} ${badge}</div></div><div><div class="label">Baixado em:</div><div class="value">${esc(p.at)}</div></div><div><div class="label">Qtd. Paletes</div><div class="value">${p.qty}</div></div><div class="arrow">›</div></div>`
+}
+function renderLists(){
+ $('#toDown').innerHTML=toDown.filter(filter).map(cardDown).join('')||'<div class="empty">Nenhum palete para este filtro.</div>';
+ $('#downed').innerHTML=downed.filter(filter).map(cardDowned).join('')||'<div class="empty">Nenhum palete abaixado para este filtro.</div>';
+ $('#sumDown').textContent=toDown.reduce((a,p)=>a+p.qty,0);
+ $('#sumDowned').textContent=downed.reduce((a,p)=>a+p.qty,0);
+ $('#sumUp').textContent=downed.filter(p=>p.state==='ready').reduce((a,p)=>a+p.qty,0);
+ $('#lastUpdate').textContent=new Date().toLocaleDateString('pt-BR')+' '+timeNow();
+ renderMy();
+}
+function renderHistory(){$('#historyBody').innerHTML=history.map(h=>`<tr><td>${esc(h.time)}</td><td><b>${esc(h.addr)}</b></td><td>${esc(h.action)}</td><td>${esc(h.by)}</td></tr>`).join('')}
+function renderMy(){const mine=[...toDown,...downed].filter(p=>p.by==='cd.ljano'||p.by===user.matricula);$('#myPallets').innerHTML=mine.length?mine.map(p=>`<div style="padding:12px;border-bottom:1px solid #1d303a"><b>${esc(p.addr)}</b> • ${p.qty} palete(s)</div>`).join(''):'<div class="empty">Nenhum palete associado ao usuário atual.</div>'}
+
+function confirmDown(id){
+ const p=toDown.find(x=>x.id===id);if(!p)return;
+ let seconds=10;
+ openModal(`<h3>Confirmar movimentação</h3><p>Você vai confirmar que o palete <b>${esc(p.addr)}</b> será abaixado.</p><div class="countdown" id="countdown">10</div><p>O botão será liberado após a confirmação de 10 segundos.</p><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="confirmMove" disabled>Confirmar</button></div>`);
+ $('#cancelModal').onclick=closeModal;
+ const timer=setInterval(()=>{seconds--;const c=$('#countdown');if(c)c.textContent=seconds;if(seconds<=0){clearInterval(timer);const b=$('#confirmMove');if(b){b.disabled=false;b.textContent='Confirmar movimentação'}}},1000);
+ $('#confirmMove').onclick=()=>{if(seconds>0)return;toDown=toDown.filter(x=>x.id!==id);downed.unshift({...p,id:'d'+Date.now(),state:'wait',at:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});log(p.addr,'Palete abaixado');closeModal();renderLists()}
+}
+function returnFlow(id){
+ const p=downed.find(x=>x.id===id);if(!p)return;
+ if(p.state==='wait'){
+   openModal(`<h3>${esc(p.addr)}</h3><p>Este palete está <b>aguardando retorno do CK3</b>.</p><div class="modal-actions"><button class="btn ghost" id="cancelModal">Fechar</button><button class="btn primary" id="release">Simular liberação CK3</button></div>`);
+   $('#cancelModal').onclick=closeModal;$('#release').onclick=()=>{p.state='ready';log(p.addr,'Liberado para subir','CK3');closeModal();renderLists()}
+ }else{
+   let seconds=10;
+   openModal(`<h3>Confirmar subida</h3><p>Confirme a subida do palete <b>${esc(p.addr)}</b>.</p><div class="countdown" id="countdown">10</div><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="confirmUp" disabled>Confirmar subida</button></div>`);
+   $('#cancelModal').onclick=closeModal;const timer=setInterval(()=>{seconds--;const c=$('#countdown');if(c)c.textContent=seconds;if(seconds<=0){clearInterval(timer);$('#confirmUp').disabled=false}},1000);
+   $('#confirmUp').onclick=()=>{if(seconds>0)return;downed=downed.filter(x=>x.id!==id);log(p.addr,'Palete devolvido / subiu');closeModal();renderLists()}
+ }
+}
+function requestPallet(){
+ openModal(`<h3>Pedir Palete</h3><p>Crie uma solicitação para o empilhador.</p><div class="modal-grid"><div class="field"><label>Endereço</label><input id="reqAddr" placeholder="Ex.: 21-015-3"></div><div class="field"><label>Quantidade</label><input id="reqQty" type="number" min="1" value="1"></div><div class="field full"><label>Observação</label><textarea id="reqObs" placeholder="Opcional"></textarea></div><div class="field full"><label>Área</label><select id="reqArea"><option value="">Operação normal</option><option value="EXP-PIC">EXP-PIC</option></select></div></div><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="saveReq">Enviar pedido</button></div>`);
+ $('#cancelModal').onclick=closeModal;$('#saveReq').onclick=()=>{const addr=$('#reqAddr').value.trim().toUpperCase();if(!addr)return;const parts=addr.split('-');const n=parseInt(parts[0]||'0',10);let corridor='Todos';for(const c of corridors.slice(1)){const [a,b]=c.split('-').map(Number);if(n>=a&&n<=b){corridor=c;break}}toDown.unshift({id:'p'+Date.now(),addr,by:user.matricula||'cd.user',at:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),qty:Math.max(1,Number($('#reqQty').value)||1),corridor,area:$('#reqArea').value});log(addr,'Pedido criado');closeModal();renderLists()}
+}
+function accessModal(){
+ openModal(`<h3>Trocar Usuário / Código do Checklist</h3><p>Gere o mesmo código de 6 dígitos usado para liberar o Checklist. Ele vale por 2 minutos e pode ser usado uma vez.</p><div class="modal-grid"><div class="field"><label>Matrícula</label><input id="accMat" value="${esc(user.matricula)}"></div><div class="field"><label>Nome</label><input id="accName" value="${esc(user.name)}"></div></div><div id="codeArea" class="hidden"><div class="modal-code" id="generatedCode"></div><p style="text-align:center">Digite este código na tela do Checklist.</p></div><div class="modal-actions"><button class="btn ghost" id="cancelModal">Fechar</button><button class="btn primary" id="generateCode">Gerar código</button></div>`);
+ $('#cancelModal').onclick=closeModal;$('#generateCode').onclick=()=>{user={...user,matricula:$('#accMat').value.trim(),name:$('#accName').value.trim()||'Empilhador'};const r=InfoTechAccessCode.generate({matricula:user.matricula,name:user.name,role:'emp'});$('#generatedCode').textContent=r.formatted;$('#codeArea').classList.remove('hidden');$('#topUser').textContent=user.name;$('#sideUser').textContent=user.name;renderMy()}
+}
+function setPage(id){$$('.tabs-content').forEach(x=>x.classList.toggle('active',x.id===id));$$('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===id))}
+
+$('#corridors').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;activeCorridor=b.dataset.c;renderCorridors();renderLists()});
+document.addEventListener('click',e=>{const d=e.target.closest('[data-down]');if(d)confirmDown(d.dataset.down);const r=e.target.closest('[data-return]');if(r)returnFlow(r.dataset.return)});
+$$('.nav button').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
+$('#requestBtn').onclick=requestPallet;$('#swapUser').onclick=accessModal;
+$('#endTurn').onclick=()=>{openModal('<h3>Encerrar turno?</h3><p>O turno atual será marcado como encerrado neste teste.</p><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="endNow">Encerrar turno</button></div>');$('#cancelModal').onclick=closeModal;$('#endNow').onclick=()=>{document.querySelectorAll('.dot').forEach(x=>x.style.background='#d93b37');$('#endTurn').textContent='Turno encerrado';$('#endTurn').disabled=true;closeModal()}};
+$('#modalWrap').addEventListener('click',e=>{if(e.target===$('#modalWrap'))closeModal()});
+
+renderCorridors();renderLists();renderHistory();renderMy();
+})();
 </script>
-</body></html>
+</body>
+</html>
