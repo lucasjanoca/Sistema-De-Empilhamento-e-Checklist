@@ -1,0 +1,10 @@
+
+.code-checklist-btn{white-space:nowrap}
+.code-checklist-modal::backdrop{background:rgba(9,14,24,.66);backdrop-filter:blur(3px)}
+.code-checklist-modal{border:0;border-radius:18px;padding:0;width:min(520px,calc(100vw - 28px));box-shadow:0 28px 90px rgba(0,0,0,.35);overflow:hidden}
+.code-checklist-card{padding:24px;background:#fff;color:#20283a}
+.code-checklist-card h3{margin:0 0 6px;font-size:22px}.code-checklist-card p{margin:0 0 18px;color:#687187;line-height:1.5}
+.code-checklist-number{margin:14px 0;background:#f3f5fb;border:1px solid #dfe4f0;border-radius:14px;padding:18px;text-align:center;font-size:42px;font-weight:1000;letter-spacing:.14em;color:#30264d;font-variant-numeric:tabular-nums}
+.code-checklist-meta{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#6e778b;margin-bottom:18px}.code-checklist-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.code-checklist-status{min-height:20px;margin-top:10px;font-size:12px;font-weight:800}.code-checklist-status.ok{color:#168354}.code-checklist-status.warn{color:#b57a00}
+@media(max-width:700px){.code-checklist-btn{padding-inline:10px}.code-checklist-number{font-size:34px}}

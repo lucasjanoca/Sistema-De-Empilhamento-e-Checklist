@@ -1,205 +1,771 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Empilhamento 2.0 • InfoTech</title>
-<style>
-:root{
- --bg:#071018;--bg2:#091621;--panel:#0c1720;--panel2:#0f1e29;--line:#20313c;
- --green:#26b65f;--green2:#168a46;--text:#f4f7f8;--muted:#94a5af;
- --yellow:#ffd331;--yellow2:#f2ba18;--red:#e23a36;--red2:#b92424;
- --purple:#7d4de8;--shadow:0 18px 50px rgba(0,0,0,.28)
-}
-*{box-sizing:border-box}html,body{margin:0;background:radial-gradient(circle at 70% 0,#0c2029 0,#071018 42%,#050c12 100%);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}body{min-height:100vh}
-button,input,select,textarea{font:inherit}button{cursor:pointer}
-.app{display:grid;grid-template-columns:292px 1fr;min-height:100vh}
-.sidebar{border-right:1px solid #162832;background:linear-gradient(180deg,#071018,#08141c);position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
-.brand{height:106px;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid #162832}.fork{font-size:44px;color:var(--green)}.brand b{font-size:22px;line-height:1.08}.brand span{display:block}
-.nav{padding:18px 12px;display:grid;gap:8px}.nav button{border:0;background:transparent;color:#b8c4cb;text-align:left;padding:17px 22px;border-radius:8px;font-size:17px;display:flex;gap:16px;align-items:center;border-left:5px solid transparent}.nav button.active{background:#0e1d27;color:#34cf72;border-left-color:#34cf72}.nav button:hover{background:#0d1a23}
-.nav .ico{width:26px;text-align:center;font-size:22px}
-.shift-card{margin:auto 18px 18px;padding:18px;border:1px solid #1a7e45;border-radius:10px;color:#d7e3df}.shift-card .dot{display:inline-block;width:12px;height:12px;background:var(--green);border-radius:50%;margin-right:10px}.shift-card small{display:block;color:#a6b6bf;margin:12px 0 4px}.swap-user{margin:0 18px 34px;border:1px solid #41515b;background:transparent;color:#d8e1e6;border-radius:9px;padding:15px;font-weight:700}
-.main{min-width:0}.topbar{height:106px;border-bottom:1px solid #182b36;display:flex;align-items:center;justify-content:space-between;padding:0 28px;gap:18px}
-.turn-card{border:1px solid #1e3039;border-radius:10px;padding:13px 18px;display:flex;align-items:center;gap:18px;min-width:610px}.turn-info{flex:1}.turn-info b{display:block;font-size:15px}.turn-info small{color:#9babb4}.dot{width:13px;height:13px;background:#2fc66a;border-radius:50%}.end-turn{border:0;background:linear-gradient(180deg,#1da054,#188644);color:#fff;padding:13px 28px;border-radius:8px;font-weight:800}
-.userbox{display:flex;align-items:center;gap:13px;min-width:250px;justify-content:flex-end}.avatar{width:50px;height:50px;border-radius:50%;background:#26b65f;display:grid;place-items:center;color:#082113;font-size:24px}.userbox b{display:block;font-size:18px}.userbox small{color:#49d980}
-.content{padding:18px 16px 62px}.section{border:1px solid var(--line);background:linear-gradient(180deg,rgba(10,25,34,.94),rgba(8,20,28,.94));border-radius:12px;box-shadow:var(--shadow)}
-.section-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.section-head h2{font-size:21px;margin:0;display:flex;gap:12px;align-items:center}.section-head .green{color:#35c970}
-.request-btn{border:0;background:linear-gradient(180deg,#21a75a,#168a46);color:#fff;border-radius:8px;padding:13px 22px;font-weight:900}
-.filters{padding:16px 16px 13px}.filters-title{font-weight:800;margin-bottom:10px}.filter-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.corridor{border:1px solid #21523a;background:#0a1720;color:#fff;border-radius:8px;padding:10px 23px;font-weight:800}.corridor.active{background:linear-gradient(180deg,#2ac86b,#1aa453);border-color:#2ac86b}.search{margin-left:auto;position:relative}.search input{width:305px;border:1px solid #2b3d48;background:#0b151d;color:#fff;border-radius:8px;padding:11px 14px 11px 42px}.search span{position:absolute;left:13px;top:10px;color:#81919b}
-.columns{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.panel{border:1px solid var(--line);border-radius:11px;background:#09151d;min-height:420px}.panel-title{padding:17px 18px;font-weight:1000;letter-spacing:.02em}.panel-title.yellow{color:#2fd06f}.panel-title.red{color:#ff4b47}.list{display:grid;gap:8px;padding:0 14px 14px;max-height:370px;overflow:auto}.card{border-radius:10px;padding:14px 14px;display:grid;grid-template-columns:1.15fr .95fr .55fr 28px;align-items:center;gap:12px;font-weight:700;box-shadow:inset 0 1px rgba(255,255,255,.14)}.card.yellow{background:linear-gradient(135deg,#ffdb47,#ffc523);color:#081018}.card.red{background:linear-gradient(135deg,#d43431,#b92b2a);color:white}.card.green{background:linear-gradient(135deg,#1c9360,#15774e);color:white}.card.purple{background:linear-gradient(135deg,#7b4be5,#5d32c5);color:white}.code{font-size:25px;font-weight:1000}.meta{font-size:14px;font-weight:500;margin-top:6px}.label{font-size:12px;opacity:.82;font-weight:700}.value{font-size:14px;margin-top:6px}.arrow{font-size:30px;text-align:center}.badge{display:inline-block;padding:4px 8px;border-radius:7px;font-size:11px;font-weight:900;margin-left:7px;background:rgba(255,255,255,.18)}.badge.wait{background:#f0c133;color:#503500}.badge.ok{background:#4bd781;color:#07361d}.badge.exp{background:#a987ff;color:#24114e}
-.summary{margin-top:14px;padding:16px 12px 12px}.summary h3{margin:0 0 14px;color:#36c771;font-size:16px}.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.sum{border:1px solid #2d3d47;border-radius:10px;padding:16px 24px;display:flex;align-items:center;justify-content:center;gap:26px}.sum.yellow{border-color:#d4af0f}.sum.red{border-color:#b83232}.sum.green{border-color:#1d8f4f}.sum .icon{font-size:42px}.sum .num{font-size:30px;font-weight:1000;text-align:center}.sum small{display:block;text-align:center;font-size:15px}.bottom{position:fixed;left:292px;right:0;bottom:0;height:55px;background:#08141c;border-top:1px solid #1b2d37;display:flex;align-items:center;justify-content:space-between;padding:0 24px;color:#9babb4;z-index:5}.online{color:#47d877;font-weight:800}.online:before{content:"";display:inline-block;width:12px;height:12px;background:#2bc965;border-radius:50%;margin-right:10px}.version{color:#9baab3}
-.hidden{display:none!important}
-.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.62);display:grid;place-items:center;padding:18px;z-index:20}.modal{width:min(640px,100%);background:#0c1720;border:1px solid #273b47;border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.5);padding:22px}.modal h3{margin:0 0 8px;font-size:23px}.modal p{color:#9fb0b9;line-height:1.5}.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:#a9bbc4;font-weight:900;text-transform:uppercase}.field input,.field select,.field textarea{border:1px solid #2b414d;background:#08131a;color:#fff;border-radius:9px;padding:11px 12px}.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.btn{border:0;border-radius:9px;padding:11px 16px;font-weight:900}.btn.ghost{background:#14252f;color:#fff}.btn.primary{background:#24b760;color:#071b11}.countdown{text-align:center;font-size:52px;font-weight:1000;color:#ffd32f;margin:14px 0}.modal-code{font-size:42px;letter-spacing:.12em;text-align:center;color:#41d878;font-weight:1000;background:#08131a;border:1px solid #214232;border-radius:12px;padding:14px}.tabs-content{display:none}.tabs-content.active{display:block}
-.history-table{width:100%;border-collapse:collapse}.history-table th,.history-table td{padding:13px 12px;border-bottom:1px solid #1d303a;text-align:left;font-size:14px}.history-table th{color:#8fa1ab}.empty{color:#91a1aa;text-align:center;padding:38px}
-@media(max-width:1050px){.app{grid-template-columns:86px 1fr}.sidebar .brand b,.nav button span:not(.ico),.shift-card,.swap-user{display:none}.brand{justify-content:center;padding:0}.nav button{justify-content:center;padding:16px}.bottom{left:86px}.turn-card{min-width:0;flex:1}.userbox{min-width:180px}.columns{grid-template-columns:1fr}.summary-grid{grid-template-columns:1fr}.search{margin-left:0}.search input{width:100%}}
-@media(max-width:720px){.app{display:block}.sidebar{display:none}.bottom{left:0}.topbar{height:auto;padding:12px;flex-direction:column}.turn-card,.userbox{width:100%;min-width:0}.content{padding:10px 10px 74px}.filter-row{display:grid;grid-template-columns:repeat(3,1fr)}.corridor{padding:9px 7px}.search{grid-column:1/-1}.card{grid-template-columns:1fr 1fr}.card .arrow{display:none}.summary-grid{gap:10px}.section-head{padding:12px}.section-head h2{font-size:18px}}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Selene 2.0 — Gestão de Paletes</title>
+  <link rel="stylesheet" href="assets/app.bundle.css">
+  <link rel="stylesheet" href="assets/operation-focus.css">
+  <link rel="stylesheet" href="assets/checklist-code.css">
+  <meta name="author" content="InfoTech.io — Desenvolvimento inicial: Lucas Janoca">
+  <meta name="application-name" content="Site Selene">
+  <meta name="referrer" content="no-referrer">
 </head>
 <body>
-<div class="app">
-<aside class="sidebar">
-  <div class="brand"><div class="fork">♜</div><b>EMPILHAMENTO<span>2.0</span></b></div>
-  <nav class="nav">
-    <button class="active" data-page="mov"><span class="ico">♜</span><span>Movimentação</span></button>
-    <button data-page="hist"><span class="ico">◷</span><span>Histórico</span></button>
-    <button data-page="meus"><span class="ico">▦</span><span>Meus Paletes</span></button>
-    <button data-page="rel"><span class="ico">▥</span><span>Relatórios</span></button>
-    <button data-page="cfg"><span class="ico">⚙</span><span>Configurações</span></button>
-  </nav>
-  <div class="shift-card"><div><span class="dot"></span>Turno ativo</div><small>Iniciado em:</small><b id="sideStart">25/09/2026 21:30</b><small>Por:</small><b id="sideUser">Lucas Empilhador</b></div>
-  <button class="swap-user" id="swapUser">⇄ &nbsp; Trocar Usuário</button>
-</aside>
+  <div id="toast" class="toast" aria-live="polite"></div>
 
-<main class="main">
-<header class="topbar">
-  <div class="turn-card"><span class="dot"></span><div class="turn-info"><b>TURNO ATIVO</b><small>Iniciado em: <span id="turnStart">25/09/2026 21:30</span></small></div><button class="end-turn" id="endTurn">◉ &nbsp; Encerrar Turno</button></div>
-  <div class="userbox"><div class="avatar">●</div><div><b id="topUser">Lucas Empilhador</b><small>Empilhador</small></div><div>⌄</div></div>
-</header>
+  <!-- LOGIN -->
+  <section id="loginView" class="login-view">
+    <div class="login-panel">
+      <div class="login-logo">E2</div>
 
-<section class="content">
-<div id="mov" class="tabs-content active">
-  <section class="section">
-    <div class="section-head"><h2><span class="green">▣</span> PALETES</h2><button class="request-btn" id="requestBtn">⊕ &nbsp; Pedir Palete</button></div>
-    <div class="filters">
-      <div class="filters-title">Selecione os corredores</div>
-      <div class="filter-row" id="corridors"></div>
+      <h1>
+        Sistema criado pela
+        <a href="https://infotech-io.com.br/" target="_blank" rel="noopener noreferrer">
+          InfoTech.io 🚀
+        </a>
+      </h1>
+
+      <p class="login-subtitle">Entre com seu acesso de Emp, Encarregado ou TI.</p>
+
+      <form id="loginForm" class="login-form">
+        <label class="field">
+          <span class="field-label">▣ Matrícula</span>
+          <input id="loginMatricula" type="text" autocomplete="username"
+                 placeholder="Digite sua matrícula" required>
+        </label>
+
+        <label class="field">
+          <span class="field-label">● Senha</span>
+          <div class="password-field">
+            <input id="loginSenha" type="password" autocomplete="current-password"
+                   placeholder="Digite sua senha" required>
+            <button id="togglePassword" type="button" class="icon-button" aria-label="Mostrar senha">👁</button>
+          </div>
+        </label>
+
+        <div id="loginError" class="login-error" role="alert" aria-live="polite"></div>
+
+        <button class="btn btn-primary btn-full" type="submit">Entrar</button>
+      </form>
+
+      <div class="demo-box security-login-note"><strong>Acesso protegido</strong><span>Use as credenciais temporárias fornecidas pelo responsável do projeto. Em produção, o TI deverá substituí-las.</span></div>
+    </div>
+
+    <div class="login-visual">
+      <div class="visual-card">
+        <div class="live-title"><i></i> Operação em tempo real</div>
+        <h2 id="visualHeadline">Paletes aguardando atendimento</h2>
+        <p id="visualSubtitle">As solicitações aparecem assim que são enviadas.</p>
+      </div>
+
+      <div class="visual-flow">
+        <span>Paletes</span>
+        <div class="flow-line"><i></i></div>
+        <span>Paletes baixados</span>
+      </div>
+
+      <div id="visualPallets" class="visual-pallet-grid">
+        <article class="visual-pallet waiting">
+          <b>20-003-3</b><span>Aguardando</span>
+        </article>
+        <article class="visual-pallet lowering">
+          <b>04-042-3</b><span>Descendo</span>
+        </article>
+        <article class="visual-pallet floor">
+          <b>03-033-2</b><span>No chão</span>
+        </article>
+        <article class="visual-pallet ready">
+          <b>19-003-4</b><span>Liberado</span>
+        </article>
+      </div>
+
+      <div class="visual-stats">
+        <div><span>↓</span><b id="visualDown">18</b><small>desceram</small></div>
+        <div><span>↑</span><b id="visualUp">14</b><small>subiram</small></div>
+        <div><span>✓</span><b id="visualTotal">32</b><small>movimentações</small></div>
+      </div>
     </div>
   </section>
 
-  <div class="columns">
-    <section class="panel">
-      <div class="panel-title yellow">↕ &nbsp; PALETES PARA BAIXAR</div>
-      <div class="list" id="toDown"></div>
-    </section>
-    <section class="panel">
-      <div class="panel-title red">↓ &nbsp; PALETES ABAIXADOS</div>
-      <div class="list" id="downed"></div>
-    </section>
+  <!-- SISTEMA -->
+  <div id="systemView" class="system-view hidden">
+    <aside id="sidebar" class="sidebar">
+      <button id="closeMenu" class="close-menu" type="button">×</button>
+
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">E2</div>
+        <div>
+          <strong>Site Selene 2.0</strong>
+          <small>Gestão inteligente de paletes</small>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-button active" data-view="painel" data-permission="dashboard">⌂ Painel geral</button>
+        <button class="nav-button" data-view="operacao" data-permission="operate">▦ Operação</button>
+        <button class="nav-button" data-view="requisicoes" data-permission="manageRequests">▤ Requisições</button>
+        <button class="nav-button" data-view="usuarios" data-permission="manageUsers">♙ Usuários</button>
+        <button class="nav-button" data-view="historico" data-permission="history">◷ Histórico</button>
+        <button class="nav-button" data-view="indicadores" data-permission="indicators">▥ Indicadores</button>
+        <button class="nav-button" data-view="auditoria" data-permission="audit">▣ Auditoria</button>
+        <button class="nav-button" data-view="configuracoes" data-permission="settings">⚙ Configurações</button>
+        <button class="nav-button ti-nav-button" data-view="tecnico" data-permission="technical">◈ Painel TI</button>
+      </nav>
+    </aside>
+
+    <div id="overlay" class="overlay"></div>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menuButton" class="menu-button" type="button">☰</button>
+
+        <div class="topbar-title">
+          <h2 id="pageTitle">Operação</h2>
+          <p id="pageSubtitle">Controle de movimentação dos paletes.</p>
+        </div>
+
+        <div class="topbar-actions">
+          <span id="centralSyncBadge" class="central-sync-badge local">Dados locais</span>
+          <button id="currentTabletBadge" class="tablet-topbar-badge" type="button" title="Trocar tablet">Tablet: selecionar</button>
+          <span id="currentUserLabel" class="current-user"></span>
+          <span id="currentProductionRequest" class="production-request-badge hidden"></span>
+          <div class="notification-center">
+            <button id="notificationButton" class="notification-button" type="button" aria-label="Notificações" aria-expanded="false">♧<span id="notificationCount" class="notification-count hidden">0</span></button>
+            <section id="notificationPanel" class="notification-panel" aria-label="Central de notificações">
+              <header><div><b>Notificações</b><small>Avisos da operação</small></div><button id="markNotificationsRead" type="button">Marcar lidas</button></header>
+              <div id="notificationList" class="notification-list"></div>
+              <footer><button id="clearNotifications" type="button">Limpar notificações</button></footer>
+            </section>
+          </div>
+          <button id="refreshButton" class="btn btn-soft" type="button">↻ Atualizar</button>
+          <button id="logoutButton" class="btn btn-light" type="button">Sair</button>
+          <button id="shiftButton" class="shift-button inactive" type="button">
+            ● <span>Iniciar requisição</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- PAINEL GERAL -->
+      <section id="view-painel" class="view active">
+        <div class="dashboard-page">
+          <section class="dashboard-hero">
+            <div>
+              <span class="dashboard-eyebrow">VISÃO OPERACIONAL EM TEMPO REAL</span>
+              <h2 id="dashboardWelcome">Olá</h2>
+              <p id="dashboardRoleText">Acompanhe a movimentação e as prioridades da operação.</p>
+              <div class="dashboard-hero-actions">
+                <button id="dashboardOpenOperation" class="btn btn-primary" type="button">Abrir operação</button>
+                <button id="dashboardGenerateReport" class="btn btn-glass" type="button" data-permission="reports">Gerar relatório PDF</button>
+              </div>
+            </div>
+            <div class="dashboard-visual-mark"><span>2.0</span><small>OPERAÇÃO</small></div>
+          </section>
+
+          <div class="dashboard-kpis">
+            <article class="dashboard-kpi blue"><span class="kpi-icon">⌛</span><div><small>Aguardando</small><b id="dashWaiting">0</b><em>paletes</em></div></article>
+            <article class="dashboard-kpi red"><span class="kpi-icon">↓</span><div><small>No chão</small><b id="dashFloor">0</b><em>em atendimento</em></div></article>
+            <article class="dashboard-kpi teal"><span class="kpi-icon">↑</span><div><small>Liberados</small><b id="dashReady">0</b><em>prontos para subir</em></div></article>
+            <article class="dashboard-kpi purple"><span class="kpi-icon">✓</span><div><small>Hoje</small><b id="dashToday">0</b><em>movimentações</em></div></article>
+          </div>
+
+          <div class="dashboard-grid-main">
+            <section class="panel dashboard-chart-panel">
+              <div class="panel-header"><div><h3>Movimentações dos últimos 7 dias</h3><p>Comparativo entre descidas e subidas</p></div><div class="chart-legend"><span><i class="down"></i>Desceram</span><span><i class="up"></i>Subiram</span></div></div>
+              <div id="dashboardChart" class="dashboard-chart"></div>
+            </section>
+            <section class="panel dashboard-request-panel"><div class="panel-header"><div><h3>Produção atual</h3><p>Requisição vinculada ao usuário</p></div></div><div id="dashboardRequestStatus" class="panel-body"></div></section>
+          </div>
+
+          <section id="tabletControlPanel" class="panel tablet-control-panel" data-roles="encarregado,ti">
+            <div class="panel-header"><div><h3>Tablets e paletes em uso</h3><p>Veja quem está ou esteve por último em cada equipamento e os paletes associados.</p></div><span class="live-pill">● Rastreio</span></div>
+            <div id="tabletControlGrid" class="tablet-control-grid"></div>
+          </section>
+
+          <div class="dashboard-mini-grid">
+            <article class="dashboard-mini-card"><span>Operadores ativos</span><b id="dashActiveOperators">0</b><small>com requisição aberta</small></article>
+            <article class="dashboard-mini-card"><span>Tempo médio de espera</span><b id="dashAverageWait">0 min</b><small>paletes aguardando</small></article>
+            <section class="panel dashboard-activity-panel"><div class="panel-header"><div><h3>Atividade recente</h3><p>Últimas ações registradas</p></div></div><div id="dashboardActivity" class="dashboard-activity"></div></section>
+            <section class="panel dashboard-alert-panel"><div class="panel-header"><div><h3>Prioridades</h3><p>Atenção necessária</p></div></div><div id="dashboardAlerts" class="dashboard-alerts"></div></section>
+          </div>
+        </div>
+      </section>
+
+      <!-- OPERAÇÃO -->
+      <section id="view-operacao" class="view">
+        <div class="operation-layout">
+          <div class="operation-main">
+            <div class="operation-mode-toolbar">
+              <div class="operation-mode-copy">
+                <b>Operação de paletes</b>
+                <small>Uma única rolagem para baixar e subir.</small>
+              </div>
+              <button id="operationFocusButton" class="btn operation-focus-button" type="button" aria-pressed="false">⛶ Tela de Paletes</button>
+              <div id="operationFocusStatus" class="operation-focus-status" aria-live="polite"></div>
+            </div>
+
+            <section class="movement-board unified-movement-board">
+              <div id="palletUnifiedScroll" class="pallet-unified-scroll" tabindex="0" aria-label="Paletes para baixar e subir">
+                <section class="pallet-scroll-section pallet-scroll-top" aria-labelledby="downloadPalletTitle">
+                  <header class="board-header pallet-section-header">
+                    <div>
+                      <span class="pallet-section-kicker">↓ OPERAÇÃO</span>
+                      <h3 id="downloadPalletTitle">Paletes para baixar</h3>
+                    </div>
+                    <span class="board-arrow">↓</span>
+                  </header>
+                  <div id="topGrid" class="pallet-grid"></div>
+                </section>
+
+                <div class="movement-divider unified-divider" aria-hidden="true">
+                  <b>↓ Baixar</b>
+                  <span>role para continuar</span>
+                  <b>↑ Subir</b>
+                </div>
+
+                <section class="pallet-scroll-section pallet-scroll-bottom" aria-labelledby="returnPalletTitle">
+                  <header class="board-header pallet-section-header bottom-section-header">
+                    <div>
+                      <span class="pallet-section-kicker">↑ RETORNO</span>
+                      <h3 id="returnPalletTitle">Paletes para subir</h3>
+                    </div>
+                    <label class="inline-check">
+                      <input id="availableOnly" type="checkbox">
+                      Disponíveis
+                    </label>
+                  </header>
+                  <div id="bottomGrid" class="pallet-grid"></div>
+                </section>
+              </div>
+            </section>
+
+            <div class="summary-grid">
+              <article class="summary-card blue"><span>Aguardando</span><b id="countWaiting">0</b></article>
+              <article class="summary-card red"><span>No chão</span><b id="countFloor">0</b></article>
+              <article class="summary-card teal"><span>Liberados</span><b id="countReady">0</b></article>
+              <article class="summary-card orange"><span>Em confirmação</span><b id="countMoving">0</b></article>
+            </div>
+          </div>
+
+          <aside class="side-column">
+            <section class="panel controls-panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Controles</h3>
+                  <p id="permissionText"></p>
+                </div>
+              </div>
+
+              <div class="panel-body controls-body">
+                <input id="searchInput" placeholder="Buscar palet...">
+
+                <select id="statusFilter">
+                  <option value="all">Todos os status</option>
+                  <option value="waiting">Aguardando</option>
+                  <option value="floor">No chão</option>
+                  <option value="ready">Liberado</option>
+                  <option value="lowering">Descendo</option>
+                  <option value="returning">Subindo</option>
+                </select>
+
+                <button id="corridorButton" class="btn btn-secondary btn-full" type="button">
+                  Selecionar corredores
+                </button>
+
+                <button id="requestButton" class="btn btn-primary btn-full" type="button">
+                  Pedir Palet
+                </button>
+              </div>
+            </section>
+
+            <section class="panel history-panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Histórico</h3>
+                  <p>Movimentações da operação</p>
+                </div>
+                <span class="live-badge"><i></i> Ao vivo</span>
+              </div>
+
+              <div class="history-counters">
+                <div><span>Desceram</span><b id="liveDown">0</b></div>
+                <div><span>Subiram</span><b id="liveUp">0</b></div>
+              </div>
+
+              <div id="liveHistory" class="live-history"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+
+      <!-- REQUISIÇÕES DE PRODUÇÃO — ENCARREGADO / TI -->
+      <section id="view-requisicoes" class="view">
+        <div class="production-page">
+          <section class="production-hero">
+            <div>
+              <span class="production-eyebrow">CONTROLE DE PRODUÇÃO</span>
+              <h3>Requisições de produção</h3>
+              <p>Consulte, filtre e some a produção registrada pelos empilhadores.</p>
+            </div>
+            <div class="production-hero-icon">▤</div>
+          </section>
+
+          <section class="panel production-filters">
+            <div class="panel-header">
+              <div>
+                <h3>Pesquisar requisições</h3>
+                <p>Use um ou mais filtros para localizar a produção.</p>
+              </div>
+              <div class="panel-actions"><button id="printProductionReport" class="btn btn-primary" type="button" data-permission="reports">Gerar PDF</button><button id="exportProductionCsv" class="btn btn-soft" type="button">Exportar CSV</button><button id="clearProductionFilters" class="btn btn-light" type="button">Limpar filtros</button></div>
+            </div>
+
+            <div class="production-filter-grid">
+              <label class="field">
+                <span class="field-label">Data inicial</span>
+                <input id="productionDateFrom" type="date">
+              </label>
+
+              <label class="field">
+                <span class="field-label">Data final</span>
+                <input id="productionDateTo" type="date">
+              </label>
+
+              <label class="field">
+                <span class="field-label">Empilhador</span>
+                <select id="productionUserFilter">
+                  <option value="">Todos os usuários</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="field-label">Situação</span>
+                <select id="productionStatusFilter">
+                  <option value="">Todas</option>
+                  <option value="open">Em andamento</option>
+                  <option value="closed">Encerradas</option>
+                </select>
+              </label>
+
+              <label class="field production-search-field">
+                <span class="field-label">Número da requisição</span>
+                <input id="productionNumberFilter" placeholder="Ex.: REQ-20260803">
+              </label>
+            </div>
+          </section>
+
+          <div class="production-summary-grid">
+            <article class="production-summary-card">
+              <span>Requisições encontradas</span>
+              <b id="productionFoundCount">0</b>
+            </article>
+            <article class="production-summary-card blue">
+              <span>Paletes que desceram</span>
+              <b id="productionDownTotal">0</b>
+            </article>
+            <article class="production-summary-card teal">
+              <span>Paletes que subiram</span>
+              <b id="productionUpTotal">0</b>
+            </article>
+            <article class="production-summary-card purple">
+              <span>Total movimentado</span>
+              <b id="productionMovementTotal">0</b>
+            </article>
+          </div>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Requisições</h3>
+                <p>Marque requisições para somar somente as selecionadas.</p>
+              </div>
+              <button id="sumSelectedRequests" class="btn btn-primary" type="button">
+                Somar selecionadas
+              </button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="production-table">
+                <thead>
+                  <tr>
+                    <th><input id="selectAllProductionRequests" type="checkbox" aria-label="Selecionar todas"></th>
+                    <th>Requisição</th>
+                    <th>Empilhador</th>
+                    <th>Tablet</th>
+                    <th>Início</th>
+                    <th>Fim</th>
+                    <th>Status</th>
+                    <th>Desceu</th>
+                    <th>Subiu</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="productionRequestsBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="selectedProductionSummary" class="panel selected-production-summary hidden">
+            <div class="panel-header">
+              <div>
+                <h3>Soma das requisições selecionadas</h3>
+                <p id="selectedProductionDescription">Nenhuma requisição selecionada.</p>
+              </div>
+            </div>
+            <div class="selected-production-grid">
+              <div><span>Requisições</span><b id="selectedRequestCount">0</b></div>
+              <div><span>Desceram</span><b id="selectedDownCount">0</b></div>
+              <div><span>Subiram</span><b id="selectedUpCount">0</b></div>
+              <div><span>Total</span><b id="selectedMovementCount">0</b></div>
+              <div><span>Tempo acumulado</span><b id="selectedDuration">00h 00min</b></div>
+              <div><span>Média por requisição</span><b id="selectedAverage">0</b></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- USUÁRIOS — ENCARREGADO / TI -->
+      <section id="view-usuarios" class="view">
+        <div class="users-page">
+          <section class="production-hero users-hero">
+            <div>
+              <span class="production-eyebrow">GESTÃO DE ACESSOS</span>
+              <h3>Gerenciar usuários</h3>
+              <p>Crie acessos para empilhadores sem precisar alterar os arquivos do site.</p>
+            </div>
+            <div class="production-hero-icon">♙</div>
+          </section>
+
+          <div class="users-layout">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Criar novo usuário</h3>
+                  <p>O empilhador inicia uma requisição para registrar sua produção.</p>
+                </div>
+              </div>
+              <form id="createUserForm" class="panel-body user-form">
+                <label class="field">
+                  <span class="field-label">Nome completo</span>
+                  <input id="newUserName" autocomplete="off" placeholder="Ex.: Operador 01" required>
+                </label>
+                <label class="field">
+                  <span class="field-label">Matrícula</span>
+                  <input id="newUserMatricula" autocomplete="off" placeholder="Ex.: 1548" required>
+                </label>
+                <label class="field">
+                  <span class="field-label">Senha inicial</span>
+                  <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="Mínimo 10 caracteres + letras, número e símbolo" minlength="10" required>
+                </label>
+                <label class="field">
+                  <span class="field-label">Tipo de acesso</span>
+                  <select id="newUserRole">
+                    <option value="empilhador">Emp</option>
+                    <option value="encarregado">Encarregado</option>
+                    <option value="ti">TI</option>
+                  </select>
+                </label>
+                <button class="btn btn-primary btn-full" type="submit">Criar usuário</button>
+                <p class="user-storage-note">No modo servidor, os acessos podem ser centralizados. Em produção, o TI poderá manter essa autenticação ou integrar ao padrão corporativo.</p>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Usuários cadastrados</h3>
+                  <p id="usersCountLabel">0 usuários</p>
+                </div>
+              </div>
+              <div id="usersList" class="users-list"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- HISTÓRICO -->
+      <section id="view-historico" class="view">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Histórico completo</h3>
+              <p>Registro das movimentações realizadas.</p>
+            </div>
+            <div class="panel-actions"><button id="exportHistoryCsv" class="btn btn-soft" type="button">Exportar CSV</button><label class="history-search" aria-label="Pesquisar histórico">
+              <span>⌕</span>
+              <input id="historySearchInput" type="search" placeholder="Pesquisar requisição, palet, data ou operador...">
+            </label></div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Requisição</th>
+                  <th>Palet</th>
+                  <th>Ação</th>
+                  <th>Operador</th>
+                </tr>
+              </thead>
+              <tbody id="historyTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <!-- INDICADORES -->
+      <section id="view-indicadores" class="view">
+        <div class="indicator-actions"><button id="printOperationalReport" class="btn btn-primary" type="button" data-permission="reports">Gerar relatório PDF</button></div>
+        <div class="summary-grid indicator-summary">
+          <article class="summary-card blue"><span>Desceram</span><b id="metricDown">0</b></article>
+          <article class="summary-card teal"><span>Subiram</span><b id="metricUp">0</b></article>
+          <article class="summary-card orange"><span>Canceladas</span><b id="metricCanceled">0</b></article>
+          <article class="summary-card red"><span>Em aberto</span><b id="metricOpen">0</b></article>
+          <article class="summary-card production"><span>Produção da requisição</span><b id="metricProduction">0</b><small id="metricProductionDetail">Sem requisição aberta</small></article>
+        </div>
+
+        <div class="two-columns">
+          <section class="panel">
+            <div class="panel-header"><h3>Atendimentos por empilhador</h3></div>
+            <div id="operatorStats" class="panel-body"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header"><h3>Alertas operacionais</h3></div>
+            <div id="alerts" class="panel-body"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- CONFIGURAÇÕES -->
+      <section id="view-configuracoes" class="view">
+        <section class="panel">
+          <div class="panel-header"><h3>Configurações</h3></div>
+          <div class="panel-body settings-stack">
+            <section class="settings-block">
+              <h4>Status do ambiente</h4>
+              <div class="environment-status-grid">
+                <div><span>Modo atual</span><b id="environmentMode">Apresentação local</b></div>
+                <div><span>Armazenamento</span><b id="storageMode">Neste navegador</b></div>
+                <div><span>Integração Selene</span><b id="integrationMode">Verificando...</b></div>
+              </div>
+              <p class="settings-help">A movimentação oficial permanece bloqueada até o TI validar os parâmetros completos da API.</p>
+            </section>
+            <section class="settings-block">
+              <h4>Dados operacionais compartilhados</h4>
+              <div class="environment-status-grid">
+                <div><span>Centralização</span><b id="centralDataMode">Verificando...</b></div>
+                <div><span>Integração oficial</span><b>Dependente do TI</b></div>
+                <div><span>Proteção de escrita</span><b>Ativada</b></div>
+              </div>
+              <p class="settings-help">Ao abrir pelo servidor, notebooks e tablets autorizados na mesma rede podem compartilhar os dados operacionais. O armazenamento definitivo será definido pelo TI.</p>
+              <div class="settings-actions"><button id="forceCentralSync" class="btn btn-secondary" type="button">Sincronizar agora</button></div>
+            </section>
+            <section class="settings-block">
+              <h4>Segurança e cópia dos dados</h4>
+              <p class="settings-help">Use o backup para exportar requisições, histórico e configurações operacionais quando necessário.</p>
+              <div class="settings-actions">
+                <button id="exportBackupButton" class="btn btn-primary" type="button">Exportar backup</button>
+                <button id="importBackupButton" class="btn btn-secondary" type="button">Importar backup</button>
+                <input id="importBackupInput" class="hidden" type="file" accept="application/json,.json">
+              </div>
+            </section>
+            <section class="settings-block device-admin-block" data-roles="encarregado,ti">
+              <div class="device-admin-heading">
+                <div><h4>Dispositivos / tablets</h4><p class="settings-help">Cadastre aqui os equipamentos autorizados. Emp escolhe um tablet; Encarregado e TI recebem um computador padrão automaticamente e podem trocar manualmente quando necessário.</p></div>
+                <span class="admin-only-pill">ENC / TI</span>
+              </div>
+              <form id="deviceAdminForm" class="device-admin-form">
+                <input id="deviceAdminName" type="text" placeholder="Ex.: Tablet 13 ou Tablet Novo" maxlength="40" required>
+                <button class="btn btn-primary" type="submit">Adicionar dispositivo</button>
+              </form>
+              <div id="registeredDeviceList" class="registered-device-list"></div>
+            </section>
+            <section class="settings-block">
+              <h4>Corredores selecionados</h4>
+              <div id="selectedCorridors" class="chips"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <!-- PAINEL TÉCNICO — SOMENTE TI -->
+      <section id="view-tecnico" class="view" data-permission="technical">
+        <section class="technical-hero">
+          <div><span class="production-eyebrow">ACESSO RESTRITO · TI</span><h3>Central Técnica de Integração</h3><p>Diagnóstico, sincronização, segurança e um roteiro claro para conectar o Site Selene ao ambiente da empresa.</p></div><div class="technical-lock">TI</div>
+        </section>
+        <div class="technical-kpis">
+          <article><span>Versão</span><b id="techVersion">2.0</b><small>build operacional</small></article>
+          <article><span>Ambiente</span><b id="techProtocol">—</b><small id="techHost">—</small></article>
+          <article><span>Dados locais</span><b id="techStorage">—</b><small>estimativa do navegador</small></article>
+          <article><span>Proteção API</span><b class="tech-safe">ATIVA</b><small>escrita real bloqueada até validação</small></article>
+        </div>
+
+        <section class="panel tech-security-panel">
+          <div class="panel-header"><div><h3>Segurança da aplicação</h3><p>Proteções do Site Selene separadas da integração com os sistemas internos.</p></div><span id="techSecurityMode" class="tech-safe-pill">VERIFICANDO</span></div>
+          <div id="techSecurityDetails" class="security-status-grid"><article><span>Segurança</span><b>Verificando...</b><small>—</small></article></div>
+          <div class="security-architecture-note"><b>Arquitetura</b><span>Tablet / navegador → Site Selene → camada de integração no servidor → sistemas internos / coletor EXP-PIC. Credenciais críticas não ficam no tablet.</span></div>
+        </section>
+
+        <section class="panel tech-integration-wizard">
+          <div class="panel-header"><div><h3>1. Configurar leitura da Selene</h3><p>O TI pode ajustar os dados do ambiente sem editar o código-fonte.</p></div><span class="ti-only-pill">CONFIGURAÇÃO TI</span></div>
+          <div class="tech-config-grid">
+            <label><span>Servidor / API base</span><input id="techApiBase" type="text" placeholder="http://servidor-interno/api"></label>
+            <label><span>Código do grupo</span><input id="techCodGrupo" type="text" placeholder="Definir"></label>
+            <label><span>Código da empresa</span><input id="techCodEmp" type="text" placeholder="Definir"></label>
+            <label><span>Rota de leitura · pendentes</span><input id="techRoutePending" type="text" placeholder="Definir pelo TI"></label>
+            <label><span>Rota de leitura · em atendimento</span><input id="techRouteAttendance" type="text" placeholder="Definir pelo TI"></label>
+            <label><span>Atualização (segundos)</span><input id="techInterval" type="number" min="5" max="300" step="1" value="10"></label>
+            <label class="tech-switch"><input id="techIntegrationEnabled" type="checkbox" checked><span>Ativar leitura automática da Selene</span></label>
+          </div>
+          <div class="tech-wizard-actions"><button id="techSaveIntegration" class="btn btn-primary" type="button">Salvar configuração</button><button id="techTestConnection" class="btn btn-secondary" type="button">Testar conexão e leitura</button><button id="techRefreshSelene" class="btn btn-soft" type="button">Atualizar paletes agora</button></div>
+          <div id="techConnectionResult" class="tech-test-result neutral"><b>Aguardando validação.</b><small>Use “Testar conexão e leitura” após o TI informar os parâmetros do ambiente.</small></div>
+        </section>
+
+        <div class="two-columns technical-columns">
+          <section class="panel">
+            <div class="panel-header"><div><h3>2. Diagnóstico interno</h3><p>Estado do sistema, usuários, dispositivos e sincronização.</p></div><button id="techRefresh" class="btn btn-soft" type="button">Atualizar diagnóstico</button></div>
+            <div id="techDiagnostics" class="technical-diagnostics"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header"><div><h3>3. Ferramentas do TI</h3><p>Ações para suporte, análise e implantação.</p></div><span class="ti-only-pill">SOMENTE TI</span></div>
+            <div class="panel-body technical-actions">
+              <button id="techForceSync" class="btn btn-primary" type="button">Sincronizar dados do servidor local</button>
+              <button id="techCopyGuide" class="btn btn-secondary" type="button">Copiar roteiro de integração</button>
+              <button id="techDownloadMap" class="btn btn-soft" type="button">Baixar mapa de integração</button>
+              <button id="techDownloadSnapshot" class="btn btn-light" type="button">Exportar snapshot técnico</button>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel tech-guide-panel">
+          <div class="panel-header"><div><h3>4. O que falta para integrar de verdade</h3><p>Checklist de trabalho para o TI. A escrita permanece bloqueada até todos os itens críticos serem confirmados.</p></div><span class="tech-safe-pill">ESCRITA PROTEGIDA</span></div>
+          <div class="tech-guide-layout">
+            <ol class="tech-checklist">
+              <li><b>Validar acesso à API</b><span>Confirmar servidor, grupo e empresa e executar a validação de leitura acima.</span></li>
+              <li><b>Confirmar autenticação</b><span>Descobrir se o login atual gera cookie/sessão que precisa ser enviado nas chamadas da API.</span></li>
+              <li><b>Confirmar escrita oficial</b><span>Registrar a rota e os parâmetros aprovados pelo TI para descer e subir um palete.</span></li>
+              <li><b>Mapear source e target</b><span>Documentar os valores exatos para cada movimento e cada estado.</span></li>
+              <li><b>Validar PIC</b><span>Identificar e homologar a fonte/coletor oficial do EXP-PIC.</span></li>
+              <li><b>Validação controlada</b><span>Executar a primeira escrita somente após homologação e acompanhamento do TI.</span></li>
+            </ol>
+            <pre id="techIntegrationGuide" class="technical-code tech-guide-code"></pre>
+          </div>
+        </section>
+
+        <section class="panel tech-notes-panel">
+          <div class="panel-header"><div><h3>5. Anotações do TI</h3><p>Espaço para registrar o que falta descobrir, decisões da reunião e instruções de implantação.</p></div><button id="techSaveNotes" class="btn btn-primary" type="button">Salvar anotações</button></div>
+          <div class="panel-body"><textarea id="techIntegrationNotes" class="tech-notes-textarea" rows="7" placeholder="Ex.: registrar parâmetros aprovados, origem do EXP-PIC e servidor definido para produção..."></textarea></div>
+        </section>
+        <section class="panel technical-map-panel"><div class="panel-header"><div><h3>Mapa técnico atual</h3><p>Rotas conhecidas, parâmetros e trava de segurança.</p></div></div><pre id="techIntegrationMap" class="technical-code"></pre></section>
+      </section>
+
+      <!-- AUDITORIA -->
+      <section id="view-auditoria" class="view">
+        <section class="production-hero audit-hero">
+          <div><span class="production-eyebrow">RASTREABILIDADE</span><h3>Auditoria do sistema</h3><p>Registro de acessos, alterações, movimentações e relatórios.</p></div><div class="production-hero-icon">▣</div>
+        </section>
+        <section class="panel">
+          <div class="panel-header audit-toolbar audit-toolbar-advanced">
+            <div><h3>Eventos registrados</h3><p id="auditCount">0 registros</p></div>
+            <div class="audit-filter-grid">
+              <select id="auditEventFilter"><option value="">Todos os eventos</option><option value="login">Logins (sucesso/erro)</option><option value="logout">Somente logouts</option><option value="movimentacao">Movimentações</option><option value="dispositivo">Tablets / dispositivos</option><option value="usuarios">Alterações de usuários</option><option value="integracao">Integração</option><option value="relatorio">Relatórios</option><option value="seguranca">Segurança / bloqueios</option><option value="outros">Outros</option></select>
+              <select id="auditUserFilter"><option value="">Todos os usuários</option></select>
+              <select id="auditRoleFilter"><option value="">Todos os perfis</option><option value="empilhador">Emp</option><option value="encarregado">Encarregado</option><option value="ti">TI</option><option value="sistema">Sistema</option></select>
+              <select id="auditSourceFilter"><option value="">Todas as origens</option><option value="server">Servidor seguro</option><option value="local">Interface / navegador</option></select>
+              <select id="auditCategoryFilter"><option value="">Todas as categorias</option><option value="acesso">Acesso</option><option value="operacao">Operação</option><option value="usuario">Usuários</option><option value="requisicao">Requisições</option><option value="relatorio">Relatórios</option><option value="integracao">Integração</option><option value="seguranca">Segurança</option><option value="sistema">Sistema</option></select>
+              <label class="audit-date-field"><span>De</span><input id="auditDateFrom" type="date"></label>
+              <label class="audit-date-field"><span>Até</span><input id="auditDateTo" type="date"></label>
+              <label class="history-search audit-search-wide"><span>⌕</span><input id="auditSearchInput" type="search" placeholder="Pesquisar ação, nome, matrícula ou detalhe..."></label>
+              <button id="auditClearFilters" class="btn btn-light" type="button">Limpar filtros</button>
+              <button id="exportAuditCsv" class="btn btn-soft" type="button">Exportar filtrado</button>
+            </div>
+          </div>
+          <div class="table-wrapper"><table class="audit-table"><thead><tr><th>Data/Hora</th><th>Categoria</th><th>Ação</th><th>Responsável</th></tr></thead><tbody id="auditTableBody"></tbody></table></div>
+        </section>
+      </section>
+    </main>
   </div>
 
-  <section class="section summary">
-    <h3>QUANTIDADE DE PALETES</h3>
-    <div class="summary-grid">
-      <div class="sum yellow"><div class="icon">⇩</div><div><small>Para baixar</small><div class="num" id="sumDown">0</div><small>paletes</small></div></div>
-      <div class="sum red"><div class="icon">⇩</div><div><small>Abaixados</small><div class="num" id="sumDowned">0</div><small>paletes</small></div></div>
-      <div class="sum green"><div class="icon">↑</div><div><small>Para subir</small><div class="num" id="sumUp">0</div><small>paletes</small></div></div>
-    </div>
-  </section>
-</div>
 
-<div id="hist" class="tabs-content">
-  <section class="section"><div class="section-head"><h2>◷ HISTÓRICO</h2></div><div style="padding:14px"><table class="history-table"><thead><tr><th>Horário</th><th>Palete</th><th>Ação</th><th>Operador</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
-</div>
-<div id="meus" class="tabs-content"><section class="section"><div class="section-head"><h2>▦ MEUS PALETES</h2></div><div id="myPallets" style="padding:14px"></div></section></div>
-<div id="rel" class="tabs-content"><section class="section"><div class="section-head"><h2>▥ RELATÓRIOS</h2></div><div style="padding:22px;color:#a7b5bd">Resumo do turno: solicitações, abaixados, liberados e tempo de atendimento.</div></section></div>
-<div id="cfg" class="tabs-content"><section class="section"><div class="section-head"><h2>⚙ CONFIGURAÇÕES</h2></div><div style="padding:22px;color:#a7b5bd">Configurações do ambiente de teste e integração com o Checklist.</div></section></div>
-</section>
-</main>
-</div>
 
-<footer class="bottom"><div><span class="online">Online</span> &nbsp;&nbsp; Última atualização: <span id="lastUpdate"></span></div><div class="version">Empilhamento 2.0 &nbsp; • &nbsp; Versão 1.2.0</div></footer>
+  <!-- MODAL PEDIR PALET -->
+  <dialog id="requestDialog">
+    <form id="requestForm" class="dialog-form">
+      <div class="request-dialog-header">
+        <span class="request-dialog-eyebrow">NOVA SOLICITAÇÃO</span>
+        <h3>Pedir Palet</h3>
+        <p>Informe o endereço para enviar o palet à tela de operação.</p>
+      </div>
 
-<div class="modal-wrap hidden" id="modalWrap">
-  <div class="modal" id="modal"></div>
-</div>
+      <label class="field">
+        <span class="field-label">Endereço do palet</span>
+        <input id="requestAddress" placeholder="Ex.: 20-015-3" required>
+      </label>
 
-<script src="../shared/access-code.js"></script>
-<script>
-(()=>{
-const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>Array.from(p.querySelectorAll(s));
-const corridors=['Todos','1-2','3-4','5-6','7-8','9-10','11-12','13-14','15-16','17-18','19-20','21-22','23-24','24-25','27-28','29-30'];
-let activeCorridor='Todos', query='';
-let user={name:'Lucas Empilhador',matricula:'017434-0',role:'emp'};
-let toDown=[
- {id:'p1',addr:'03-032-2',by:'cd.ljano',at:'22:36',qty:2,corridor:'3-4',area:''},
- {id:'p2',addr:'20-006-3',by:'cd.arleq',at:'22:36',qty:1,corridor:'19-20',area:''},
- {id:'p3',addr:'20-009-3',by:'cd.arleq',at:'22:36',qty:1,corridor:'19-20',area:'EXP-PIC'},
- {id:'p4',addr:'21-003-3',by:'cd.arleq',at:'22:36',qty:1,corridor:'21-22',area:''},
- {id:'p5',addr:'23-004-3',by:'cd.ljano',at:'22:41',qty:1,corridor:'23-24',area:''}
-];
-let downed=[
- {id:'d1',addr:'03-034-3',by:'cd.ljano',at:'22:51',qty:3,corridor:'3-4',state:'wait',area:''},
- {id:'d2',addr:'10-050-2',by:'emp9',at:'22:55',qty:2,corridor:'9-10',state:'wait',area:''},
- {id:'d3',addr:'19-003-4',by:'cd.arleq',at:'22:58',qty:1,corridor:'19-20',state:'wait',area:''},
- {id:'d4',addr:'21-007-4',by:'cd.arleq',at:'23:02',qty:1,corridor:'21-22',state:'ready',area:''}
-];
-let history=[
- {time:'22:51',addr:'03-034-3',action:'Palete abaixado',by:'Lucas Empilhador'},
- {time:'22:55',addr:'10-050-2',action:'Palete abaixado',by:'Lucas Empilhador'},
- {time:'23:02',addr:'21-007-4',action:'Liberado para subir',by:'cd.arleq'}
-];
+      <label class="field">
+        <span class="field-label">Solicitante</span>
+        <input id="requestOperator" required>
+      </label>
 
-function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function timeNow(){return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
-function closeModal(){$('#modalWrap').classList.add('hidden');$('#modal').innerHTML=''}
-function openModal(html){$('#modal').innerHTML=html;$('#modalWrap').classList.remove('hidden')}
-function log(addr,action,by=user.name){history.unshift({time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),addr,action,by});renderHistory()}
-function filter(x){const c=activeCorridor==='Todos'||x.corridor===activeCorridor;const q=!query||(`${x.addr} ${x.by} ${x.area||''}`).toLowerCase().includes(query.toLowerCase());return c&&q}
+      <label class="pic-option">
+        <input id="requestIsPic" type="checkbox">
+        <span><b>EXP-PIC</b><small>Identifica o palet inteiro em roxo e mostra “Avisar armazenista”.</small></span>
+      </label>
 
-function renderCorridors(){
- $('#corridors').innerHTML=corridors.map(c=>`<button class="corridor ${c===activeCorridor?'active':''}" data-c="${c}">${c}</button>`).join('')+`<div class="search"><span>⌕</span><input id="searchInput" placeholder="Buscar palete ou endereço" value="${esc(query)}"></div>`;
- $('#searchInput').addEventListener('input',e=>{query=e.target.value;renderLists()});
-}
-function cardDown(p){
- const cls=p.area==='EXP-PIC'?'purple':'yellow';
- return `<div class="card ${cls}" data-down="${p.id}"><div><div class="code">${esc(p.addr)}${p.area?'<span class="badge exp">'+esc(p.area)+'</span>':''}</div><div class="meta">Solicitado por: ${esc(p.by)}</div></div><div><div class="label">Solicitado em:</div><div class="value">${esc(p.at)}</div></div><div><div class="label">Qtd. Paletes</div><div class="value">${p.qty}</div></div><div class="arrow">›</div></div>`
-}
-function cardDowned(p){
- const cls=p.state==='ready'?'green':'red';
- const badge=p.state==='ready'?'<span class="badge ok">Liberado</span>':'<span class="badge wait">Aguard. CK3</span>';
- return `<div class="card ${cls}" data-return="${p.id}"><div><div class="code">${esc(p.addr)}</div><div class="meta">${p.state==='ready'?'Liberado para subir':'Aguardando retorno (CK3)'} ${badge}</div></div><div><div class="label">Baixado em:</div><div class="value">${esc(p.at)}</div></div><div><div class="label">Qtd. Paletes</div><div class="value">${p.qty}</div></div><div class="arrow">›</div></div>`
-}
-function renderLists(){
- $('#toDown').innerHTML=toDown.filter(filter).map(cardDown).join('')||'<div class="empty">Nenhum palete para este filtro.</div>';
- $('#downed').innerHTML=downed.filter(filter).map(cardDowned).join('')||'<div class="empty">Nenhum palete abaixado para este filtro.</div>';
- $('#sumDown').textContent=toDown.reduce((a,p)=>a+p.qty,0);
- $('#sumDowned').textContent=downed.reduce((a,p)=>a+p.qty,0);
- $('#sumUp').textContent=downed.filter(p=>p.state==='ready').reduce((a,p)=>a+p.qty,0);
- $('#lastUpdate').textContent=new Date().toLocaleDateString('pt-BR')+' '+timeNow();
- renderMy();
-}
-function renderHistory(){$('#historyBody').innerHTML=history.map(h=>`<tr><td>${esc(h.time)}</td><td><b>${esc(h.addr)}</b></td><td>${esc(h.action)}</td><td>${esc(h.by)}</td></tr>`).join('')}
-function renderMy(){const mine=[...toDown,...downed].filter(p=>p.by==='cd.ljano'||p.by===user.matricula);$('#myPallets').innerHTML=mine.length?mine.map(p=>`<div style="padding:12px;border-bottom:1px solid #1d303a"><b>${esc(p.addr)}</b> • ${p.qty} palete(s)</div>`).join(''):'<div class="empty">Nenhum palete associado ao usuário atual.</div>'}
+      <div class="request-dialog-note">
+        <span>ℹ</span>
+        O tempo de espera começa assim que o palet é solicitado.
+      </div>
 
-function confirmDown(id){
- const p=toDown.find(x=>x.id===id);if(!p)return;
- let seconds=10;
- openModal(`<h3>Confirmar movimentação</h3><p>Você vai confirmar que o palete <b>${esc(p.addr)}</b> será abaixado.</p><div class="countdown" id="countdown">10</div><p>O botão será liberado após a confirmação de 10 segundos.</p><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="confirmMove" disabled>Confirmar</button></div>`);
- $('#cancelModal').onclick=closeModal;
- const timer=setInterval(()=>{seconds--;const c=$('#countdown');if(c)c.textContent=seconds;if(seconds<=0){clearInterval(timer);const b=$('#confirmMove');if(b){b.disabled=false;b.textContent='Confirmar movimentação'}}},1000);
- $('#confirmMove').onclick=()=>{if(seconds>0)return;toDown=toDown.filter(x=>x.id!==id);downed.unshift({...p,id:'d'+Date.now(),state:'wait',at:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});log(p.addr,'Palete abaixado');closeModal();renderLists()}
-}
-function returnFlow(id){
- const p=downed.find(x=>x.id===id);if(!p)return;
- if(p.state==='wait'){
-   openModal(`<h3>${esc(p.addr)}</h3><p>Este palete está <b>aguardando retorno do CK3</b>.</p><div class="modal-actions"><button class="btn ghost" id="cancelModal">Fechar</button><button class="btn primary" id="release">Simular liberação CK3</button></div>`);
-   $('#cancelModal').onclick=closeModal;$('#release').onclick=()=>{p.state='ready';log(p.addr,'Liberado para subir','CK3');closeModal();renderLists()}
- }else{
-   let seconds=10;
-   openModal(`<h3>Confirmar subida</h3><p>Confirme a subida do palete <b>${esc(p.addr)}</b>.</p><div class="countdown" id="countdown">10</div><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="confirmUp" disabled>Confirmar subida</button></div>`);
-   $('#cancelModal').onclick=closeModal;const timer=setInterval(()=>{seconds--;const c=$('#countdown');if(c)c.textContent=seconds;if(seconds<=0){clearInterval(timer);$('#confirmUp').disabled=false}},1000);
-   $('#confirmUp').onclick=()=>{if(seconds>0)return;downed=downed.filter(x=>x.id!==id);log(p.addr,'Palete devolvido / subiu');closeModal();renderLists()}
- }
-}
-function requestPallet(){
- openModal(`<h3>Pedir Palete</h3><p>Crie uma solicitação para o empilhador.</p><div class="modal-grid"><div class="field"><label>Endereço</label><input id="reqAddr" placeholder="Ex.: 21-015-3"></div><div class="field"><label>Quantidade</label><input id="reqQty" type="number" min="1" value="1"></div><div class="field full"><label>Observação</label><textarea id="reqObs" placeholder="Opcional"></textarea></div><div class="field full"><label>Área</label><select id="reqArea"><option value="">Operação normal</option><option value="EXP-PIC">EXP-PIC</option></select></div></div><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="saveReq">Enviar pedido</button></div>`);
- $('#cancelModal').onclick=closeModal;$('#saveReq').onclick=()=>{const addr=$('#reqAddr').value.trim().toUpperCase();if(!addr)return;const parts=addr.split('-');const n=parseInt(parts[0]||'0',10);let corridor='Todos';for(const c of corridors.slice(1)){const [a,b]=c.split('-').map(Number);if(n>=a&&n<=b){corridor=c;break}}toDown.unshift({id:'p'+Date.now(),addr,by:user.matricula||'cd.user',at:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),qty:Math.max(1,Number($('#reqQty').value)||1),corridor,area:$('#reqArea').value});log(addr,'Pedido criado');closeModal();renderLists()}
-}
-function accessModal(){
- openModal(`<h3>Trocar Usuário / Código do Checklist</h3><p>Gere o mesmo código de 6 dígitos usado para liberar o Checklist. Ele vale por 2 minutos e pode ser usado uma vez.</p><div class="modal-grid"><div class="field"><label>Matrícula</label><input id="accMat" value="${esc(user.matricula)}"></div><div class="field"><label>Nome</label><input id="accName" value="${esc(user.name)}"></div></div><div id="codeArea" class="hidden"><div class="modal-code" id="generatedCode"></div><p style="text-align:center">Digite este código na tela do Checklist.</p></div><div class="modal-actions"><button class="btn ghost" id="cancelModal">Fechar</button><button class="btn primary" id="generateCode">Gerar código</button></div>`);
- $('#cancelModal').onclick=closeModal;$('#generateCode').onclick=()=>{user={...user,matricula:$('#accMat').value.trim(),name:$('#accName').value.trim()||'Empilhador'};const r=InfoTechAccessCode.generate({matricula:user.matricula,name:user.name,role:'emp'});$('#generatedCode').textContent=r.formatted;$('#codeArea').classList.remove('hidden');$('#topUser').textContent=user.name;$('#sideUser').textContent=user.name;renderMy()}
-}
-function setPage(id){$$('.tabs-content').forEach(x=>x.classList.toggle('active',x.id===id));$$('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===id))}
+      <div class="dialog-actions">
+        <button class="btn btn-light cancel-dialog" type="button">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Enviar para operação</button>
+      </div>
+    </form>
+  </dialog>
 
-$('#corridors').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;activeCorridor=b.dataset.c;renderCorridors();renderLists()});
-document.addEventListener('click',e=>{const d=e.target.closest('[data-down]');if(d)confirmDown(d.dataset.down);const r=e.target.closest('[data-return]');if(r)returnFlow(r.dataset.return)});
-$$('.nav button').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
-$('#requestBtn').onclick=requestPallet;$('#swapUser').onclick=accessModal;
-$('#endTurn').onclick=()=>{openModal('<h3>Encerrar turno?</h3><p>O turno atual será marcado como encerrado neste teste.</p><div class="modal-actions"><button class="btn ghost" id="cancelModal">Cancelar</button><button class="btn primary" id="endNow">Encerrar turno</button></div>');$('#cancelModal').onclick=closeModal;$('#endNow').onclick=()=>{document.querySelectorAll('.dot').forEach(x=>x.style.background='#d93b37');$('#endTurn').textContent='Turno encerrado';$('#endTurn').disabled=true;closeModal()}};
-$('#modalWrap').addEventListener('click',e=>{if(e.target===$('#modalWrap'))closeModal()});
+  <!-- MODAL CORREDORES -->
+  <dialog id="corridorDialog">
+    <form id="corridorForm" class="dialog-form">
+      <h3>Selecionar corredores</h3>
 
-renderCorridors();renderLists();renderHistory();renderMy();
-})();
-</script>
+      <button id="toggleAllCorridors" class="toggle-all" type="button">
+        □ Selecionar todos
+      </button>
+
+      <div id="corridorOptions" class="corridor-options"></div>
+
+      <div class="dialog-actions">
+        <button class="btn btn-light cancel-dialog" type="button">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+
+  <!-- SELEÇÃO / TROCA DE TABLET -->
+  <dialog id="tabletDialog" class="tablet-dialog">
+    <form id="tabletForm" class="dialog-form tablet-form">
+      <div class="request-dialog-header">
+        <span class="request-dialog-eyebrow">RASTREIO DE EQUIPAMENTO</span>
+        <h3>Qual equipamento você está usando?</h3>
+        <p>Emp seleciona somente tablets cadastrados. Encarregado e TI recebem um computador padrão automaticamente e podem trocar para outro dispositivo cadastrado quando necessário.</p>
+      </div>
+      <label class="field"><span class="field-label">Tablet / equipamento</span><input id="tabletNameInput" list="tabletOptions" placeholder="Selecione um tablet cadastrado" autocomplete="off" required></label>
+      <datalist id="tabletOptions">
+        <option value="Tablet 01"><option value="Tablet 02"><option value="Tablet 03"><option value="Tablet 04"><option value="Tablet 05">
+        <option value="Tablet 06"><option value="Tablet 07"><option value="Tablet 08"><option value="Tablet 09"><option value="Tablet 10">
+        <option value="Tablet 11"><option value="Tablet 12">
+      </datalist>
+      <div id="tabletCurrentWarning" class="tablet-warning hidden"></div>
+      <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
+    </form>
+  </dialog>
+  <script src="../shared/access-code.js"></script>
+  <script src="assets/app.bundle.js"></script>
+  <script src="assets/operation-focus.js"></script>
+  <script src="assets/checklist-code.js"></script>
 </body>
 </html>
