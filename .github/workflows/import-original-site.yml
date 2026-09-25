@@ -1,0 +1,68 @@
+name: Importar Site Selene 2.0 original
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".site-import/Site-2.0.zip"
+      - ".github/workflows/import-original-site.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  import-site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Extrair site original
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/site2 empilhadores
+          mkdir -p /tmp/site2 empilhadores
+          unzip -q ".site-import/Site-2.0.zip" -d /tmp/site2
+          cp -a "/tmp/site2/Site Selene/public/." empilhadores/
+      - name: Conectar código do Checklist sem alterar o visual original
+        shell: bash
+        env:
+          CODE_CSS_B64: Ci5jb2RlLWNoZWNrbGlzdC1idG57d2hpdGUtc3BhY2U6bm93cmFwfQouY29kZS1jaGVja2xpc3QtbW9kYWw6OmJhY2tkcm9we2JhY2tncm91bmQ6cmdiYSg5LDE0LDI0LC42Nik7YmFja2Ryb3AtZmlsdGVyOmJsdXIoM3B4KX0KLmNvZGUtY2hlY2tsaXN0LW1vZGFse2JvcmRlcjowO2JvcmRlci1yYWRpdXM6MThweDtwYWRkaW5nOjA7d2lkdGg6bWluKDUyMHB4LGNhbGMoMTAwdncgLSAyOHB4KSk7Ym94LXNoYWRvdzowIDI4cHggOTBweCByZ2JhKDAsMCwwLC4zNSk7b3ZlcmZsb3c6aGlkZGVufQouY29kZS1jaGVja2xpc3QtY2FyZHtwYWRkaW5nOjI0cHg7YmFja2dyb3VuZDojZmZmO2NvbG9yOiMyMDI4M2F9Ci5jb2RlLWNoZWNrbGlzdC1jYXJkIGgze21hcmdpbjowIDAgNnB4O2ZvbnQtc2l6ZToyMnB4fS5jb2RlLWNoZWNrbGlzdC1jYXJkIHB7bWFyZ2luOjAgMCAxOHB4O2NvbG9yOiM2ODcxODc7bGluZS1oZWlnaHQ6MS41fQouY29kZS1jaGVja2xpc3QtbnVtYmVye21hcmdpbjoxNHB4IDA7YmFja2dyb3VuZDojZjNmNWZiO2JvcmRlcjoxcHggc29saWQgI2RmZTRmMDtib3JkZXItcmFkaXVzOjE0cHg7cGFkZGluZzoxOHB4O3RleHQtYWxpZ246Y2VudGVyO2ZvbnQtc2l6ZTo0MnB4O2ZvbnQtd2VpZ2h0OjEwMDA7bGV0dGVyLXNwYWNpbmc6LjE0ZW07Y29sb3I6IzMwMjY0ZDtmb250LXZhcmlhbnQtbnVtZXJpYzp0YWJ1bGFyLW51bXN9Ci5jb2RlLWNoZWNrbGlzdC1tZXRhe2Rpc3BsYXk6ZmxleDtqdXN0aWZ5LWNvbnRlbnQ6c3BhY2UtYmV0d2VlbjtnYXA6MTBweDtmb250LXNpemU6MTJweDtjb2xvcjojNmU3NzhiO21hcmdpbi1ib3R0b206MThweH0uY29kZS1jaGVja2xpc3QtYWN0aW9uc3tkaXNwbGF5OmZsZXg7anVzdGlmeS1jb250ZW50OmZsZXgtZW5kO2dhcDoxMHB4O2ZsZXgtd3JhcDp3cmFwfQouY29kZS1jaGVja2xpc3Qtc3RhdHVze21pbi1oZWlnaHQ6MjBweDttYXJnaW4tdG9wOjEwcHg7Zm9udC1zaXplOjEycHg7Zm9udC13ZWlnaHQ6ODAwfS5jb2RlLWNoZWNrbGlzdC1zdGF0dXMub2t7Y29sb3I6IzE2ODM1NH0uY29kZS1jaGVja2xpc3Qtc3RhdHVzLndhcm57Y29sb3I6I2I1N2EwMH0KQG1lZGlhKG1heC13aWR0aDo3MDBweCl7LmNvZGUtY2hlY2tsaXN0LWJ0bntwYWRkaW5nLWlubGluZToxMHB4fS5jb2RlLWNoZWNrbGlzdC1udW1iZXJ7Zm9udC1zaXplOjM0cHh9fQo=
+          CODE_JS_B64: KCgpPT57CiAgJ3VzZSBzdHJpY3QnOwogIGNvbnN0ICQ9cz0+ZG9jdW1lbnQucXVlcnlTZWxlY3RvcihzKTsKICBmdW5jdGlvbiByb2xlRm9yQ2hlY2tsaXN0KHJvbGUpe3JldHVybiByb2xlPT09J3RpJz8nYWRtJzonZW1wJzt9CiAgZnVuY3Rpb24gZW5zdXJlVWkoKXsKICAgIGlmKCQoJyNjaGVja2xpc3RDb2RlQnV0dG9uJykpIHJldHVybjsKICAgIGNvbnN0IGFjdGlvbnM9JCgnLnRvcGJhci1hY3Rpb25zJyk7CiAgICBpZighYWN0aW9ucykgcmV0dXJuOwogICAgY29uc3QgYnV0dG9uPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2J1dHRvbicpOwogICAgYnV0dG9uLmlkPSdjaGVja2xpc3RDb2RlQnV0dG9uJzsKICAgIGJ1dHRvbi50eXBlPSdidXR0b24nOwogICAgYnV0dG9uLmNsYXNzTmFtZT0nYnRuIGJ0bi1zb2Z0IGNvZGUtY2hlY2tsaXN0LWJ0bic7CiAgICBidXR0b24udGV4dENvbnRlbnQ9J+KMgSBDw7NkaWdvIENoZWNrbGlzdCc7CiAgICBjb25zdCBsb2dvdXQ9JCgnI2xvZ291dEJ1dHRvbicpOwogICAgYWN0aW9ucy5pbnNlcnRCZWZvcmUoYnV0dG9uLGxvZ291dHx8bnVsbCk7CiAgICBjb25zdCBkaWFsb2c9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGlhbG9nJyk7CiAgICBkaWFsb2cuaWQ9J2NoZWNrbGlzdENvZGVNb2RhbCc7CiAgICBkaWFsb2cuY2xhc3NOYW1lPSdjb2RlLWNoZWNrbGlzdC1tb2RhbCc7CiAgICBkaWFsb2cuaW5uZXJIVE1MPWA8ZGl2IGNsYXNzPSJjb2RlLWNoZWNrbGlzdC1jYXJkIj4KICAgICAgPGgzPkPDs2RpZ28gZG8gQ2hlY2tsaXN0PC9oMz4KICAgICAgPHA+R2VyZSB1bSBjw7NkaWdvIHRlbXBvcsOhcmlvIHBhcmEgZW50cmFyIG5vIENoZWNrbGlzdCBjb20gbyBtZXNtbyB1c3XDoXJpbyBsb2dhZG8gbmVzdGUgc2lzdGVtYS48L3A+CiAgICAgIDxkaXYgY2xhc3M9ImNvZGUtY2hlY2tsaXN0LW51bWJlciIgaWQ9ImNoZWNrbGlzdENvZGVOdW1iZXIiPi0tLSAtLS08L2Rpdj4KICAgICAgPGRpdiBjbGFzcz0iY29kZS1jaGVja2xpc3QtbWV0YSI+PHNwYW4gaWQ9ImNoZWNrbGlzdENvZGVVc2VyIj5Vc3XDoXJpbzwvc3Bhbj48c3BhbiBpZD0iY2hlY2tsaXN0Q29kZVRpbWVyIj5OZW5odW0gY8OzZGlnbyBhdGl2bzwvc3Bhbj48L2Rpdj4KICAgICAgPGRpdiBjbGFzcz0iY29kZS1jaGVja2xpc3QtYWN0aW9ucyI+CiAgICAgICAgPGJ1dHRvbiBjbGFzcz0iYnRuIGJ0bi1saWdodCIgdHlwZT0iYnV0dG9uIiBpZD0iY2hlY2tsaXN0Q29kZUNsb3NlIj5GZWNoYXI8L2J1dHRvbj4KICAgICAgICA8YnV0dG9uIGNsYXNzPSJidG4gYnRuLXNvZnQiIHR5cGU9ImJ1dHRvbiIgaWQ9ImNoZWNrbGlzdENvZGVDb3B5IiBkaXNhYmxlZD5Db3BpYXI8L2J1dHRvbj4KICAgICAgICA8YnV0dG9uIGNsYXNzPSJidG4gYnRuLXByaW1hcnkiIHR5cGU9ImJ1dHRvbiIgaWQ9ImNoZWNrbGlzdENvZGVHZW5lcmF0ZSI+R2VyYXIgY8OzZGlnbzwvYnV0dG9uPgogICAgICA8L2Rpdj4KICAgICAgPGRpdiBjbGFzcz0iY29kZS1jaGVja2xpc3Qtc3RhdHVzIiBpZD0iY2hlY2tsaXN0Q29kZVN0YXR1cyI+PC9kaXY+CiAgICA8L2Rpdj5gOwogICAgZG9jdW1lbnQuYm9keS5hcHBlbmRDaGlsZChkaWFsb2cpOwogICAgbGV0IHRpbWVyPW51bGwsbGFzdENvZGU9Jyc7CiAgICBmdW5jdGlvbiBjdXJyZW50VXNlcigpe3RyeXtyZXR1cm4gQXBwU3RhdGUuZ2V0VXNlcj8uKCl8fG51bGx9Y2F0Y2h7cmV0dXJuIG51bGx9fQogICAgZnVuY3Rpb24gcmVuZGVyKCl7CiAgICAgIGNvbnN0IHM9SW5mb1RlY2hBY2Nlc3NDb2RlLnN0YXR1cygpOwogICAgICBjb25zdCB0aW1lckVsPSQoJyNjaGVja2xpc3RDb2RlVGltZXInKSxudW09JCgnI2NoZWNrbGlzdENvZGVOdW1iZXInKSxjb3B5PSQoJyNjaGVja2xpc3RDb2RlQ29weScpOwogICAgICBpZihzLnN0YXRlPT09J2FjdGl2ZScpewogICAgICAgIGxhc3RDb2RlPXMucmVjb3JkLmNvZGU7bnVtLnRleHRDb250ZW50PUluZm9UZWNoQWNjZXNzQ29kZS5mb3JtYXRDb2RlKGxhc3RDb2RlKTtjb3B5LmRpc2FibGVkPWZhbHNlOwogICAgICAgIGNvbnN0IHNlYz1NYXRoLm1heCgwLE1hdGguY2VpbChzLnJlbWFpbmluZ01zLzEwMDApKTsKICAgICAgICB0aW1lckVsLnRleHRDb250ZW50PWBFeHBpcmEgZW0gJHtTdHJpbmcoTWF0aC5mbG9vcihzZWMvNjApKS5wYWRTdGFydCgyLCcwJyl9OiR7U3RyaW5nKHNlYyU2MCkucGFkU3RhcnQoMiwnMCcpfWA7CiAgICAgIH1lbHNlewogICAgICAgIGxhc3RDb2RlPScnO251bS50ZXh0Q29udGVudD0nLS0tIC0tLSc7Y29weS5kaXNhYmxlZD10cnVlOwogICAgICAgIHRpbWVyRWwudGV4dENvbnRlbnQ9cy5zdGF0ZT09PSd1c2VkJz8nQ8OzZGlnbyBqw6EgdXRpbGl6YWRvJzpzLnN0YXRlPT09J2V4cGlyZWQnPydDw7NkaWdvIGV4cGlyYWRvJzonTmVuaHVtIGPDs2RpZ28gYXRpdm8nOwogICAgICB9CiAgICB9CiAgICBmdW5jdGlvbiBvcGVuKCl7CiAgICAgIGNvbnN0IHU9Y3VycmVudFVzZXIoKTsKICAgICAgaWYoIXUpeyBVST8udG9hc3Q/LignRW50cmUgbm8gc2lzdGVtYSBhbnRlcyBkZSBnZXJhciB1bSBjw7NkaWdvLicpOyByZXR1cm47IH0KICAgICAgJCgnI2NoZWNrbGlzdENvZGVVc2VyJykudGV4dENvbnRlbnQ9YCR7dS5ub21lfSDigKIgJHt1Lm1hdHJpY3VsYX1gOwogICAgICAkKCcjY2hlY2tsaXN0Q29kZVN0YXR1cycpLnRleHRDb250ZW50PScnO3JlbmRlcigpO2RpYWxvZy5zaG93TW9kYWwoKTtjbGVhckludGVydmFsKHRpbWVyKTt0aW1lcj1zZXRJbnRlcnZhbChyZW5kZXIsNTAwKTsKICAgIH0KICAgIGJ1dHRvbi5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsb3Blbik7CiAgICAkKCcjY2hlY2tsaXN0Q29kZUNsb3NlJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCgpPT57ZGlhbG9nLmNsb3NlKCk7Y2xlYXJJbnRlcnZhbCh0aW1lcil9KTsKICAgICQoJyNjaGVja2xpc3RDb2RlR2VuZXJhdGUnKS5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsKCk9PnsKICAgICAgY29uc3QgdT1jdXJyZW50VXNlcigpOyBpZighdSkgcmV0dXJuOwogICAgICBjb25zdCByPUluZm9UZWNoQWNjZXNzQ29kZS5nZW5lcmF0ZSh7bmFtZTp1Lm5vbWUsbWF0cmljdWxhOnUubWF0cmljdWxhLHJvbGU6cm9sZUZvckNoZWNrbGlzdCh1LnJvbGUpLHNvdXJjZVJvbGU6dS5yb2xlfSk7CiAgICAgIGxhc3RDb2RlPXIuY29kZTtyZW5kZXIoKTsKICAgICAgY29uc3Qgcz0kKCcjY2hlY2tsaXN0Q29kZVN0YXR1cycpO3MuY2xhc3NOYW1lPSdjb2RlLWNoZWNrbGlzdC1zdGF0dXMgb2snO3MudGV4dENvbnRlbnQ9J0PDs2RpZ28gY3JpYWRvLiBEaWdpdGUtbyBubyBDaGVja2xpc3QgZW0gYXTDqSAyIG1pbnV0b3MuJzsKICAgIH0pOwogICAgJCgnI2NoZWNrbGlzdENvZGVDb3B5JykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLGFzeW5jKCk9PnsKICAgICAgaWYoIWxhc3RDb2RlKXJldHVybjt0cnl7YXdhaXQgbmF2aWdhdG9yLmNsaXBib2FyZC53cml0ZVRleHQobGFzdENvZGUpOyQoJyNjaGVja2xpc3RDb2RlU3RhdHVzJykudGV4dENvbnRlbnQ9J0PDs2RpZ28gY29waWFkby4nfWNhdGNoeyQoJyNjaGVja2xpc3RDb2RlU3RhdHVzJykudGV4dENvbnRlbnQ9J0NvcGllIG8gbsO6bWVybyBleGliaWRvIGFjaW1hLid9CiAgICB9KTsKICAgIGRpYWxvZy5hZGRFdmVudExpc3RlbmVyKCdjbG9zZScsKCk9PmNsZWFySW50ZXJ2YWwodGltZXIpKTsKICB9CiAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsKCk9PnNldFRpbWVvdXQoZW5zdXJlVWksMCkpOwp9KSgpOwo=
+        run: |
+          set -euo pipefail
+          printf '%s' "$CODE_CSS_B64" | base64 -d > empilhadores/assets/checklist-code.css
+          printf '%s' "$CODE_JS_B64" | base64 -d > empilhadores/assets/checklist-code.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("empilhadores/index.html")
+          s=p.read_text(encoding="utf-8")
+          css='<link rel="stylesheet" href="assets/checklist-code.css">'
+          shared='<script src="../shared/access-code.js"></script>'
+          js='<script src="assets/checklist-code.js"></script>'
+          if css not in s:
+              anchor='<link rel="stylesheet" href="assets/operation-focus.css">'
+              s=s.replace(anchor, anchor+"\n  "+css)
+          if shared not in s:
+              anchor='<script src="assets/app.bundle.js"></script>'
+              s=s.replace(anchor, shared+"\n  "+anchor)
+          if js not in s:
+              anchor='<script src="assets/operation-focus.js"></script>'
+              s=s.replace(anchor, anchor+"\n  "+js)
+          p.write_text(s,encoding="utf-8")
+          PY
+      - name: Limpar partes temporárias e publicar
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .site-import/chunk-*.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add empilhadores .site-import
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração."
+            exit 0
+          fi
+          git commit -m "Publica Site Selene 2.0 original com códigos do Checklist"
+          git push
