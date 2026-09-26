@@ -690,11 +690,11 @@
 
 
   <!-- MODAL PEDIR PALET -->
-  <dialog id="requestDialog">
+  <dialog id="requestDialog" aria-labelledby="requestDialogTitle">
     <form id="requestForm" class="dialog-form">
       <div class="request-dialog-header">
         <span class="request-dialog-eyebrow">NOVA SOLICITAÇÃO</span>
-        <h3>Pedir Palet</h3>
+        <h3 id="requestDialogTitle">Pedir Palet</h3>
         <p>Informe o endereço para enviar o palet à tela de operação.</p>
       </div>
 
@@ -726,9 +726,9 @@
   </dialog>
 
   <!-- MODAL CORREDORES -->
-  <dialog id="corridorDialog">
+  <dialog id="corridorDialog" aria-labelledby="corridorDialogTitle">
     <form id="corridorForm" class="dialog-form">
-      <h3>Selecionar corredores</h3>
+      <h3 id="corridorDialogTitle">Selecionar corredores</h3>
 
       <button id="toggleAllCorridors" class="toggle-all" type="button">
         □ Selecionar todos
@@ -745,11 +745,11 @@
 
 
   <!-- SELEÇÃO / TROCA DE TABLET -->
-  <dialog id="tabletDialog" class="tablet-dialog">
+  <dialog id="tabletDialog" class="tablet-dialog" aria-labelledby="tabletDialogTitle">
     <form id="tabletForm" class="dialog-form tablet-form">
       <div class="request-dialog-header">
         <span class="request-dialog-eyebrow">RASTREIO DE EQUIPAMENTO</span>
-        <h3>Qual equipamento você está usando?</h3>
+        <h3 id="tabletDialogTitle">Qual equipamento você está usando?</h3>
         <p>Emp seleciona somente tablets cadastrados. Encarregado e TI selecionam um dispositivo cadastrado. Cada equipamento pode ter apenas uma sessão ativa.</p>
       </div>
       <label class="field"><span class="field-label">Tablet / equipamento</span><input id="tabletNameInput" list="tabletOptions" placeholder="Selecione um tablet cadastrado" autocomplete="off" required></label>

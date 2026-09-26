@@ -6,7 +6,7 @@ import subprocess
 
 root = Path(__file__).resolve().parent.parent
 listed = subprocess.run(
-    ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+    ["git", "-c", f"safe.directory={root}", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
     cwd=root,
     check=True,
     capture_output=True,

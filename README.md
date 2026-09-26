@@ -1,4 +1,4 @@
-# Site Selene 2.1
+# Site Selene 2.1.1
 
 Aplicação operacional do Empilhamento 2.0 e Checklist, com a identidade visual original preservada e uma única fonte de verdade em PostgreSQL. O backend FastAPI decide autenticação, permissões, transições, autorizações, locks, timers, códigos temporários e auditoria. O navegador não armazena dados corporativos.
 
@@ -17,4 +17,4 @@ Desenvolvimento inicial: **Lucas Janoca / InfoTech.io**. A evolução técnica 2
 
 O software está implementado e validado localmente com PostgreSQL 17. A entrada em produção corporativa depende dos valores e da homologação listados em [PENDENCIAS-TI.md](PENDENCIAS-TI.md). Nenhum hostname, certificado, segredo, endpoint interno ou credencial foi inventado.
 
-Comece por [docs/INSTALACAO.md](docs/INSTALACAO.md), depois execute a validação descrita em [docs/TESTES.md](docs/TESTES.md). O relatório completo está em [RELATORIO-FINAL.md](RELATORIO-FINAL.md).
+Comece por [docs/INSTALACAO.md](docs/INSTALACAO.md) e execute `python scripts/homologate.py` no ambiente configurado. O resultado da versão 2.1.1 está em [docs/HOMOLOGACAO-2.1.1.md](docs/HOMOLOGACAO-2.1.1.md), e o roteiro operacional está em [docs/PILOTO-CONTROLADO.md](docs/PILOTO-CONTROLADO.md).

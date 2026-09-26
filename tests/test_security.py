@@ -136,3 +136,59 @@ def test_checklist_code_scope_cannot_change_ti(clients):
             headers={"Origin": settings().public_origin, "X-CSRF-Token": r.json()["csrfToken"], "Idempotency-Key": str(uuid4())},
         )
         assert r.status_code == 403
+
+
+def test_login_failures_session_restore_and_logout(clients):
+    user = clients("empilhador")
+    with TestClient(app, base_url=settings().public_origin) as browser:
+        headers = {"Origin": settings().public_origin}
+        assert browser.post(
+            "/api/site-selene/auth/login", json={"matricula": user.name, "senha": "senha-incorreta"}, headers=headers
+        ).status_code == 401
+        assert browser.post(
+            "/api/site-selene/auth/login", json={"matricula": "usuario-inexistente", "senha": "senha-incorreta"}, headers=headers
+        ).status_code == 401
+        login = browser.post(
+            "/api/site-selene/auth/login", json={"matricula": user.name, "senha": user.password}, headers=headers
+        )
+        assert login.status_code == 200
+        csrf = login.json()["csrfToken"]
+        assert browser.get("/api/site-selene/auth/me").status_code == 200
+        assert (
+            browser.post(
+                "/api/site-selene/auth/logout",
+                json={},
+                headers={**headers, "X-CSRF-Token": csrf, "Idempotency-Key": str(uuid4())},
+            ).status_code
+            == 200
+        )
+        assert browser.get("/api/site-selene/auth/me").status_code == 401
+
+
+def test_new_code_revokes_previous_and_rejects_incomplete(clients):
+    user = clients("empilhador")
+    first = user.ok("/codes")["code"]
+    second = user.ok("/codes")["code"]
+    with TestClient(app, base_url=settings().public_origin) as browser:
+        headers = {"Origin": settings().public_origin}
+        assert browser.post("/api/site-selene/codes/redeem", json={"code": "123"}, headers=headers).status_code == 422
+        assert browser.post("/api/site-selene/codes/redeem", json={"code": first}, headers=headers).status_code == 401
+        assert browser.post("/api/site-selene/codes/redeem", json={"code": second}, headers=headers).status_code == 200
+
+
+def test_encarregado_cannot_administer_ti(clients):
+    supervisor = clients("encarregado")
+    assert supervisor.send(
+        "/users",
+        {"nome": "TI indevido", "matricula": "ti-" + uuid4().hex[:12], "senha": "Senha-temporaria-forte", "role": "ti"},
+    ).status_code == 403
+    assert supervisor.get("/integration/config").status_code == 403
+
+
+def test_last_active_ti_cannot_be_disabled(clients):
+    admin = clients("ti")
+    with engine().begin() as conn:
+        ti_ids = sa.select(t.user_roles.c.user_id).join(t.roles).where(t.roles.c.name == "ti")
+        conn.execute(t.users.update().where(t.users.c.id.in_(ti_ids), t.users.c.id != admin.uid).values(active=False))
+    admin.ok("/auth/reauth", {"senha": admin.password})
+    assert admin.send("/users/" + admin.name, method="DELETE").status_code == 409

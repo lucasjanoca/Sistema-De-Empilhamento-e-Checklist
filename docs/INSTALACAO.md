@@ -28,6 +28,8 @@ O proxy termina TLS, redireciona HTTP para HTTPS e preserva `Host` e `X-Forwarde
 4. Verifique readiness, login, dispositivo, produção, Empilhamento, Checklist, métricas e cadeia de auditoria.
 5. Para falha, siga [ROLLBACK.md](ROLLBACK.md); não execute downgrade destrutivo no banco operacional.
 
+Antes de promover a versão 2.1.1, execute `python scripts/homologate.py`, percorra `PILOTO-CONTROLADO.md` e registre o commit/digest aprovado. Os service workers usam caches separados `selene-checklist-2.1.1` e `selene-empilhadores-2.1.1`, ativam a nova versão e removem somente caches antigos do próprio módulo.
+
 ## Teste local
 
 Use PostgreSQL descartável e `ENVIRONMENT=test`, `SECURE_COOKIES=false`, `PUBLIC_ORIGIN=http://127.0.0.1:PORT`. Instale `requirements.lock`, aplique a migration, crie a conta runtime e execute pytest. Esses relaxamentos são recusados fora de loopback/teste.

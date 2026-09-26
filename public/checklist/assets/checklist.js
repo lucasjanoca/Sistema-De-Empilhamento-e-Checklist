@@ -4,7 +4,7 @@ const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>Array.from(p.quer
 const statusLabel={unchecked:'SEM CHECKLIST',ok:'OK',warn:'ATENÇÃO',crit:'CRÍTICO'};
 const typeLabel={bateria:'Bateria',empilhadeira:'Empilhadeira',tablet:'Tablet'};
 let currentUser=null,currentTab='bateria',currentAdminPage='overview',editingEquipmentId=null;
-let equipment=[],history=[],users=[],issues=[],audit=[];
+let equipment=[],history=[],users=[],issues=[],audit=[],auditLoaded=false,auditLoading=null;
 let templates={},templateVersions=[],events=null,poll=null,checkVersion=null,checkTemplateId=null;
 
 function fmt(dt){if(!dt)return '—';return new Date(dt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
@@ -29,7 +29,7 @@ function showAdmin(page='overview'){
   currentAdminPage=page;$('#operationView').classList.add('hidden');$('#adminView').classList.remove('hidden');
   $$('.admin-page').forEach(x=>x.classList.toggle('active',x.dataset.page===page));
   $$('#sideNav [data-admin-page]').forEach(x=>x.classList.toggle('active',x.dataset.adminPage===page));
-  renderAdmin();closeSidebar();
+  renderAdmin();closeSidebar();if(page==='history')loadAudit().catch(error=>toast(error.message));
 }
 
 function calcKPIs(){
@@ -47,9 +47,9 @@ function cardHTML(e){
 }
 function renderEquipment(){const grid=$('#equipmentGrid'),list=filteredList();grid.className=`grid ${currentTab==='bateria'?'battery-grid':'standard-grid'}`;grid.innerHTML=list.length?list.map(cardHTML).join(''):'<div class="empty">Nenhum equipamento encontrado.</div>'}
 function renderHistory(){const q=$('#searchInput').value.trim().toLowerCase();const rows=history.filter(h=>!q||JSON.stringify(h).toLowerCase().includes(q));$('#historyList').innerHTML=rows.length?rows.map(h=>`<div class="history-item"><div><b>${esc(h.equipment)}</b><small>${esc(h.kind==='swap'?'Troca de bateria':'Checklist')} • ${esc(h.details)}</small><small>${esc(h.obs)}</small><small>${esc(h.operator)}</small></div><div class="history-right"><span class="badge ${esc(h.status)}">${esc(h.kind==='swap'?'TROCA':statusLabel[h.status])}</span><time>${esc(fmt(h.createdAt))}</time></div></div>`).join(''):'<div class="empty">Sem registros.</div>'}
-function setTab(tab){currentTab=tab;$$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));const hist=tab==='historico';$('#historySection').classList.toggle('hidden',!hist);$('#equipmentsSection').classList.toggle('hidden',hist);$('#statusFilter').closest('.toolbar-right').classList.toggle('hidden',hist);hist?loadHistory():renderEquipment()}
+function setTab(tab){currentTab=tab;$$('#nav button').forEach(b=>{const active=b.dataset.tab===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});const hist=tab==='historico';$('#historySection').classList.toggle('hidden',!hist);$('#equipmentsSection').classList.toggle('hidden',hist);$('#statusFilter').closest('.toolbar-right').classList.toggle('hidden',hist);hist?loadHistory():renderEquipment()}
 
-function renderCheckItems(type){$('#checkItems').innerHTML=(templates[type]||[]).map((item,i)=>`<div class="check-row"><span>${esc(item)}</span><select data-checkitem="${i}"><option value="ok">OK</option><option value="warn">Atenção</option><option value="crit">Crítico</option></select></div>`).join('')}
+function renderCheckItems(type){$('#checkItems').innerHTML=(templates[type]||[]).map((item,i)=>`<div class="check-row"><label for="check-item-${i}">${esc(item)}</label><select id="check-item-${i}" data-checkitem="${i}" aria-label="Resultado: ${esc(item)}"><option value="ok">OK</option><option value="warn">Atenção</option><option value="crit">Crítico</option></select></div>`).join('')}
 function refreshEquipmentSelect(type,selectedId=''){
   const list=equipment.filter(e=>e.active&&e.type===type);$('#ckEquipment').innerHTML=list.map(e=>`<option value="${e.id}" ${e.id===selectedId?'selected':''}>${esc(e.code)} · ${esc(e.name)}</option>`).join('');
   const target=equipment.find(e=>e.id===$('#ckEquipment').value)||list[0];if(target){checkVersion=target.version;checkTemplateId=templateVersions.find(t=>t.type===type)?.id;$('#ckStatus').value=target.status;$('#ckOperator').value=currentUser?.name||target.operator||'';$('#ckObservation').value='';$('#ckLiters').value=target.liters||'';$('#ckWater').value='Cheio'}
@@ -80,10 +80,10 @@ function renderUsers(){
   $('#usersList').innerHTML=users.map(u=>`<div class="list-row"><div class="main"><b>${esc(u.name)}</b><small>${esc(u.username)} • ${u.role==='adm'?'ADM / TI':'Empilhador / Operador'} • ${u.active?'Ativo':'Bloqueado'}</small></div><div class="controls"><button class="btn small" data-reset-user="${u.id}">Redefinir senha</button><button class="btn small ${u.active?'warn':'primary'}" data-toggle-user="${u.id}">${u.active?'Bloquear':'Ativar'}</button></div></div>`).join('')
 }
 function renderTemplates(){
-  $('#templatesList').innerHTML=Object.entries(templates).map(([type,items],idx)=>`<div class="admin-card"><h3>${typeLabel[type]} • v${templateVersions.find(t=>t.type===type)?.version}</h3><p>${items.length} itens ativos</p><div class="list">${items.map(x=>`<div class="list-row"><div class="main"><b>${esc(x)}</b><small>Item obrigatório</small></div></div>`).join('')}</div><button class="btn small" class="template-edit-spacing" data-template-edit="${type}">Editar modelo</button></div>`).join('')
+  $('#templatesList').innerHTML=Object.entries(templates).map(([type,items],idx)=>`<div class="admin-card"><h3>${typeLabel[type]} • v${templateVersions.find(t=>t.type===type)?.version}</h3><p>${items.length} itens ativos</p><div class="list">${items.map(x=>`<div class="list-row"><div class="main"><b>${esc(x)}</b><small>Item obrigatório</small></div></div>`).join('')}</div><button class="btn small template-edit-spacing" data-template-edit="${type}">Editar modelo</button></div>`).join('')
 }
 function renderAudit(){
-  $('#auditBody').innerHTML=audit.map(a=>`<tr><td>${esc(fmt(a.at))}</td><td>${esc(a.user)}</td><td>${esc(a.event)}</td><td>${esc(a.origin)}</td><td>${esc(a.detail)}</td></tr>`).join('')
+  $('#auditBody').innerHTML=audit.length?audit.map(a=>`<tr><td>${esc(fmt(a.at))}</td><td>${esc(a.user)}</td><td>${esc(a.event)}</td><td>${esc(a.origin)}</td><td>${esc(a.detail)}</td></tr>`).join(''):`<tr><td colspan="5">${auditLoaded?'Nenhum evento encontrado.':'Os eventos serão carregados ao abrir esta página.'}</td></tr>`
 }
 function renderReports(){
   const active=equipment.filter(e=>e.active),good=active.filter(e=>e.status==='ok').length,pct=active.length?Math.round(good/active.length*100):0;$('#complianceBar').value=pct;$('#complianceText').textContent=pct+'%';$('#reportHist').textContent=history.length;$('#reportIssues').textContent=issues.filter(i=>i.status!=='resolved').length;$('#reportEquip').textContent=active.length
@@ -95,8 +95,15 @@ async function refresh(){
   const d=await SeleneApi.request('/checklist/state');equipment=d.equipment;if(currentTab!=='historico')history=d.history;else await loadHistory();issues=d.issues;templateVersions=d.templates;templates=Object.fromEntries(d.templates.map(x=>[x.type,x.questions]));
   $('#todayText').textContent='Data operacional '+d.operationalDate;$('#serverTime').textContent='Servidor '+fmt(d.serverTime);$('#shiftLabel').textContent=d.shift;
   if(SeleneApi.has('users:view'))users=(await SeleneApi.request('/users')).users.map(u=>({...u,id:String(u.id),name:u.nome,username:u.matricula}));
-  if(SeleneApi.has('audit:view'))audit=(await SeleneApi.request('/audit-secure')).events.map(a=>({at:a.time,user:a.actorName,event:a.action,origin:a.source,detail:a.details}));
+  if(SeleneApi.has('audit:view')&&auditLoaded)await loadAudit(true);
   calcKPIs();renderEquipment();renderHistory();renderAdmin();
+}
+async function loadAudit(force=false){
+  if(!SeleneApi.has('audit:view'))return;
+  if(auditLoaded&&!force){renderAudit();return;}
+  if(auditLoading)return auditLoading;
+  auditLoading=SeleneApi.request('/audit-secure').then(result=>{audit=result.events.map(a=>({at:a.time,user:a.actorName,event:a.action,origin:a.source,detail:a.details}));auditLoaded=true;renderAudit();}).finally(()=>{auditLoading=null;});
+  return auditLoading;
 }
 async function command(path,body={},method='POST'){try{const r=await SeleneApi.mutate(path,body,method);await refresh();return r;}catch(error){toast(error.message);if(error.status===409)await refresh().catch(()=>{});return null;}}
 async function enterWithIdentity(identity){
@@ -134,6 +141,7 @@ $('#historyPrev').onclick=()=>{historyPage--;loadHistory();};$('#historyNext').o
 $('#accessCode').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,6);});
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const button=e.target.querySelector('[type=submit]');button.disabled=true;try{const result=await SeleneApi.mutate('/codes/redeem',{code:$('#accessCode').value});$('#accessCode').value='';await enterWithIdentity(result.user);}catch(error){$('#loginError').textContent=error.message;$('#loginError').classList.remove('hidden');}finally{button.disabled=false;}});
 $('#menuBtn').onclick=openSidebar;$('#closeSidebar').onclick=closeSidebar;$('#backdrop').onclick=closeSidebar;$('#logoutBtn').onclick=logout;$('#sideLogout').onclick=logout;$('#backToOperation').onclick=showOperation;
+$('#refreshChecklistBtn').onclick=async()=>{const button=$('#refreshChecklistBtn');button.disabled=true;try{await refresh();toast('Dados atualizados.');}catch(error){toast(error.message);}finally{button.disabled=false;}};
 $('#sideNav').onclick=e=>{const b=e.target.closest('[data-admin-page]');if(b)showAdmin(b.dataset.adminPage);};
 document.addEventListener('click',async e=>{
   const select=a=>e.target.closest('['+a+']');

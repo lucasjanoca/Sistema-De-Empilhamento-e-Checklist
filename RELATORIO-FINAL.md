@@ -1,4 +1,8 @@
-# Relatório final — Site Selene 2.1
+# Relatório final - Site Selene 2.1.1
+
+## ATUALIZAÇÃO 2.1.1
+
+O Checklist agora usa a mesma linguagem visual clara do Empilhadores, com topbar, cards, abas, painel lateral, área ADM, tabelas e dialogs consistentes. A revisão em 320 a 1920 px corrigiu overflow do cabeçalho móvel e o rodapé do modal em 320 px. A auditoria administrativa passou a carregar sob demanda, os caches PWA foram versionados e a homologação ganhou um comando único e contratos automáticos de UI/PWA. A matriz completa está em `docs/HOMOLOGACAO-2.1.1.md` e o piloto em `docs/PILOTO-CONTROLADO.md`.
 
 ## STATUS GERAL
 
@@ -27,14 +31,14 @@ As duas interfaces chamam a mesma API e compartilham usuários, perfis, banco e 
 
 ## TESTES
 
-- 29/29 testes pytest aprovados em PostgreSQL 17 real.
+- 33/33 testes pytest aprovados em PostgreSQL 17 real.
 - Concorrência com clientes/sessões simultâneos e locks reais: aprovada.
 - Timer real de 10 segundos e restart: aprovados.
 - Código Checklist entre clientes, expiração, replay e brute force: aprovados.
 - RBAC, CSRF, IDOR, role bypass, SQL injection, XSS textual, session fixation, transição inválida e double submit: aprovados.
 - Migration do zero: 34 tabelas físicas incluindo `alembic_version`, zero usuários, versão `0001_operational`.
 - Backup cifrado e restore num segundo banco: aprovados; restore em banco não vazio recusado.
-- Cadeia de auditoria: íntegra em 789 eventos no banco final de validação.
+- Cadeia de auditoria: íntegra em 1.874 eventos no banco final de validação da versão 2.1.1.
 - Diagnóstico: zero locks órfãos, movimentos pendentes em produção fechada ou confirmações vencidas.
 - Ruff, sintaxe JS, fronteira pública, CSP estática e scanner de segredos: aprovados.
 - `pip-audit`: nenhuma vulnerabilidade conhecida nas versões travadas.
