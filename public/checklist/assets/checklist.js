@@ -3,6 +3,8 @@
 const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>Array.from(p.querySelectorAll(s));
 const statusLabel={unchecked:'SEM CHECKLIST',ok:'OK',warn:'ATENÇÃO',crit:'CRÍTICO'};
 const typeLabel={bateria:'Bateria',empilhadeira:'Empilhadeira',tablet:'Tablet'};
+let currentUser=null,currentTab='bateria',currentAdminPage='overview',editingEquipmentId=null;
+let equipment=[],history=[],users=[],issues=[],audit=[];
 let templates={},templateVersions=[],events=null,poll=null,checkVersion=null,checkTemplateId=null;
 
 function fmt(dt){if(!dt)return '—';return new Date(dt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}

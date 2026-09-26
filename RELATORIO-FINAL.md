@@ -34,7 +34,7 @@ As duas interfaces chamam a mesma API e compartilham usuários, perfis, banco e 
 - RBAC, CSRF, IDOR, role bypass, SQL injection, XSS textual, session fixation, transição inválida e double submit: aprovados.
 - Migration do zero: 34 tabelas físicas incluindo `alembic_version`, zero usuários, versão `0001_operational`.
 - Backup cifrado e restore num segundo banco: aprovados; restore em banco não vazio recusado.
-- Cadeia de auditoria: íntegra em 626 eventos no último banco de validação.
+- Cadeia de auditoria: íntegra em 789 eventos no banco final de validação.
 - Diagnóstico: zero locks órfãos, movimentos pendentes em produção fechada ou confirmações vencidas.
 - Ruff, sintaxe JS, fronteira pública, CSP estática e scanner de segredos: aprovados.
 - `pip-audit`: nenhuma vulnerabilidade conhecida nas versões travadas.
@@ -75,7 +75,9 @@ O contrato interno do adaptador Selene está definido, com allowlist HTTPS e fal
 - Código Checklist funcionava na mesma origem/navegador: movido para banco, hash, validade e uso único.
 - Arquivos originais duplicados e workflow de importação poderiam republicar a versão insegura: removidos; checkpoint Git preserva o original.
 - O estado não sobrevivia a restart e não havia restore validado: PostgreSQL, backup cifrado e ensaio de restore implementados.
+- A inspeção final encontrou uma variável de aba não inicializada no carregamento autenticado do Checklist: o estado inicial foi declarado, e o fluxo PC → código → Checklist → seleção de dispositivo → relatório foi repetido sem erro de console.
 - A última execução inicialmente encontrou o PostgreSQL portátil de teste parado; a instância isolada foi reiniciada e toda a suíte passou.
+- A suíte emite avisos de depreciação futura do adaptador `httpx` do Starlette/Authlib e de `authlib.jose`; eles não causam falha nem vulnerabilidade conhecida, mas devem ser migrados para `httpx2`/`joserfc` antes de uma futura atualização principal dessas bibliotecas.
 
 ## PENDÊNCIAS DA TI
 
@@ -98,7 +100,8 @@ Os antigos arquivos estáticos da raiz, o ZIP duplicado e o workflow de importa�
 - `8ed2cb8` — Argon2id, sessões revogáveis, RBAC e auditoria encadeada.
 - `8ddf76d` — movimentos, autorizações, dispositivos, Checklist e testes PostgreSQL.
 - `82f442d` — frontend integrado, backup, observabilidade, implantação e validações.
-- Commit de documentação e pacote final: contém este relatório, runbooks e pendências externas.
+- `c12fe09` — relatório, runbooks e pendências externas da TI.
+- Commit final de inspeção visual — inicialização autenticada do Checklist e evidência JUnit atualizada.
 
 ## COMO INSTALAR
 
