@@ -6,7 +6,7 @@
 <title>InfoTech • Checklist Operacional CD</title>
 <link rel="stylesheet" href="assets/checklist.css"><link rel="stylesheet" href="/shared/production.css"><link rel="manifest" href="manifest.webmanifest">
 </head>
-<body><div id="offlineBanner" class="connection-banner hidden" role="alert">Sem conexão. Operações exigem o servidor.</div>
+<body><div id="offlineBanner" class="connection-banner hidden" role="alert"><span>Sem conexão. Operações exigem o servidor.</span><button id="retryChecklistBtn" type="button">Tentar novamente</button></div>
 
 <section class="login-shell" id="loginScreen">
   <div class="login-card">
@@ -72,14 +72,14 @@
       <div class="operation-layout">
         <div class="operation-main">
           <nav class="nav" id="nav" aria-label="Tipos de equipamento" role="tablist">
-            <button class="active" data-tab="bateria" type="button" role="tab" aria-selected="true">Baterias</button>
-            <button data-tab="empilhadeira" type="button" role="tab" aria-selected="false" tabindex="-1">Empilhadeiras</button>
-            <button data-tab="tablet" type="button" role="tab" aria-selected="false" tabindex="-1">Tablets</button>
-            <button data-tab="historico" type="button" role="tab" aria-selected="false" tabindex="-1">Histórico</button>
+            <button id="tab-bateria" class="active" data-tab="bateria" type="button" role="tab" aria-controls="equipmentsSection" aria-selected="true">Baterias</button>
+            <button id="tab-empilhadeira" data-tab="empilhadeira" type="button" role="tab" aria-controls="equipmentsSection" aria-selected="false" tabindex="-1">Empilhadeiras</button>
+            <button id="tab-tablet" data-tab="tablet" type="button" role="tab" aria-controls="equipmentsSection" aria-selected="false" tabindex="-1">Tablets</button>
+            <button id="tab-historico" data-tab="historico" type="button" role="tab" aria-controls="historySection" aria-selected="false" tabindex="-1">Histórico</button>
           </nav>
 
-          <section id="equipmentsSection"><div id="equipmentGrid" class="grid battery-grid" aria-live="polite"><div class="empty">Carregando equipamentos…</div></div></section>
-          <section id="historySection" class="hidden"><div class="original-style-4 panel"><h3>Histórico de checklists</h3><p>Um novo checklist atualiza o estado atual do equipamento e mantém os registros anteriores no histórico.</p></div><div class="field history-kind"><label for="historyKind">Tipo de registro</label><select id="historyKind"><option value="checklist">Checklist</option><option value="swap">Trocas de bateria</option></select></div><div class="history" id="historyList" aria-live="polite"></div><div class="pagination"><button id="historyPrev" class="btn" type="button">Anterior</button><span id="historyPage">Página 1</span><button id="historyNext" class="btn" type="button">Próxima</button></div></section>
+          <section id="equipmentsSection" role="tabpanel" aria-labelledby="tab-bateria"><div id="equipmentGrid" class="grid battery-grid" aria-live="polite" aria-busy="false"><div class="empty">Carregando equipamentos…</div></div></section>
+          <section id="historySection" class="hidden" role="tabpanel" aria-labelledby="tab-historico"><div class="original-style-4 panel"><h3>Histórico de checklists</h3><p>Um novo checklist atualiza o estado atual do equipamento e mantém os registros anteriores no histórico.</p></div><div class="field history-kind"><label for="historyKind">Tipo de registro</label><select id="historyKind"><option value="checklist">Checklist</option><option value="swap">Trocas de bateria</option></select></div><div class="history" id="historyList" aria-live="polite" aria-busy="false"></div><div class="pagination"><button id="historyPrev" class="btn" type="button">Anterior</button><span id="historyPage">Página 1</span><button id="historyNext" class="btn" type="button">Próxima</button></div></section>
         </div>
 
         <aside class="operation-controls" aria-labelledby="controlsTitle">
@@ -159,11 +159,11 @@
 
       <div class="admin-page" data-page="settings">
         <div class="admin-header"><div><h2>Configurações</h2><p>Preferências gerais do ambiente de checklist.</p></div></div>
-        <div class="admin-grid"><div class="admin-card"><h3>Interface</h3><div class="field"><label for="gridSetting">Grade de baterias no tablet</label><select id="gridSetting"><option value="4" selected>4 colunas</option><option value="3">3 colunas</option><option value="2">2 colunas</option></select></div><button class="btn" id="saveUiSettings">Salvar aparência</button></div><div class="admin-card"><h3>Operação</h3><div class="field"><label>Regra do novo checklist</label><select disabled aria-label="Regra do novo checklist"><option>Atualiza o estado atual e mantém o anterior no histórico</option></select></div><p class="original-style-6">Essa regra fica fixa para não duplicar cards do mesmo equipamento.</p></div><div class="admin-card"><h3>Backup</h3><p>Backup criptografado e restauração seguem o procedimento de TI.</p><button class="btn" id="backupBtn">Procedimento de backup</button></div><div class="admin-card"><h3>Saúde do sistema</h3><p>Consultar a saúde do servidor.</p><button class="btn" id="healthBtn">Executar verificação</button><div id="healthResult" class="original-style-7 muted"></div></div></div>
+        <div class="admin-grid"><div class="admin-card"><h3>Interface</h3><div class="field"><label for="gridSetting">Grade de baterias no tablet</label><select id="gridSetting"><option value="4" selected>4 colunas</option><option value="3">3 colunas</option><option value="2">2 colunas</option></select></div><button class="btn" id="saveUiSettings">Salvar aparência</button></div><div class="admin-card"><h3>Operação</h3><div class="field"><label>Regra do novo checklist</label><select disabled aria-label="Regra do novo checklist"><option>Atualiza o estado atual e mantém o anterior no histórico</option></select></div><p class="original-style-6">Essa regra fica fixa para não duplicar cards do mesmo equipamento.</p></div><div class="admin-card"><h3>Backup</h3><p>Solicita um backup criptografado no servidor. A TI precisa configurar diretório privado e chave pública.</p><button class="btn" id="backupBtn">Solicitar backup</button></div><div class="admin-card"><h3>Saúde do sistema</h3><p>Consultar a saúde do servidor.</p><button class="btn" id="healthBtn">Executar verificação</button><div id="healthResult" class="original-style-7 muted" role="status" aria-live="polite"></div></div></div>
       </div>
     </section>
 
-    <div class="footer-label">InfoTech • Secure Checklist 2.1.1 • dados centralizados</div>
+    <div class="footer-label">InfoTech • Secure Checklist 2.1.2 • dados centralizados</div>
   </main>
 </div>
 
@@ -175,7 +175,7 @@
     <div class="field battery-field"><label for="ckWater">Nível de água</label><select id="ckWater"><option value="Cheio">Cheio</option><option value="Abastecer">Abastecer</option><option value="Vazio">Vazio</option></select></div>
     <div class="field"><label for="ckStatus">Resultado calculado pelas respostas</label><select id="ckStatus" disabled><option value="ok">OK</option><option value="warn">Atenção</option><option value="crit">Crítico</option></select></div>
     <div class="field"><label for="ckOperator">Operador</label><input id="ckOperator" readonly maxlength="80"></div>
-    <div class="field battery-field"><label for="ckLiters">Litros</label><input id="ckLiters" inputmode="decimal" placeholder=""></div>
+    <div class="field battery-field"><label for="ckLiters">Litros</label><input id="ckLiters" type="number" inputmode="decimal" min="0" max="100000" step="0.1" placeholder="0"></div>
     <div class="field span-2"><label for="ckObservation">Observação</label><textarea id="ckObservation" maxlength="500" placeholder="Descreva o que foi verificado..."></textarea></div>
   </div><div class="original-style-8">Itens de verificação</div><div class="check-items" id="checkItems"></div></div>
   <div class="dialog-foot"><button type="button" class="btn ghost" data-close="checklistDialog">Cancelar</button><button type="submit" class="btn primary">Salvar checklist</button></div></form>
@@ -184,8 +184,8 @@
 <dialog id="equipmentDialog" aria-labelledby="equipmentDialogTitle">
   <div class="dialog-head"><h3 id="equipmentDialogTitle">Adicionar equipamento</h3></div>
   <form id="equipmentForm"><div class="dialog-body"><div class="form-grid">
-    <div class="field"><label for="eqCode">Código</label><input id="eqCode" maxlength="20" placeholder=""></div>
-    <div class="field"><label for="eqName">Nome</label><input id="eqName" maxlength="60" placeholder=""></div>
+    <div class="field"><label for="eqCode">Código</label><input id="eqCode" maxlength="20" required></div>
+    <div class="field"><label for="eqName">Nome</label><input id="eqName" maxlength="60" required></div>
     <div class="field"><label for="eqType">Tipo</label><select id="eqType"><option value="bateria">Bateria</option><option value="empilhadeira">Empilhadeira</option><option value="tablet">Tablet</option></select></div>
     <div class="field"><label for="eqStatus">Status inicial</label><select id="eqStatus" disabled><option value="unchecked">Sem checklist</option></select></div>
   </div></div><div class="dialog-foot"><button type="button" class="btn ghost" data-close="equipmentDialog">Cancelar</button><button type="submit" class="btn primary">Salvar</button></div></form>
@@ -194,10 +194,10 @@
 <dialog id="userDialog" aria-labelledby="userDialogTitle">
   <div class="dialog-head"><h3 id="userDialogTitle">Adicionar usuário</h3></div>
   <form id="userForm"><div class="dialog-body"><div class="form-grid">
-    <div class="field"><label for="usrName">Nome</label><input id="usrName" maxlength="60"></div>
-    <div class="field"><label for="usrUser">Usuário</label><input id="usrUser" maxlength="30"></div>
-    <div class="field"><label for="usrRole">Perfil</label><select id="usrRole"><option value="empilhador">Empilhador</option><option value="encarregado">Encarregado</option><option value="ti">TI (exige autenticação no Empilhamento)</option></select></div>
-    <div class="field"><label for="usrPass">Senha temporária</label><input id="usrPass" type="password" minlength="12" maxlength="128" autocomplete="new-password"></div>
+    <div class="field"><label for="usrName">Nome</label><input id="usrName" maxlength="60" required></div>
+    <div class="field"><label for="usrUser">Usuário</label><input id="usrUser" maxlength="30" autocomplete="username" required></div>
+    <div class="field"><label for="usrRole">Perfil</label><select id="usrRole"><option value="empilhador">Empilhador</option><option value="encarregado">Encarregado</option><option value="ti">TI</option></select></div>
+    <div class="field"><label for="usrPass">Senha temporária</label><input id="usrPass" type="password" minlength="12" maxlength="128" autocomplete="new-password" required></div>
   </div></div><div class="dialog-foot"><button type="button" class="btn ghost" data-close="userDialog">Cancelar</button><button type="submit" class="btn primary">Criar acesso</button></div></form>
 </dialog>
 

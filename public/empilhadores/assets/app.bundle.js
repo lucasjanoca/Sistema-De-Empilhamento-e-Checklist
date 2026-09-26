@@ -54,7 +54,7 @@ const DataSync=(()=>{
     poll=setInterval(()=>refresh().catch(()=>{}),15000);
   }
   function status(e){const online=e.detail.online;const el=UI.$('centralSyncBadge');if(el){el.className='central-sync-badge '+(online?'online':'offline');el.textContent=online?'Conectado ao servidor':'Sem conexão · ações bloqueadas';}UI.$('connectionBanner')?.classList.toggle('hidden',online);}
-  function init(){document.addEventListener('server:connection',status);UI.$('forceCentralSync')?.addEventListener('click',()=>refresh().then(()=>UI.toast('Dados atualizados do servidor.')).catch(e=>UI.toast(e.message)));}
+  function init(){document.addEventListener('server:connection',status);const retry=async button=>{button.disabled=true;try{if(AppState.getUser())await refresh();else await SeleneApi.request('/status');UI.toast('Conexão restabelecida.');}catch(e){UI.toast(e.message);}finally{button.disabled=false;}};UI.$('forceCentralSync')?.addEventListener('click',e=>retry(e.currentTarget));UI.$('retryEmpilhadoresBtn')?.addEventListener('click',e=>retry(e.currentTarget));}
   return {init,refresh,command,start,forceSync:refresh,reconnect:start,isConnected:()=>SeleneApi.online()};
 })();
 
@@ -1328,8 +1328,11 @@ const DataTools=(()=>{
   return {init};
 })();
 const TechnicalPanel=(()=>{
+  let lastSnapshot=null;
+  function downloadJson(filename,value){const blob=new Blob([JSON.stringify(value,null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.hidden=true;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   async function render(){if(!Permissions.can('technical'))return;try{
     const s=await SecurityApi.getSecurityStatus();await SeleneIntegration.loadServerConfig();const c=SeleneIntegration.getSettings();
+    lastSnapshot={generatedAt:new Date().toISOString(),application:{version:s.version,database:s.database,passwordStorage:s.passwordStorage,csrf:s.csrf,securityHeaders:s.securityHeaders,rateLimit:s.rateLimit,sessionIdleMinutes:s.sessionIdleMinutes,counts:s.counts},operations:{automaticBackups:s.automaticBackups,backupConfigured:s.backupConfigured,integrationConfigured:s.integrationConfigured},integration:{map:SeleneIntegration.integrationMap(),config:c}};
     for(const [id,value] of Object.entries({techVersion:s.version,techProtocol:location.protocol,techHost:location.host,techStorage:'PostgreSQL',techSecurityMode:'Servidor',techIntegrationGuide:SeleneIntegration.integrationGuide(),techIntegrationMap:JSON.stringify(SeleneIntegration.integrationMap(),null,2)})){if(UI.$(id))UI.$(id).textContent=value;}
     const rows=[['Banco',s.database],['Usuários',s.counts.users],['Paletes registrados',s.counts.pallets],['Backup automático',s.automaticBackups?'Ativo':'Não configurado'],['Integração externa',s.integrationConfigured?'Configurada':'Não configurada']];
     UI.$('techDiagnostics').innerHTML=rows.map(([a,b])=>`<div><span>${escapeHtml(a)}</span><b>${escapeHtml(b)}</b></div>`).join('');
@@ -1339,10 +1342,10 @@ const TechnicalPanel=(()=>{
   }catch(e){UI.toast(e.message);}}
   function init(){
     document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});UI.$('techRefresh').onclick=render;UI.$('techForceSync').onclick=()=>DataSync.refresh().catch(e=>UI.toast(e.message));
-    for(const id of ['techTestConnection','techRefreshSelene'])UI.$(id).onclick=async()=>{try{await SeleneIntegration.testConnection();}catch(e){UI.$('techConnectionResult').textContent=e.message;UI.$('techConnectionResult').className='tech-test-result error';}};
+    for(const id of ['techTestConnection','techRefreshSelene'])UI.$(id).onclick=async()=>{const result=UI.$('techConnectionResult');result.textContent='Verificando integração…';result.className='tech-test-result neutral';try{await SeleneIntegration.testConnection();result.textContent='Conexão validada pelo servidor.';result.className='tech-test-result ok';}catch(e){result.textContent=e.message;result.className='tech-test-result error';}};
     UI.$('techSaveIntegration').onclick=async()=>{try{await SeleneIntegration.saveSettings({serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,interval:Number(UI.$('techInterval').value)*1000,enabled:UI.$('techIntegrationEnabled').checked});UI.toast('Configuração registrada.');}catch(e){UI.toast(e.message);}};
-    UI.$('techSaveNotes').onclick=()=>DataSync.command('/settings/ti-notes',{value:UI.$('techIntegrationNotes').value},'PUT');UI.$('techCopyGuide').onclick=()=>navigator.clipboard.writeText(SeleneIntegration.integrationGuide()).catch(()=>UI.toast('Selecione o roteiro para copiar.'));
-    UI.$('techDownloadMap').onclick=()=>UI.toast(SeleneIntegration.integrationGuide());UI.$('techDownloadSnapshot').onclick=()=>Reports.download('history','csv');
+    UI.$('techSaveNotes').onclick=()=>DataSync.command('/settings/ti-notes',{value:UI.$('techIntegrationNotes').value},'PUT');UI.$('techCopyGuide').onclick=()=>navigator.clipboard.writeText(SeleneIntegration.integrationGuide()).then(()=>UI.toast('Roteiro copiado.')).catch(()=>UI.toast('Selecione o roteiro para copiar.'));
+    UI.$('techDownloadMap').onclick=()=>downloadJson('selene-mapa-integracao.json',SeleneIntegration.integrationMap());UI.$('techDownloadSnapshot').onclick=async()=>{if(!lastSnapshot)await render();if(lastSnapshot)downloadJson('selene-snapshot-tecnico.json',lastSnapshot);else UI.toast('Não foi possível montar o snapshot técnico.');};
   }
   return {init,render};
 })();

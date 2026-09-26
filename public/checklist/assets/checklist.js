@@ -3,6 +3,7 @@
 const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>Array.from(p.querySelectorAll(s));
 const statusLabel={unchecked:'SEM CHECKLIST',ok:'OK',warn:'ATENÇÃO',crit:'CRÍTICO'};
 const typeLabel={bateria:'Bateria',empilhadeira:'Empilhadeira',tablet:'Tablet'};
+const roleLabel={empilhador:'Empilhador',encarregado:'Encarregado',ti:'TI'};
 let currentUser=null,currentTab='bateria',currentAdminPage='overview',editingEquipmentId=null;
 let equipment=[],history=[],users=[],issues=[],audit=[],auditLoaded=false,auditLoading=null;
 let templates={},templateVersions=[],events=null,poll=null,checkVersion=null,checkTemplateId=null;
@@ -12,16 +13,18 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&l
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(window._toast);window._toast=setTimeout(()=>t.classList.remove('show'),2500)}
 function applyUser(){
   $('#userName').textContent=currentUser.name;
-  $('#roleName').textContent=currentUser.backendRole;
+  $('#roleName').textContent=roleLabel[currentUser.backendRole]||'Operador';
   $('#menuBtn').classList.toggle('hidden',currentUser.role!=='adm');
   $('#sideUser').textContent=currentUser.name;
-  $('#sideRole').textContent=currentUser.role==='adm'?'Administrador / TI':'Operador';
+  $('#sideRole').textContent=roleLabel[currentUser.backendRole]||'Operador';
+  const tiOption=$('#usrRole option[value="ti"]');if(tiOption){tiOption.disabled=currentUser.backendRole!=='ti';tiOption.textContent=currentUser.backendRole==='ti'?'TI':'TI (somente TI pode criar)';}
+  $('#backupBtn').classList.toggle('hidden',!SeleneApi.has('backup:create'));
   const mapping={equipment:'equipment:manage',issues:'issues:resolve',history:'audit:view',users:'users:view',templates:'checklist:manage',reports:'reports:export',settings:'system:configure'};
   for(const [page,perm] of Object.entries(mapping))$$('[data-admin-page="'+page+'"],[data-admin-page-jump="'+page+'"]').forEach(el=>el.classList.toggle('hidden',!SeleneApi.has(perm)));
   for(const id of ['printBtn','exportBtn'])$('#'+id).classList.toggle('hidden',!SeleneApi.has('reports:export'));
   if(currentUser.role!=='adm') closeSidebar();
 }
-function openSidebar(){if(currentUser?.role!=='adm')return;$('#sidebar').classList.add('open');$('#backdrop').classList.add('show')}
+function openSidebar(){if(currentUser?.role!=='adm')return;$('#sidebar').classList.add('open');$('#backdrop').classList.add('show');$('#closeSidebar').focus()}
 function closeSidebar(){$('#sidebar').classList.remove('open');$('#backdrop').classList.remove('show')}
 function showOperation(){currentAdminPage='overview';$('#adminView').classList.add('hidden');$('#operationView').classList.remove('hidden');closeSidebar()}
 function showAdmin(page='overview'){
@@ -47,13 +50,14 @@ function cardHTML(e){
 }
 function renderEquipment(){const grid=$('#equipmentGrid'),list=filteredList();grid.className=`grid ${currentTab==='bateria'?'battery-grid':'standard-grid'}`;grid.innerHTML=list.length?list.map(cardHTML).join(''):'<div class="empty">Nenhum equipamento encontrado.</div>'}
 function renderHistory(){const q=$('#searchInput').value.trim().toLowerCase();const rows=history.filter(h=>!q||JSON.stringify(h).toLowerCase().includes(q));$('#historyList').innerHTML=rows.length?rows.map(h=>`<div class="history-item"><div><b>${esc(h.equipment)}</b><small>${esc(h.kind==='swap'?'Troca de bateria':'Checklist')} • ${esc(h.details)}</small><small>${esc(h.obs)}</small><small>${esc(h.operator)}</small></div><div class="history-right"><span class="badge ${esc(h.status)}">${esc(h.kind==='swap'?'TROCA':statusLabel[h.status])}</span><time>${esc(fmt(h.createdAt))}</time></div></div>`).join(''):'<div class="empty">Sem registros.</div>'}
-function setTab(tab){currentTab=tab;$$('#nav button').forEach(b=>{const active=b.dataset.tab===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});const hist=tab==='historico';$('#historySection').classList.toggle('hidden',!hist);$('#equipmentsSection').classList.toggle('hidden',hist);$('#statusFilter').closest('.toolbar-right').classList.toggle('hidden',hist);hist?loadHistory():renderEquipment()}
+function setTab(tab){currentTab=tab;$$('#nav button').forEach(b=>{const active=b.dataset.tab===tab;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;});const hist=tab==='historico';$('#historySection').classList.toggle('hidden',!hist);$('#equipmentsSection').classList.toggle('hidden',hist);$('#equipmentsSection').setAttribute('aria-labelledby','tab-'+(hist?'bateria':tab));$('#statusFilter').closest('.toolbar-right').classList.toggle('hidden',hist);hist?loadHistory():renderEquipment()}
 
-function renderCheckItems(type){$('#checkItems').innerHTML=(templates[type]||[]).map((item,i)=>`<div class="check-row"><label for="check-item-${i}">${esc(item)}</label><select id="check-item-${i}" data-checkitem="${i}" aria-label="Resultado: ${esc(item)}"><option value="ok">OK</option><option value="warn">Atenção</option><option value="crit">Crítico</option></select></div>`).join('')}
+function updateChecklistResult(){const answers=$$('#checkItems select').map(s=>s.value);let result=answers.includes('crit')?'crit':answers.includes('warn')?'warn':'ok';if($('#ckType').value==='bateria'){if($('#ckWater').value==='Vazio')result='crit';else if($('#ckWater').value==='Abastecer'&&result==='ok')result='warn';}$('#ckStatus').value=result;return result;}
+function renderCheckItems(type){$('#checkItems').innerHTML=(templates[type]||[]).map((item,i)=>`<div class="check-row"><label for="check-item-${i}">${esc(item)}</label><select id="check-item-${i}" data-checkitem="${i}" aria-label="Resultado: ${esc(item)}"><option value="ok">OK</option><option value="warn">Atenção</option><option value="crit">Crítico</option></select></div>`).join('');updateChecklistResult()}
 function refreshEquipmentSelect(type,selectedId=''){
   const list=equipment.filter(e=>e.active&&e.type===type);$('#ckEquipment').innerHTML=list.map(e=>`<option value="${e.id}" ${e.id===selectedId?'selected':''}>${esc(e.code)} · ${esc(e.name)}</option>`).join('');
-  const target=equipment.find(e=>e.id===$('#ckEquipment').value)||list[0];if(target){checkVersion=target.version;checkTemplateId=templateVersions.find(t=>t.type===type)?.id;$('#ckStatus').value=target.status;$('#ckOperator').value=currentUser?.name||target.operator||'';$('#ckObservation').value='';$('#ckLiters').value=target.liters||'';$('#ckWater').value='Cheio'}
-  const showBattery=type==='bateria';$$('.battery-field').forEach(el=>el.classList.toggle('hidden',!showBattery));renderCheckItems(type)
+  const target=equipment.find(e=>e.id===$('#ckEquipment').value)||list[0];if(target){checkVersion=target.version;checkTemplateId=templateVersions.find(t=>t.type===type)?.id;$('#ckOperator').value=currentUser?.name||target.operator||'';$('#ckObservation').value='';$('#ckLiters').value=target.liters||'';$('#ckWater').value='Cheio'}
+  const showBattery=type==='bateria';$$('.battery-field').forEach(el=>el.classList.toggle('hidden',!showBattery));$('#ckLiters').required=showBattery;renderCheckItems(type)
 }
 function openChecklist(id=''){
   let target=equipment.find(e=>e.id===id&&e.active);if(!target)target=equipment.find(e=>e.active&&e.type===(currentTab==='historico'?'bateria':currentTab))||equipment.find(e=>e.active);
@@ -77,7 +81,7 @@ function renderIssues(){
   $('#issuesList').innerHTML=issues.map(i=>`<div class="list-row"><div class="main"><b>${esc(i.code)} · ${esc(i.name)}</b><small>${esc(i.summary)}</small><small>Status: ${i.status==='resolved'?'Resolvida':i.status==='in_progress'?'Em tratamento':'Aberta'}${i.resolution?` • ${esc(i.resolution)}`:''}</small></div><div class="controls"><span class="badge ${esc(i.severity)}">${i.severity==='crit'?'CRÍTICO':'ATENÇÃO'}</span>${i.status!=='resolved'?`<button class="btn small" data-treat-issue="${i.id}">Tratar</button>`:''}</div></div>`).join('')||'<div class="empty">Nenhuma pendência.</div>'
 }
 function renderUsers(){
-  $('#usersList').innerHTML=users.map(u=>`<div class="list-row"><div class="main"><b>${esc(u.name)}</b><small>${esc(u.username)} • ${u.role==='adm'?'ADM / TI':'Empilhador / Operador'} • ${u.active?'Ativo':'Bloqueado'}</small></div><div class="controls"><button class="btn small" data-reset-user="${u.id}">Redefinir senha</button><button class="btn small ${u.active?'warn':'primary'}" data-toggle-user="${u.id}">${u.active?'Bloquear':'Ativar'}</button></div></div>`).join('')
+  $('#usersList').innerHTML=users.map(u=>{const protectedTi=u.role==='ti'&&currentUser.backendRole!=='ti',locked=protectedTi?'disabled title="Somente TI pode alterar uma conta TI"':'';return `<div class="list-row"><div class="main"><b>${esc(u.name)}</b><small>${esc(u.username)} • ${esc(roleLabel[u.role]||u.role)} • ${u.active?'Ativo':'Bloqueado'}</small></div><div class="controls"><button class="btn small" data-reset-user="${u.id}" ${locked}>Redefinir senha</button><button class="btn small ${u.active?'warn':'primary'}" data-toggle-user="${u.id}" ${locked}>${u.active?'Bloquear':'Ativar'}</button></div></div>`}).join('')
 }
 function renderTemplates(){
   $('#templatesList').innerHTML=Object.entries(templates).map(([type,items],idx)=>`<div class="admin-card"><h3>${typeLabel[type]} • v${templateVersions.find(t=>t.type===type)?.version}</h3><p>${items.length} itens ativos</p><div class="list">${items.map(x=>`<div class="list-row"><div class="main"><b>${esc(x)}</b><small>Item obrigatório</small></div></div>`).join('')}</div><button class="btn small template-edit-spacing" data-template-edit="${type}">Editar modelo</button></div>`).join('')
@@ -92,11 +96,14 @@ function renderReports(){
 function openEquipmentDialog(id=null){editingEquipmentId=id;const e=equipment.find(x=>x.id===id);$('#equipmentDialogTitle').textContent=e?'Editar equipamento':'Adicionar equipamento';$('#eqCode').value=e?.code||'';$('#eqName').value=e?.name||'';$('#eqType').value=e?.type||'bateria';$('#eqStatus').value=e?.status||'unchecked';$('#eqType').disabled=!!e;$('#equipmentDialog').showModal()}
 function openIssue(id){const i=issues.find(x=>x.id===id);if(!i)return;$('#issueId').value=i.id;$('#issueEquipment').value=`${i.code} · ${i.name}`;$('#issueStatus').value=i.status==='open'?'in_progress':i.status;$('#issueResolution').value=i.resolution||'';$('#issueDialog').showModal()}
 async function refresh(){
-  const d=await SeleneApi.request('/checklist/state');equipment=d.equipment;if(currentTab!=='historico')history=d.history;else await loadHistory();issues=d.issues;templateVersions=d.templates;templates=Object.fromEntries(d.templates.map(x=>[x.type,x.questions]));
-  $('#todayText').textContent='Data operacional '+d.operationalDate;$('#serverTime').textContent='Servidor '+fmt(d.serverTime);$('#shiftLabel').textContent=d.shift;
-  if(SeleneApi.has('users:view'))users=(await SeleneApi.request('/users')).users.map(u=>({...u,id:String(u.id),name:u.nome,username:u.matricula}));
-  if(SeleneApi.has('audit:view')&&auditLoaded)await loadAudit(true);
-  calcKPIs();renderEquipment();renderHistory();renderAdmin();
+  $('#equipmentGrid').setAttribute('aria-busy','true');
+  try{
+    const d=await SeleneApi.request('/checklist/state');equipment=d.equipment;if(currentTab!=='historico')history=d.history;else await loadHistory();issues=d.issues;templateVersions=d.templates;templates=Object.fromEntries(d.templates.map(x=>[x.type,x.questions]));
+    $('#todayText').textContent='Data operacional '+d.operationalDate;$('#serverTime').textContent='Servidor '+fmt(d.serverTime);$('#shiftLabel').textContent=d.shift;
+    if(SeleneApi.has('users:view'))users=(await SeleneApi.request('/users')).users.map(u=>({...u,id:String(u.id),name:u.nome,username:u.matricula}));
+    if(SeleneApi.has('audit:view')&&auditLoaded)await loadAudit(true);
+    calcKPIs();renderEquipment();renderHistory();renderAdmin();
+  }finally{$('#equipmentGrid').setAttribute('aria-busy','false');}
 }
 async function loadAudit(force=false){
   if(!SeleneApi.has('audit:view'))return;
@@ -106,6 +113,7 @@ async function loadAudit(force=false){
   return auditLoading;
 }
 async function command(path,body={},method='POST'){try{const r=await SeleneApi.mutate(path,body,method);await refresh();return r;}catch(error){toast(error.message);if(error.status===409)await refresh().catch(()=>{});return null;}}
+async function lockedSubmit(ev,task){ev.preventDefault();const button=ev.submitter||ev.currentTarget.querySelector('[type="submit"]');if(button?.disabled)return;const label=button?.textContent;if(button){button.disabled=true;button.textContent='Salvando…';}try{await task();}finally{if(button){button.disabled=false;button.textContent=label;}}}
 async function enterWithIdentity(identity){
   currentUser={...identity,id:String(identity.id),name:identity.nome,username:identity.matricula,backendRole:identity.role,role:identity.permissions.some(p=>['equipment:manage','users:view','audit:view','issues:resolve'].includes(p))?'adm':'emp'};
   await refresh();$('#loginError').classList.add('hidden');$('#loginScreen').classList.add('hidden');$('#appScreen').classList.remove('hidden');applyUser();$('#ckOperator').value=currentUser.name;showOperation();
@@ -115,15 +123,11 @@ async function enterWithIdentity(identity){
 }
 async function selectDevice(){const state=await SeleneApi.request('/state');const list=state.data.registeredDevices.filter(d=>currentUser.backendRole!=='empilhador'||d.type==='tablet');if(!list.length){toast('Nenhum dispositivo cadastrado. Solicite cadastro ao Encarregado ou TI.');return;}const input=await SeleneApi.dialog('Equipamento desta sessão',[{name:'device',label:'Dispositivo',options:list.map(d=>({value:d.id,label:d.name}))}]);if(input&&await command('/devices/select',{device_id:Number(input.device)}))toast('Dispositivo vinculado.');}
 async function logout(){try{await SeleneApi.mutate('/auth/logout');SeleneApi.clear();location.reload();}catch(e){toast(e.message);}}
-async function saveChecklist(ev){
-  ev.preventDefault();const item=equipment.find(e=>e.id===$('#ckEquipment').value),template=templateVersions.find(t=>t.type===item?.type);if(!item||!template)return;
-  const payload={equipment_id:Number(item.id),equipment_version:checkVersion,template_version_id:checkTemplateId,answers:$$('#checkItems select').map(s=>s.value),observation:$('#ckObservation').value,water:item.type==='bateria'?$('#ckWater').value:null,liters:item.type==='bateria'?Number($('#ckLiters').value.replace(',','.')):null};
-  if(await command('/checklist/records',payload)){$('#checklistDialog').close();toast('Checklist registrado. Histórico preservado.');}
-}
-async function saveEquipment(ev){ev.preventDefault();const old=equipment.find(e=>e.id===editingEquipmentId),body={code:$('#eqCode').value,name:$('#eqName').value,type:$('#eqType').value};if(old)Object.assign(body,{version:old.version,active:old.active});if(await command(old?'/equipment/'+old.id:'/equipment',body,old?'PUT':'POST')){$('#equipmentDialog').close();toast('Equipamento salvo.');}}
+async function saveChecklist(ev){return lockedSubmit(ev,async()=>{const item=equipment.find(e=>e.id===$('#ckEquipment').value),template=templateVersions.find(t=>t.type===item?.type);if(!item||!template){toast('Equipamento ou modelo indisponível. Atualize a tela.');return;}const payload={equipment_id:Number(item.id),equipment_version:checkVersion,template_version_id:checkTemplateId,answers:$$('#checkItems select').map(s=>s.value),observation:$('#ckObservation').value,water:item.type==='bateria'?$('#ckWater').value:null,liters:item.type==='bateria'?Number($('#ckLiters').value):null};if(await command('/checklist/records',payload)){$('#checklistDialog').close();toast('Checklist registrado. Histórico preservado.');}})}
+async function saveEquipment(ev){return lockedSubmit(ev,async()=>{const old=equipment.find(e=>e.id===editingEquipmentId),body={code:$('#eqCode').value.trim(),name:$('#eqName').value.trim(),type:$('#eqType').value};if(old)Object.assign(body,{version:old.version,active:old.active});if(await command(old?'/equipment/'+old.id:'/equipment',body,old?'PUT':'POST')){$('#equipmentDialog').close();toast('Equipamento salvo.');}})}
 async function toggleEquipment(item){await command('/equipment/'+item.id,{code:item.code,name:item.name,type:item.type,version:item.version,active:!item.active},'PUT');}
-async function saveUser(ev){ev.preventDefault();if(await command('/users',{nome:$('#usrName').value,matricula:$('#usrUser').value,senha:$('#usrPass').value,role:$('#usrRole').value})){$('#usrPass').value='';$('#userDialog').close();toast('Usuário criado.');}}
-async function saveIssue(ev){ev.preventDefault();const i=issues.find(x=>x.id===$('#issueId').value);if(i&&await command('/issues/'+i.id,{version:i.version,status:$('#issueStatus').value.toUpperCase(),reason:$('#issueResolution').value},'PATCH')){$('#issueDialog').close();toast('Tratamento registrado.');}}
+async function saveUser(ev){return lockedSubmit(ev,async()=>{if(await command('/users',{nome:$('#usrName').value.trim(),matricula:$('#usrUser').value.trim(),senha:$('#usrPass').value,role:$('#usrRole').value})){$('#usrPass').value='';$('#userDialog').close();toast('Usuário criado.');}})}
+async function saveIssue(ev){return lockedSubmit(ev,async()=>{const i=issues.find(x=>x.id===$('#issueId').value);if(i&&await command('/issues/'+i.id,{version:i.version,status:$('#issueStatus').value.toUpperCase(),reason:$('#issueResolution').value.trim()},'PATCH')){$('#issueDialog').close();toast('Tratamento registrado.');}})}
 async function editTemplate(type){
   const old=templateVersions.find(t=>t.type===type);const input=await SeleneApi.dialog('Publicar versão de checklist',[{name:'type',label:'Tipo',value:type,options:Object.entries(typeLabel).map(([value,label])=>({value,label}))},{name:'name',label:'Nome',value:old?.name||'',required:true},{name:'questions',label:'Uma pergunta obrigatória por linha',type:'textarea',value:old?.questions.join('\n')||'',max:20000,required:true}]);
   if(input){const current=templateVersions.find(t=>t.type===input.type);if(await command('/checklist/templates',{type:input.type,name:input.name,questions:input.questions.split('\n').map(x=>x.trim()).filter(Boolean),expected_version:current?.version||0}))toast('Nova versão publicada. Registros anteriores preservados.');}
@@ -135,8 +139,10 @@ async function swapBattery(){
   if(input&&await command('/battery-swaps',{...input,forklift_id:Number(input.forklift_id),removed_id:input.removed_id?Number(input.removed_id):null,installed_id:Number(input.installed_id),out_meter:Number(input.out_meter),in_meter:Number(input.in_meter)}))toast('Troca registrada.');
 }
 function report(kind,format){SeleneApi.download('/reports/'+kind+'.'+format,'selene-'+kind+'.'+format).catch(e=>toast(e.message));}
+async function requestBackup(){if(!SeleneApi.has('backup:create')){toast('Seu perfil não possui permissão para solicitar backup.');return;}if(!await SeleneApi.reauth())return;try{const result=await SeleneApi.mutate('/backups');toast('Backup solicitado no servidor. Job '+result.job_id+'.');}catch(error){toast(error.message);}}
+async function retryConnection(){const button=$('#retryChecklistBtn');button.disabled=true;try{if(currentUser)await refresh();else await SeleneApi.request('/status');toast('Conexão restabelecida.');}catch(error){toast(error.message);}finally{button.disabled=false;}}
 let historyPage=1;
-async function loadHistory(){try{const r=await SeleneApi.request(($('#historyKind').value==='swap'?'/battery-swaps':'/checklist/history')+'?'+new URLSearchParams({page:historyPage,q:$('#searchInput').value}));history=r.rows;renderHistory();$('#historyPage').textContent='Página '+historyPage;$('#historyPrev').disabled=historyPage<=1;$('#historyNext').disabled=!r.hasMore;}catch(e){toast(e.message);}}
+async function loadHistory(){const list=$('#historyList');list.setAttribute('aria-busy','true');try{const r=await SeleneApi.request(($('#historyKind').value==='swap'?'/battery-swaps':'/checklist/history')+'?'+new URLSearchParams({page:historyPage,q:$('#searchInput').value}));history=r.rows;renderHistory();$('#historyPage').textContent='Página '+historyPage;$('#historyPrev').disabled=historyPage<=1;$('#historyNext').disabled=!r.hasMore;}catch(e){toast(e.message);}finally{list.setAttribute('aria-busy','false');}}
 $('#historyPrev').onclick=()=>{historyPage--;loadHistory();};$('#historyNext').onclick=()=>{historyPage++;loadHistory();};$('#historyKind').onchange=()=>{historyPage=1;loadHistory();};
 $('#accessCode').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,6);});
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const button=e.target.querySelector('[type=submit]');button.disabled=true;try{const result=await SeleneApi.mutate('/codes/redeem',{code:$('#accessCode').value});$('#accessCode').value='';await enterWithIdentity(result.user);}catch(error){$('#loginError').textContent=error.message;$('#loginError').classList.remove('hidden');}finally{button.disabled=false;}});
@@ -157,13 +163,15 @@ document.addEventListener('click',async e=>{
   if(select('data-template-edit'))await editTemplate(select('data-template-edit').dataset.templateEdit);
   if(select('data-close'))$('#'+select('data-close').dataset.close).close();
 });
-$('#nav').onclick=e=>{const b=e.target.closest('[data-tab]');if(b)setTab(b.dataset.tab);};$('#searchInput').oninput=()=>currentTab==='historico'?renderHistory():renderEquipment();$('#statusFilter').onchange=renderEquipment;
-$('#newChecklistBtn').onclick=()=>openChecklist();$('#printBtn').onclick=()=>report('checklist','pdf');$('#exportBtn').onclick=()=>report('checklist','csv');$('#ckType').onchange=e=>refreshEquipmentSelect(e.target.value);$('#ckEquipment').onchange=()=>refreshEquipmentSelect($('#ckType').value,$('#ckEquipment').value);$('#checklistForm').onsubmit=saveChecklist;
-$('#goOperationBtn').onclick=showOperation;$('#addEquipmentBtn').onclick=()=>openEquipmentDialog();$('#equipmentForm').onsubmit=saveEquipment;$('#admEquipSearch').oninput=renderAdminEquipment;$('#admEquipType').onchange=renderAdminEquipment;$('#addUserBtn').onclick=()=>{$('#userForm').reset();$('#userDialog').showModal();};$('#userForm').onsubmit=saveUser;$('#issueForm').onsubmit=saveIssue;
-$('#refreshIssues').onclick=()=>refresh().catch(e=>toast(e.message));$('#downloadAudit').onclick=()=>report('audit','csv');$('#newTemplateBtn').onclick=()=>editTemplate('bateria');$('#reportCsv').onclick=()=>report('checklist','csv');$('#reportPdf').onclick=()=>report('checklist','pdf');$('#backupBtn').onclick=()=>toast('Consulte OPERACAO.md: backup criptografado e restore por administrador autorizado.');
-$('#healthBtn').onclick=async()=>{try{const r=await SeleneApi.request('/security/status');$('#healthResult').textContent='Servidor '+r.version+' · Banco '+r.database+' · Integração externa não configurada';}catch(e){$('#healthResult').textContent=e.message;}};
+$('#nav').onclick=e=>{const b=e.target.closest('[data-tab]');if(b)setTab(b.dataset.tab);};$('#nav').onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=$$('#nav [role="tab"]'),current=tabs.indexOf(document.activeElement);let next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(current+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;setTab(tabs[next].dataset.tab);tabs[next].focus();};$('#searchInput').oninput=()=>currentTab==='historico'?renderHistory():renderEquipment();$('#statusFilter').onchange=renderEquipment;
+$('#newChecklistBtn').onclick=()=>openChecklist();$('#printBtn').onclick=()=>report('checklist','pdf');$('#exportBtn').onclick=()=>report('checklist','csv');$('#ckType').onchange=e=>refreshEquipmentSelect(e.target.value);$('#ckEquipment').onchange=()=>refreshEquipmentSelect($('#ckType').value,$('#ckEquipment').value);$('#ckWater').onchange=updateChecklistResult;$('#checkItems').onchange=e=>{if(e.target.matches('[data-checkitem]'))updateChecklistResult();};$('#checklistForm').onsubmit=saveChecklist;
+$('#goOperationBtn').onclick=showOperation;$('#addEquipmentBtn').onclick=()=>openEquipmentDialog();$('#equipmentForm').onsubmit=saveEquipment;$('#admEquipSearch').oninput=renderAdminEquipment;$('#admEquipType').onchange=renderAdminEquipment;$('#addUserBtn').onclick=()=>{$('#userForm').reset();if(currentUser.backendRole!=='ti')$('#usrRole').value='empilhador';$('#userDialog').showModal();};$('#userForm').onsubmit=saveUser;$('#issueForm').onsubmit=saveIssue;
+$('#refreshIssues').onclick=()=>refresh().catch(e=>toast(e.message));$('#downloadAudit').onclick=()=>report('audit','csv');$('#newTemplateBtn').onclick=()=>editTemplate('bateria');$('#reportCsv').onclick=()=>report('checklist','csv');$('#reportPdf').onclick=()=>report('checklist','pdf');$('#backupBtn').onclick=requestBackup;
+$('#healthBtn').onclick=async()=>{const button=$('#healthBtn');button.disabled=true;$('#healthResult').textContent='Verificando…';try{const r=await SeleneApi.request('/security/status');$('#healthResult').textContent='Servidor '+r.version+' · Banco '+r.database+' · Integração '+(r.integrationConfigured?'configurada':'não configurada')+' · Backup '+(r.backupConfigured?'configurado':'não configurado');}catch(e){$('#healthResult').textContent=e.message;}finally{button.disabled=false;}};
 $('#saveUiSettings').onclick=()=>{const n=$('#gridSetting').value;sessionStorage.setItem('checklist-grid',n);document.documentElement.classList.remove('battery-cols-2','battery-cols-3','battery-cols-4','battery-cols-5','battery-cols-6');document.documentElement.classList.add('battery-cols-'+n);toast('Preferência visual salva nesta sessão.');};
 $('#deviceButton').onclick=()=>selectDevice().catch(e=>toast(e.message));$('#swapButton').onclick=swapBattery;
+$('#retryChecklistBtn').onclick=retryConnection;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#sidebar').classList.contains('open')){closeSidebar();$('#menuBtn').focus();}});
 document.addEventListener('security:expired',()=>{equipment=[];history=[];users=[];issues=[];audit=[];currentUser=null;location.replace('/checklist/');},{once:true});
 document.addEventListener('server:connection',e=>{$('#offlineBanner').classList.toggle('hidden',e.detail.online);});
 setInterval(()=>{if(currentUser)SeleneApi.mutate('/devices/heartbeat').catch(()=>{});},60000);

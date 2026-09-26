@@ -10,7 +10,7 @@
   <meta name="application-name" content="Site Selene">
   <meta name="referrer" content="no-referrer">
 <link rel="stylesheet" href="/shared/production.css"><link rel="stylesheet" href="assets/checklist-code.css"><link rel="manifest" href="manifest.webmanifest"></head>
-<body><div id="connectionBanner" class="connection-banner hidden" role="alert">Sem conexão com o servidor. As ações dependem da reconexão.</div>
+<body><div id="connectionBanner" class="connection-banner hidden" role="alert"><span>Sem conexão com o servidor. As ações dependem da reconexão.</span><button id="retryEmpilhadoresBtn" type="button">Tentar novamente</button></div>
   <div id="toast" class="toast" aria-live="polite"></div>
 
   <!-- LOGIN -->
@@ -125,7 +125,7 @@
         </div>
 
         <div class="topbar-actions">
-          <span id="centralSyncBadge" class="central-sync-badge local">Dados locais</span>
+          <span id="centralSyncBadge" class="central-sync-badge local">Conectando ao servidor…</span>
           <button id="currentTabletBadge" class="tablet-topbar-badge" type="button" title="Trocar tablet">Tablet: selecionar</button>
           <span id="currentUserLabel" class="current-user"></span>
           <span id="currentProductionRequest" class="production-request-badge hidden"></span>
@@ -558,7 +558,7 @@
                 <div><span>Integração oficial</span><b>Dependente do TI</b></div>
                 <div><span>Proteção de escrita</span><b>Ativada</b></div>
               </div>
-              <p class="settings-help">Ao abrir pelo servidor, notebooks e tablets autorizados na mesma rede podem compartilhar os dados operacionais. O armazenamento definitivo será definido pelo TI.</p>
+              <p class="settings-help">Notebooks e tablets autorizados compartilham os dados pelo PostgreSQL do servidor. A TI deve fornecer a infraestrutura corporativa definitiva antes do go-live.</p>
               <div class="settings-actions"><button id="forceCentralSync" class="btn btn-secondary" type="button">Sincronizar agora</button></div>
             </section>
             <section class="settings-block">
@@ -597,7 +597,7 @@
         <div class="technical-kpis">
           <article><span>Versão</span><b id="techVersion">2.0</b><small>build operacional</small></article>
           <article><span>Ambiente</span><b id="techProtocol">—</b><small id="techHost">—</small></article>
-          <article><span>Dados locais</span><b id="techStorage">—</b><small>estimativa do navegador</small></article>
+          <article><span>Persistência</span><b id="techStorage">—</b><small>fonte de verdade do servidor</small></article>
           <article><span>Proteção API</span><b class="tech-safe">ATIVA</b><small>escrita real bloqueada até validação</small></article>
         </div>
 

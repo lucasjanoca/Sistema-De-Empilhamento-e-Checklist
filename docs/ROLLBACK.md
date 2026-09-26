@@ -1,11 +1,12 @@
 # Rollback
 
-## Referência da versão 2.1.1
+## Referência da versão 2.1.2
 
 - Base anterior da `main`: `183ee22`.
 - Tag preservada: `checkpoint-main-pre-backend-20260926`.
 - Esta atualização introduz a migration inicial `0001_operational` para instalações que ainda usavam a versão estática. O rollback da aplicação não deve apagar o banco criado.
-- Arquivos materiais: interface do Checklist, acessibilidade dos dialogs do Empilhadores, service workers, versão, testes, CI e documentação.
+- Versão anterior integrada: tag `site-selene-2.1.1-main`, commit `cd5a62369dc92164313520bee5548b2bb0f69077`.
+- Arquivos materiais desta atualização: interface do Checklist, feedback de conexão e operações, painel técnico do Empilhadores, service workers, contratos de UI e documentação.
 
 ## Aplicação
 

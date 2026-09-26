@@ -121,7 +121,7 @@ def metrics(conn, actor):
 def state(conn, actor):
     at = now(conn)
     data = dict(
-        version="2.1.1",
+        version="2.1.2",
         requests=[],
         history=[],
         productionRequests=[],

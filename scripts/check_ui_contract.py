@@ -81,10 +81,35 @@ def check_checklist_contract() -> list[str]:
     js_path = PUBLIC / "checklist" / "assets" / "checklist.js"
     html = html_path.read_text(encoding="utf-8")
     ids = set(re.findall(r'\bid="([^"]+)"', html))
-    js_ids = set(re.findall(r"\$\('#([A-Za-z][\w:-]*)'\)", js_path.read_text(encoding="utf-8")))
+    js = js_path.read_text(encoding="utf-8")
+    js_ids = set(re.findall(r"\$\('#([A-Za-z][\w:-]*)'\)", js))
     missing = sorted(js_ids - ids)
     if missing:
         errors.append("Checklist: IDs usados no JavaScript e ausentes no HTML: " + ", ".join(missing))
+    for control_id in ("eqCode", "eqName", "usrName", "usrUser", "usrPass"):
+        tag_match = re.search(rf'<(?:input|select|textarea)\b[^>]*\bid="{control_id}"[^>]*>', html)
+        if not tag_match or not re.search(r"\brequired(?:\s|=|>)", tag_match.group(0)):
+            errors.append(f"Checklist: controle obrigatorio sem required: {control_id}")
+    for tab_id in ("tab-bateria", "tab-empilhadeira", "tab-tablet", "tab-historico"):
+        tag_match = re.search(rf'<button\b[^>]*\bid="{tab_id}"[^>]*>', html)
+        if not tag_match or 'role="tab"' not in tag_match.group(0) or 'aria-controls=' not in tag_match.group(0):
+            errors.append(f"Checklist: aba sem contrato ARIA completo: {tab_id}")
+    for required_js in ("lockedSubmit", "updateChecklistResult", "roleLabel[currentUser.backendRole]"):
+        if required_js not in js:
+            errors.append(f"Checklist: protecao de interface ausente: {required_js}")
+    return errors
+
+
+def check_production_feedback() -> list[str]:
+    errors: list[str] = []
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in PUBLIC.rglob("*.*") if path.suffix in {".html", ".js"})
+    for misleading in ("Dados locais", "estimativa do navegador", "Backup concluído", "Backup realizado"):
+        if misleading.casefold() in combined.casefold():
+            errors.append(f"Interface publica contem mensagem enganosa: {misleading}")
+    shared_api = (PUBLIC / "shared" / "api.js").read_text(encoding="utf-8")
+    for required in ('aria-labelledby', "AbortSignal.timeout(30000)", "addEventListener('online'"):
+        if required not in shared_api:
+            errors.append(f"API compartilhada sem feedback esperado: {required}")
     return errors
 
 
@@ -123,6 +148,7 @@ def main() -> None:
     for html_path in PUBLIC.rglob("*.html"):
         errors.extend(check_html(html_path, require_control_labels=html_path == PUBLIC / "checklist" / "index.html"))
     errors.extend(check_checklist_contract())
+    errors.extend(check_production_feedback())
     errors.extend(check_pwa("checklist"))
     errors.extend(check_pwa("empilhadores"))
     if errors:
