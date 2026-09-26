@@ -1,0 +1,13 @@
+.git
+.env*
+tests
+outputs
+work
+backups
+keys
+*.pem
+*.selene
+__pycache__
+.pytest_cache
+.ruff_cache
+*.zip
