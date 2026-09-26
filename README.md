@@ -1,28 +1,20 @@
-# Sistema de Empilhamento e Checklist
+# Site Selene 2.1.1
 
-Repositório integrado dos sistemas operacionais desenvolvidos pela InfoTech.io.
+Aplicação operacional do Empilhamento 2.0 e Checklist, com a identidade visual original preservada e uma única fonte de verdade em PostgreSQL. O backend FastAPI decide autenticação, permissões, transições, autorizações, locks, timers, códigos temporários e auditoria. O navegador não armazena dados corporativos.
 
-## Estrutura
+Desenvolvimento inicial: **Lucas Janoca / InfoTech.io**. A evolução técnica 2.1 mantém o crédito, os fluxos e as telas do Site 2.0.
 
-- `index.html` — Checklist Operacional com acesso por código.
-- `checklist/index.html` — cópia do Checklist para testes.
-- `empilhadores/index.html` — gerador de código do Sistema de Empilhadores.
-- `shared/access-code.js` — regras compartilhadas do código temporário.
+## Conteúdo
 
-## Fluxo de acesso integrado
+- `app/`: API, regras operacionais, segurança, backup, manutenção e observabilidade.
+- `migrations/`: migration Alembic congelada e política de integridade PostgreSQL.
+- `public/empilhadores/` e `public/checklist/`: interfaces preservadas, conectadas à API.
+- `tests/`: testes reais em PostgreSQL, sem SQLite ou mocks de persistência.
+- `deploy/`, `Dockerfile`, `compose.yaml`: base reproduzível para homologação da TI.
+- `docs/`: arquitetura, instalação, operação, segurança, backup, API e validação.
 
-1. O operador abre o Sistema de Empilhadores.
-2. Informa matrícula/nome e gera um código numérico de 6 dígitos.
-3. O código fica válido por 2 minutos.
-4. No Checklist, o operador digita o código.
-5. O Checklist recebe a identidade e o perfil.
-6. O código é marcado como utilizado e não pode ser usado novamente.
-7. Tentativas repetidas incorretas recebem bloqueio temporário.
+## Estado da entrega
 
-## Estado atual do teste online
+O software está implementado e validado localmente com PostgreSQL 17. A entrada em produção corporativa depende dos valores e da homologação listados em [PENDENCIAS-TI.md](PENDENCIAS-TI.md). Nenhum hostname, certificado, segredo, endpoint interno ou credencial foi inventado.
 
-Nesta etapa o armazenamento compartilhado usa o navegador/origem do site para permitir validação imediata durante os testes. Isso funciona quando gerador e Checklist são usados no mesmo navegador/origem.
-
-A próxima etapa de integração substituirá apenas essa camada por Supabase/backend compartilhado, preservando as telas e as regras, para o código funcionar entre dispositivos diferentes (por exemplo, código gerado em um terminal e digitado em outro tablet).
-
-> Ambiente de desenvolvimento/testes. Perfis e emissão de códigos administrativos devem ser controlados pelo backend antes do uso real em produção.
+Comece por [docs/INSTALACAO.md](docs/INSTALACAO.md) e execute `python scripts/homologate.py` no ambiente configurado. O resultado da versão 2.1.1 está em [docs/HOMOLOGACAO-2.1.1.md](docs/HOMOLOGACAO-2.1.1.md), e o roteiro operacional está em [docs/PILOTO-CONTROLADO.md](docs/PILOTO-CONTROLADO.md).
