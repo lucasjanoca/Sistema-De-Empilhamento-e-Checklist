@@ -2,8 +2,8 @@
 
 from alembic import op
 import sqlalchemy as sa
-from app.schema import metadata, roles, permissions, role_permissions, system_settings
-from app.policy import ALL_PERMISSIONS, ROLE_GRANTS, CORRIDORS
+from migrations.schema_v0001 import metadata, roles, permissions, role_permissions, system_settings
+from migrations.policy_v0001 import ALL_PERMISSIONS, ROLE_GRANTS, CORRIDORS
 
 revision = "0001_operational"
 down_revision = None

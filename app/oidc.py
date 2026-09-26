@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 import httpx
 import sqlalchemy as sa
 from authlib.integrations.httpx_client import OAuth2Client
-from authlib.jose import jwt
+from authlib.jose import JsonWebToken
 from authlib.oidc.core import CodeIDToken
 from fastapi import Request
 from fastapi.responses import RedirectResponse
@@ -14,6 +14,8 @@ from . import schema as t
 from .config import settings
 from .db import engine, now, one
 from .security import Actor, audit, digest, fail, grants, new_session, rate_limit
+
+jwt = JsonWebToken(["RS256", "ES256"])
 
 
 def metadata():

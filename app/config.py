@@ -47,6 +47,9 @@ class Settings(BaseSettings):
         ZoneInfo(self.timezone)
         if self.oidc_issuer and not self.oidc_issuer.startswith("https://"):
             raise ValueError("OIDC exige HTTPS.")
+        oidc_values = (self.oidc_issuer, self.oidc_client_id, self.oidc_client_secret.get_secret_value())
+        if any(oidc_values) and not all(oidc_values):
+            raise ValueError("OIDC exige issuer, client ID e client secret completos.")
         if self.require_admin_mfa and not (self.oidc_issuer and self.oidc_mfa_acr):
             raise ValueError("MFA administrativo exige OIDC e ACR homologados.")
         return self

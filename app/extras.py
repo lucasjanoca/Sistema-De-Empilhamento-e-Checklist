@@ -1,6 +1,5 @@
 import csv
 import io
-import json
 import sqlalchemy as sa
 from fastapi import Request
 from fastapi.responses import Response
@@ -9,6 +8,8 @@ from . import schema as t, inputs as inp, views
 from .db import rows
 from .security import audit, fail, rate_limit
 from .integration import validate_base, require_adapter
+from .queries import production_query, production_row, checklist_query, checklist_row, audit_query
+from .monitoring import snapshot
 
 
 def safe_cell(value):
@@ -21,14 +22,15 @@ def register(app, run):
 
     @app.get(base + "/integration/config")
     def config(request: Request):
+        def read(c, a):
+            value = c.scalar(sa.select(t.integration_settings.c.value).where(t.integration_settings.c.key == "config")) or {}
+            return {"config": value, "configured": bool(value.get("enabled") and value.get("serverBase"))}
+
         return run(
             request,
             "integration:view",
             {},
-            lambda c, a: {
-                "config": c.scalar(sa.select(t.integration_settings.c.value).where(t.integration_settings.c.key == "config")) or {},
-                "configured": False,
-            },
+            read,
         )
 
     @app.put(base + "/integration/config")
@@ -43,7 +45,7 @@ def register(app, run):
                 .values(key="config", value=value)
                 .on_conflict_do_update(index_elements=["key"], set_={"value": value})
             )
-            audit(c, "INTEGRATION_CONFIG_CHANGED", {"enabled": False}, a, request)
+            audit(c, "INTEGRATION_CONFIG_CHANGED", {"enabled": body.enabled}, a, request)
             return {"ok": True, "config": value}
 
         return run(request, "integration:configure", body.model_dump(), action, True)
@@ -54,12 +56,22 @@ def register(app, run):
 
     @app.get(base + "/reports/{kind}.{format}")
     def report(
-        kind: str, format: str, request: Request, q: str = "", date_from: str = "", date_to: str = "", user: str = "", status: str = ""
+        kind: str,
+        format: str,
+        request: Request,
+        q: str = "",
+        date_from: str = "",
+        date_to: str = "",
+        user: str = "",
+        status: str = "",
+        role: str = "",
+        category: str = "",
+        event: str = "",
     ):
         if (
             kind not in {"history", "production", "audit", "checklist"}
             or format not in {"csv", "pdf"}
-            or max(map(len, [q, date_from, date_to, user, status])) > 100
+            or max(map(len, [q, date_from, date_to, user, status, role, category, event])) > 100
         ):
             fail(422, "Relatório inválido.")
 
@@ -68,29 +80,26 @@ def register(app, run):
             if kind == "audit":
                 if "audit:view" not in a.permissions:
                     fail(403, "Auditoria não autorizada.")
-                query = sa.select(t.audit_log.c.timestamp, t.audit_log.c.action, t.audit_log.c.details)
-                if q:
-                    query = query.where(t.audit_log.c.action.icontains(q, autoescape=True))
-                data = [list(r.values()) for r in rows(c, query.order_by(t.audit_log.c.id.desc()).limit(10000))]
+                query = audit_query(q, user, role, category, event, date_from, date_to)
+                data = [[r["timestamp"], r["action"], r["details"]] for r in rows(c, query.order_by(t.audit_log.c.id.desc()).limit(10001))]
                 heads = ["Data", "Ação", "Detalhes"]
             elif kind == "production":
-                result = views.production_rows(c, a)
                 result = [
-                    r
-                    for r in result
-                    if (not q or q.lower() in r["number"].lower())
-                    and (not user or user == r["userMatricula"])
-                    and (not status or status == r["status"])
+                    production_row(r)
+                    for r in rows(
+                        c, production_query(a, q, user, status, date_from, date_to).order_by(t.production_requests.c.id.desc()).limit(10001)
+                    )
                 ]
                 data = [[r["number"], r["userName"], r["tabletName"], r["status"], r["downCount"], r["upCount"]] for r in result]
                 heads = ["Requisição", "Operador", "Dispositivo", "Status", "Desceu", "Subiu"]
             elif kind == "checklist":
-                records = views.checklist_state(c, a)["history"]
-                data = [
-                    [r["createdAt"], r["equipment"], r["operator"], r["status"], r["obs"]]
-                    for r in records
-                    if not q or q.lower() in json.dumps(r).lower()
+                records = [
+                    checklist_row(r)
+                    for r in rows(
+                        c, checklist_query(a, q, status, user, date_from, date_to).order_by(t.checklist_records.c.id.desc()).limit(10001)
+                    )
                 ]
+                data = [[r["createdAt"], r["equipment"], r["operator"], r["status"], r["obs"]] for r in records]
                 heads = ["Data", "Equipamento", "Operador", "Resultado", "Observação"]
             else:
                 query = views.history_query(a)
@@ -107,9 +116,13 @@ def register(app, run):
                         query = query.where(t.operational_history.c.operational_date <= date.fromisoformat(date_to))
                 except ValueError:
                     fail(422, "Data inválida.")
-                records = rows(c, query.order_by(t.operational_history.c.id.desc()).limit(10000))
+                if user:
+                    query = query.where(t.users.c.matricula == user)
+                records = rows(c, query.order_by(t.operational_history.c.id.desc()).limit(10001))
                 data = [[r["timestamp"], r["number"], r["address"], r["action"], r["nome"], r["device_name"]] for r in records]
                 heads = ["Data", "Requisição", "Endereço", "Ação", "Operador", "Dispositivo"]
+            if len(data) > 10000:
+                fail(422, "Mais de 10.000 registros. Restrinja o período ou o filtro antes de exportar.")
             audit(c, "REPORT_EXPORTED", {"kind": kind, "format": format, "rows": len(data)}, a, request)
             if format == "csv":
                 output = io.StringIO()
@@ -132,7 +145,7 @@ def register(app, run):
             style = styles["BodyText"]
             style.fontSize = 8
             cells = [[Paragraph(escape(str(v or "")), style) for v in r] for r in [heads, *data]]
-            tbl = Table(cells, repeatRows=1, colWidths=[740 / len(heads)] * len(heads))
+            tbl = Table(cells, repeatRows=1, splitInRow=1, colWidths=[690 / len(heads)] * len(heads))
             tbl.setStyle(
                 TableStyle(
                     [
@@ -160,6 +173,20 @@ def register(app, run):
             "security:view",
             {},
             lambda c, a: {
+                **snapshot(),
+                "login_failures_15m": c.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(t.audit_log)
+                    .where(
+                        t.audit_log.c.action == "LOGIN_FAILED", t.audit_log.c.timestamp > sa.func.now() - sa.text("interval '15 minutes'")
+                    )
+                ),
+                "last_backup": c.scalar(
+                    sa.select(t.technical_events.c.details)
+                    .where(t.technical_events.c.kind == "BACKUP")
+                    .order_by(t.technical_events.c.id.desc())
+                    .limit(1)
+                ),
                 "open_movements": c.scalar(
                     sa.select(sa.func.count()).select_from(t.pallet_movements).where(t.pallet_movements.c.status == "PENDING")
                 ),
@@ -173,5 +200,9 @@ def register(app, run):
         )
 
     from .oidc import register_oidc
+    from .queries import register_queries
+    from .backup_routes import register_backups
 
     register_oidc(app)
+    register_queries(app, run)
+    register_backups(app, run)

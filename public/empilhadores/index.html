@@ -6,12 +6,11 @@
   <title>Site Selene 2.0 — Gestão de Paletes</title>
   <link rel="stylesheet" href="assets/app.bundle.css">
   <link rel="stylesheet" href="assets/operation-focus.css">
-  <link rel="stylesheet" href="assets/checklist-code.css">
   <meta name="author" content="InfoTech.io — Desenvolvimento inicial: Lucas Janoca">
   <meta name="application-name" content="Site Selene">
   <meta name="referrer" content="no-referrer">
-</head>
-<body>
+<link rel="stylesheet" href="/shared/production.css"><link rel="stylesheet" href="assets/checklist-code.css"><link rel="manifest" href="manifest.webmanifest"></head>
+<body><div id="connectionBanner" class="connection-banner hidden" role="alert">Sem conexão com o servidor. As ações dependem da reconexão.</div>
   <div id="toast" class="toast" aria-live="polite"></div>
 
   <!-- LOGIN -->
@@ -49,7 +48,7 @@
         <button class="btn btn-primary btn-full" type="submit">Entrar</button>
       </form>
 
-      <div class="demo-box security-login-note"><strong>Acesso protegido</strong><span>Use as credenciais temporárias fornecidas pelo responsável do projeto. Em produção, o TI deverá substituí-las.</span></div>
+      <div class="demo-box security-login-note"><strong>Acesso protegido</strong><span>Use a matrícula e a senha cadastradas pelo responsável. O acesso depende do servidor.</span></div>
     </div>
 
     <div class="login-visual">
@@ -67,23 +66,23 @@
 
       <div id="visualPallets" class="visual-pallet-grid">
         <article class="visual-pallet waiting">
-          <b>20-003-3</b><span>Aguardando</span>
+          <b>Palete</b><span>Aguardando</span>
         </article>
         <article class="visual-pallet lowering">
-          <b>04-042-3</b><span>Descendo</span>
+          <b>Palete</b><span>Descendo</span>
         </article>
         <article class="visual-pallet floor">
-          <b>03-033-2</b><span>No chão</span>
+          <b>Palete</b><span>No chão</span>
         </article>
         <article class="visual-pallet ready">
-          <b>19-003-4</b><span>Liberado</span>
+          <b>Palete</b><span>Liberado</span>
         </article>
       </div>
 
       <div class="visual-stats">
-        <div><span>↓</span><b id="visualDown">18</b><small>desceram</small></div>
-        <div><span>↑</span><b id="visualUp">14</b><small>subiram</small></div>
-        <div><span>✓</span><b id="visualTotal">32</b><small>movimentações</small></div>
+        <div><span>↓</span><b id="visualDown">—</b><small>desceram</small></div>
+        <div><span>↑</span><b id="visualUp">—</b><small>subiram</small></div>
+        <div><span>✓</span><b id="visualTotal">—</b><small>movimentações</small></div>
       </div>
     </div>
   </section>
@@ -139,7 +138,7 @@
             </section>
           </div>
           <button id="refreshButton" class="btn btn-soft" type="button">↻ Atualizar</button>
-          <button id="logoutButton" class="btn btn-light" type="button">Sair</button>
+          <button id="reauthButton" class="btn btn-light" type="button">Reautenticar</button><button id="logoutButton" class="btn btn-light" type="button">Sair</button>
           <button id="shiftButton" class="shift-button inactive" type="button">
             ● <span>Iniciar requisição</span>
           </button>
@@ -349,7 +348,7 @@
 
               <label class="field production-search-field">
                 <span class="field-label">Número da requisição</span>
-                <input id="productionNumberFilter" placeholder="Ex.: REQ-20260803">
+                <input id="productionNumberFilter" placeholder="">
               </label>
             </div>
           </section>
@@ -401,7 +400,7 @@
                   </tr>
                 </thead>
                 <tbody id="productionRequestsBody"></tbody>
-              </table>
+              </table><div class="pagination"><button id="productionPrev" class="btn btn-light" type="button">Anterior</button><span id="productionPage">Página 1</span><button id="productionNext" class="btn btn-light" type="button">Próxima</button></div>
             </div>
           </section>
 
@@ -447,15 +446,15 @@
               <form id="createUserForm" class="panel-body user-form">
                 <label class="field">
                   <span class="field-label">Nome completo</span>
-                  <input id="newUserName" autocomplete="off" placeholder="Ex.: Operador 01" required>
+                  <input id="newUserName" autocomplete="off" placeholder="" required>
                 </label>
                 <label class="field">
                   <span class="field-label">Matrícula</span>
-                  <input id="newUserMatricula" autocomplete="off" placeholder="Ex.: 1548" required>
+                  <input id="newUserMatricula" autocomplete="off" placeholder="" required>
                 </label>
                 <label class="field">
                   <span class="field-label">Senha inicial</span>
-                  <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="Mínimo 10 caracteres + letras, número e símbolo" minlength="10" required>
+                  <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="Mínimo 12 caracteres + letras, número e símbolo" minlength="12" required>
                 </label>
                 <label class="field">
                   <span class="field-label">Tipo de acesso</span>
@@ -509,7 +508,7 @@
                 </tr>
               </thead>
               <tbody id="historyTable"></tbody>
-            </table>
+            </table><div class="pagination"><button id="historyPrev" class="btn btn-light" type="button">Anterior</button><span id="historyPage">Página 1</span><button id="historyNext" class="btn btn-light" type="button">Próxima</button></div>
           </div>
         </section>
       </section>
@@ -573,11 +572,11 @@
             </section>
             <section class="settings-block device-admin-block" data-roles="encarregado,ti">
               <div class="device-admin-heading">
-                <div><h4>Dispositivos / tablets</h4><p class="settings-help">Cadastre aqui os equipamentos autorizados. Emp escolhe um tablet; Encarregado e TI recebem um computador padrão automaticamente e podem trocar manualmente quando necessário.</p></div>
+                <div><h4>Dispositivos / tablets</h4><p class="settings-help">Cadastre aqui os equipamentos autorizados. Emp escolhe um tablet cadastrado. Encarregado e TI podem selecionar tablet, computador ou totem disponível.</p></div>
                 <span class="admin-only-pill">ENC / TI</span>
               </div>
-              <form id="deviceAdminForm" class="device-admin-form">
-                <input id="deviceAdminName" type="text" placeholder="Ex.: Tablet 13 ou Tablet Novo" maxlength="40" required>
+              <form id="deviceAdminForm" class="device-admin-form"><label>Tipo<select id="deviceAdminType"><option value="TABLET">Tablet</option><option value="COMPUTADOR">Computador</option><option value="TOTEM">Totem</option></select></label>
+                <input id="deviceAdminName" type="text" placeholder="" maxlength="40" required>
                 <button class="btn btn-primary" type="submit">Adicionar dispositivo</button>
               </form>
               <div id="registeredDeviceList" class="registered-device-list"></div>
@@ -611,7 +610,7 @@
         <section class="panel tech-integration-wizard">
           <div class="panel-header"><div><h3>1. Configurar leitura da Selene</h3><p>O TI pode ajustar os dados do ambiente sem editar o código-fonte.</p></div><span class="ti-only-pill">CONFIGURAÇÃO TI</span></div>
           <div class="tech-config-grid">
-            <label><span>Servidor / API base</span><input id="techApiBase" type="text" placeholder="http://servidor-interno/api"></label>
+            <label><span>Servidor / API base</span><input id="techApiBase" type="text" placeholder=""></label>
             <label><span>Código do grupo</span><input id="techCodGrupo" type="text" placeholder="Definir"></label>
             <label><span>Código da empresa</span><input id="techCodEmp" type="text" placeholder="Definir"></label>
             <label><span>Rota de leitura · pendentes</span><input id="techRoutePending" type="text" placeholder="Definir pelo TI"></label>
@@ -656,7 +655,7 @@
 
         <section class="panel tech-notes-panel">
           <div class="panel-header"><div><h3>5. Anotações do TI</h3><p>Espaço para registrar o que falta descobrir, decisões da reunião e instruções de implantação.</p></div><button id="techSaveNotes" class="btn btn-primary" type="button">Salvar anotações</button></div>
-          <div class="panel-body"><textarea id="techIntegrationNotes" class="tech-notes-textarea" rows="7" placeholder="Ex.: registrar parâmetros aprovados, origem do EXP-PIC e servidor definido para produção..."></textarea></div>
+          <div class="panel-body"><textarea id="techIntegrationNotes" class="tech-notes-textarea" rows="7" placeholder=""></textarea></div>
         </section>
         <section class="panel technical-map-panel"><div class="panel-header"><div><h3>Mapa técnico atual</h3><p>Rotas conhecidas, parâmetros e trava de segurança.</p></div></div><pre id="techIntegrationMap" class="technical-code"></pre></section>
       </section>
@@ -673,7 +672,7 @@
               <select id="auditEventFilter"><option value="">Todos os eventos</option><option value="login">Logins (sucesso/erro)</option><option value="logout">Somente logouts</option><option value="movimentacao">Movimentações</option><option value="dispositivo">Tablets / dispositivos</option><option value="usuarios">Alterações de usuários</option><option value="integracao">Integração</option><option value="relatorio">Relatórios</option><option value="seguranca">Segurança / bloqueios</option><option value="outros">Outros</option></select>
               <select id="auditUserFilter"><option value="">Todos os usuários</option></select>
               <select id="auditRoleFilter"><option value="">Todos os perfis</option><option value="empilhador">Emp</option><option value="encarregado">Encarregado</option><option value="ti">TI</option><option value="sistema">Sistema</option></select>
-              <select id="auditSourceFilter"><option value="">Todas as origens</option><option value="server">Servidor seguro</option><option value="local">Interface / navegador</option></select>
+              <span class="chip">Origem: servidor</span>
               <select id="auditCategoryFilter"><option value="">Todas as categorias</option><option value="acesso">Acesso</option><option value="operacao">Operação</option><option value="usuario">Usuários</option><option value="requisicao">Requisições</option><option value="relatorio">Relatórios</option><option value="integracao">Integração</option><option value="seguranca">Segurança</option><option value="sistema">Sistema</option></select>
               <label class="audit-date-field"><span>De</span><input id="auditDateFrom" type="date"></label>
               <label class="audit-date-field"><span>Até</span><input id="auditDateTo" type="date"></label>
@@ -682,7 +681,7 @@
               <button id="exportAuditCsv" class="btn btn-soft" type="button">Exportar filtrado</button>
             </div>
           </div>
-          <div class="table-wrapper"><table class="audit-table"><thead><tr><th>Data/Hora</th><th>Categoria</th><th>Ação</th><th>Responsável</th></tr></thead><tbody id="auditTableBody"></tbody></table></div>
+          <div class="table-wrapper"><table class="audit-table"><thead><tr><th>Data/Hora</th><th>Categoria</th><th>Ação</th><th>Responsável</th></tr></thead><tbody id="auditTableBody"></tbody></table><div class="pagination"><button id="auditPrev" class="btn btn-light" type="button">Anterior</button><span id="auditPage">Página 1</span><button id="auditNext" class="btn btn-light" type="button">Próxima</button></div></div>
         </section>
       </section>
     </main>
@@ -701,7 +700,7 @@
 
       <label class="field">
         <span class="field-label">Endereço do palet</span>
-        <input id="requestAddress" placeholder="Ex.: 20-015-3" required>
+        <input id="requestAddress" placeholder="" required>
       </label>
 
       <label class="field">
@@ -709,7 +708,7 @@
         <input id="requestOperator" required>
       </label>
 
-      <label class="pic-option">
+      <div class="request-extra-fields"><label class="field">Quantidade<input id="requestQuantity" type="number" min="1" max="1000" value="1" required></label><label class="field">Referência<input id="requestReference" maxlength="100"></label><label class="field">Volumes<input id="requestVolumes" type="number" min="0" max="1000000"></label><label class="field">Observação<textarea id="requestNote" maxlength="1000"></textarea></label><label><input id="requestIdentified" type="checkbox"> Identificação conferida</label><label><input id="requestStretch" type="checkbox"> Stretch conferido</label></div><label class="pic-option">
         <input id="requestIsPic" type="checkbox">
         <span><b>EXP-PIC</b><small>Identifica o palet inteiro em roxo e mostra “Avisar armazenista”.</small></span>
       </label>
@@ -751,21 +750,16 @@
       <div class="request-dialog-header">
         <span class="request-dialog-eyebrow">RASTREIO DE EQUIPAMENTO</span>
         <h3>Qual equipamento você está usando?</h3>
-        <p>Emp seleciona somente tablets cadastrados. Encarregado e TI recebem um computador padrão automaticamente e podem trocar para outro dispositivo cadastrado quando necessário.</p>
+        <p>Emp seleciona somente tablets cadastrados. Encarregado e TI selecionam um dispositivo cadastrado. Cada equipamento pode ter apenas uma sessão ativa.</p>
       </div>
       <label class="field"><span class="field-label">Tablet / equipamento</span><input id="tabletNameInput" list="tabletOptions" placeholder="Selecione um tablet cadastrado" autocomplete="off" required></label>
-      <datalist id="tabletOptions">
-        <option value="Tablet 01"><option value="Tablet 02"><option value="Tablet 03"><option value="Tablet 04"><option value="Tablet 05">
-        <option value="Tablet 06"><option value="Tablet 07"><option value="Tablet 08"><option value="Tablet 09"><option value="Tablet 10">
-        <option value="Tablet 11"><option value="Tablet 12">
-      </datalist>
+      <datalist id="tabletOptions"></datalist>
       <div id="tabletCurrentWarning" class="tablet-warning hidden"></div>
       <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
     </form>
   </dialog>
-  <script src="../shared/access-code.js"></script>
+  <script src="/shared/api.js"></script>
   <script src="assets/app.bundle.js"></script>
   <script src="assets/operation-focus.js"></script>
-  <script src="assets/checklist-code.js"></script>
-</body>
+<script src="assets/checklist-code.js"></script><script src="assets/admin-actions.js"></script><script src="/shared/pwa.js"></script></body>
 </html>

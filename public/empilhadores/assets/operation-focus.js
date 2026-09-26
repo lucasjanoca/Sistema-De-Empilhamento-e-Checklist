@@ -10,7 +10,7 @@
   }
   function currentUser(){
     try{
-      const u=JSON.parse(sessionStorage.getItem('empilhamento_user')||localStorage.getItem('empilhamento_user')||'null');
+      const u=AppState.getUser();
       return u?.nome||u?.matricula||safeText('currentUserLabel','Operador');
     }catch{return safeText('currentUserLabel','Operador');}
   }
@@ -25,7 +25,7 @@
     document.body.classList.toggle('operation-focus-mode',!!on);
     const b=button();
     if(b){b.classList.toggle('is-active',!!on);b.setAttribute('aria-pressed',String(!!on));b.textContent=on?'✕ Sair da Tela de Paletes':'⛶ Tela de Paletes';}
-    if(persist){try{localStorage.setItem(KEY,on?'1':'0');}catch{}}
+    if(persist){try{sessionStorage.setItem(KEY,on?'1':'0');}catch{}}
     updateStatus();
     setTimeout(()=>scrollBox()?.focus({preventScroll:true}),50);
   }
@@ -36,12 +36,12 @@
     document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('operation-focus-mode'))setMode(false);});
     document.addEventListener('view:changed',e=>{
       if(e.detail?.name!=='operacao'&&document.body.classList.contains('operation-focus-mode'))setMode(false,{persist:false});
-      if(e.detail?.name==='operacao'){updateStatus();let saved=false;try{saved=localStorage.getItem(KEY)==='1';}catch{}if(saved)setMode(true,{persist:false});}
+      if(e.detail?.name==='operacao'){updateStatus();let saved=false;try{saved=sessionStorage.getItem(KEY)==='1';}catch{}if(saved)setMode(true,{persist:false});}
     });
     ['currentTabletBadge','currentProductionRequest','currentUserLabel'].forEach(id=>{
       const el=$(id); if(el)new MutationObserver(updateStatus).observe(el,{subtree:true,childList:true,characterData:true,attributes:true});
     });
-    let saved=false;try{saved=localStorage.getItem(KEY)==='1';}catch{}
+    let saved=false;try{saved=sessionStorage.getItem(KEY)==='1';}catch{}
     if(saved&&isOperationVisible())setMode(true,{persist:false});
     updateStatus();
   }

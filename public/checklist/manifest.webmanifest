@@ -1,0 +1,1 @@
+{"id": "/checklist/", "name": "Site Selene · Checklist", "short_name": "CK", "start_url": "/checklist/", "scope": "/checklist/", "display": "standalone", "background_color": "#f2f6f3", "theme_color": "#126c50", "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]}

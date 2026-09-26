@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Defina o nome do banco}
+      POSTGRES_USER: ${POSTGRES_OWNER:?Defina a conta de migration}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina a senha de migration}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [private]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+  app:
+    build: .
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:?Defina production ou staging}
+      DATABASE_URL: ${DATABASE_URL:?Defina a conexão da aplicação sem privilégios administrativos}
+      SESSION_SECRET: ${SESSION_SECRET:?Defina um segredo aleatório}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Defina a origem HTTPS oficial}
+      SECURE_COOKIES: "true"
+      FORWARDED_ALLOW_IPS: ${TRUSTED_PROXY_IPS:?Defina somente os endereços do proxy confiável}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_MFA_ACR: ${OIDC_MFA_ACR:-}
+      REQUIRE_ADMIN_MFA: ${REQUIRE_ADMIN_MFA:-false}
+      INTEGRATION_ALLOWED_HOSTS: ${INTEGRATION_ALLOWED_HOSTS:-}
+      BACKUP_DIRECTORY: /backups
+      BACKUP_PUBLIC_KEY: /keys/backup-public.pem
+    ports: ["127.0.0.1:8000:8000"]
+    volumes:
+      - ${BACKUP_DIRECTORY:?Defina diretório privado de backup}:/backups
+      - ${BACKUP_PUBLIC_KEY:?Defina caminho da chave pública}:/keys/backup-public.pem:ro
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import socket; s=socket.create_connection(('127.0.0.1',8000),3); s.close()"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+volumes:
+  pgdata:
+networks:
+  private:
+    driver: bridge

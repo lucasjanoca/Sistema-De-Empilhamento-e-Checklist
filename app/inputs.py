@@ -10,6 +10,14 @@ class Login(Input):
     matricula: str = Field(min_length=1, max_length=80)
     senha: str = Field(min_length=1, max_length=128)
 
+    @field_validator("matricula")
+    @classmethod
+    def normalize_matricula(cls, value):
+        value = value.strip().lower()
+        if not value:
+            raise ValueError("Matrícula vazia.")
+        return value
+
 
 class Password(Input):
     senha: str = Field(min_length=1, max_length=128)
@@ -18,6 +26,14 @@ class Password(Input):
 class UserCreate(Login):
     nome: str = Field(min_length=1, max_length=160)
     role: Literal["empilhador", "encarregado", "ti"]
+
+    @field_validator("nome")
+    @classmethod
+    def normalize_name(cls, value):
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Nome vazio.")
+        return value
 
 
 class UserUpdate(Input):
@@ -30,6 +46,14 @@ class UserUpdate(Input):
 class DeviceCreate(Input):
     name: str = Field(min_length=1, max_length=100)
     type: Literal["TABLET", "COMPUTADOR", "TOTEM"]
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value):
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Nome vazio.")
+        return value
 
 
 class DeviceSelect(Input):
@@ -68,6 +92,14 @@ class EquipmentCreate(Input):
     code: str = Field(min_length=1, max_length=40)
     name: str = Field(min_length=1, max_length=100)
     type: Literal["bateria", "empilhadeira", "tablet"]
+
+    @field_validator("code", "name")
+    @classmethod
+    def normalize_equipment(cls, value):
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Identificação vazia.")
+        return value
 
 
 class EquipmentUpdate(EquipmentCreate):

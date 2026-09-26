@@ -1,7 +1,9 @@
 import asyncio
 import json
 import logging
+import os
 import secrets
+import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -70,6 +72,19 @@ def tick():
 @asynccontextmanager
 async def lifespan(app):
     cfg = settings()
+    if cfg.environment in ("staging", "production"):
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        backup_dir = Path(cfg.backup_directory)
+        public_key = Path(cfg.backup_public_key)
+        if not cfg.backup_directory or not backup_dir.is_dir() or not os.access(backup_dir, os.W_OK):
+            raise RuntimeError("Diretório privado de backup ausente ou sem escrita.")
+        if not cfg.backup_public_key or not public_key.is_file():
+            raise RuntimeError("Chave pública de backup ausente.")
+        key = serialization.load_pem_public_key(public_key.read_bytes())
+        if not isinstance(key, rsa.RSAPublicKey) or key.key_size < 3072:
+            raise RuntimeError("Chave pública RSA de backup inválida.")
     with engine().connect() as conn:
         if conn.scalar(sa.text("SELECT version_num FROM alembic_version")) != "0001_operational":
             raise RuntimeError("Aplique as migrations antes de iniciar.")
@@ -95,6 +110,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=[urlsplit(settings().pub
 
 @app.middleware("http")
 async def protections(request, call_next):
+    started = time.monotonic()
     request.state.correlation_id = str(uuid4())
     cfg = settings()
     response = None
@@ -141,6 +157,9 @@ async def protections(request, call_next):
     )
     if cfg.secure_cookies:
         response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    from .monitoring import record
+
+    record(response.status_code, time.monotonic() - started)
     return response
 
 
@@ -709,14 +728,24 @@ def history(request: Request, q: str = "", page: int = 1):
 
 
 @app.get(API + "/audit-secure")
-def audit_read(request: Request, page: int = 1, q: str = ""):
-    if page < 1 or len(q) > 100:
+def audit_read(
+    request: Request,
+    page: int = 1,
+    q: str = "",
+    user: str = "",
+    role: str = "",
+    category: str = "",
+    event: str = "",
+    date_from: str = "",
+    date_to: str = "",
+):
+    if page < 1 or max(map(len, [q, user, role, category, event, date_from, date_to])) > 100:
         fail(422, "Filtro inválido.")
 
     def read(c, a):
-        query = sa.select(t.audit_log, t.users.c.nome, t.users.c.matricula).select_from(t.audit_log.outerjoin(t.users))
-        if q:
-            query = query.where(t.audit_log.c.action.icontains(q, autoescape=True))
+        from .queries import audit_query, audit_category
+
+        query = audit_query(q, user, role, category, event, date_from, date_to)
         result = rows(c, query.order_by(t.audit_log.c.id.desc()).offset((page - 1) * 100).limit(101))
         return {
             "events": [
@@ -727,9 +756,9 @@ def audit_read(request: Request, page: int = 1, q: str = ""):
                     details=json.dumps(r["details"], ensure_ascii=False),
                     actorName=r["nome"] or "Sistema",
                     actorMatricula=r["matricula"] or "",
-                    actorRole=grants(c, r["user_id"])[0] if r["user_id"] else "sistema",
+                    actorRole=r["details"].get("actor_role", "sistema" if not r["user_id"] else "não registrado"),
                     source="servidor-seguro",
-                    category="seguranca",
+                    category=audit_category(r["action"]),
                 )
                 for r in result[:100]
             ],

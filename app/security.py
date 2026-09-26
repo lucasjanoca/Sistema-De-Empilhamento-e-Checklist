@@ -58,7 +58,7 @@ def audit(conn, action, details=None, actor=None, request=None):
         correlation_id=getattr(request.state, "correlation_id", str(uuid4())) if request else str(uuid4()),
         action=action,
         origin=(request.client.host if request and request.client else "server")[:100],
-        details=details or {},
+        details={**(details or {}), **({"actor_role": actor.role} if actor else {})},
         previous_hash=prev,
     )
     if actor:
