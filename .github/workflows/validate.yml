@@ -1,0 +1,39 @@
+name: Validate production hardening
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test_owner
+          POSTGRES_PASSWORD: selene-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: selene_ci_test
+        ports: [5432:5432]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      ENVIRONMENT: test
+      PUBLIC_ORIGIN: http://127.0.0.1:8090
+      SECURE_COOKIES: "false"
+      DATABASE_URL: postgresql+psycopg://test_app:runtime-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/selene_ci_test
+      MIGRATION_DATABASE_URL: postgresql+psycopg://test_owner:selene-ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/selene_ci_test
+      RUNTIME_DATABASE_PASSWORD: runtime-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install -r requirements.lock
+      - run: python -c "import secrets; print('SESSION_SECRET='+secrets.token_urlsafe(48))" >> "$GITHUB_ENV"
+      - run: python -m alembic upgrade head
+      - run: python scripts/ci_runtime_role.py
+      - run: python -m ruff check app tests migrations scripts
+      - run: python -m pytest --junitxml=test-results.xml
+      - run: python scripts/check_public.py
+      - run: python scripts/check_ui_contract.py
+      - run: python scripts/scan_secrets.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: test-results, path: test-results.xml}
