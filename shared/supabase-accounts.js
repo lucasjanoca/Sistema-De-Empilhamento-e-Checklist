@@ -13,7 +13,7 @@
 
   function safeParse(value,fallback=null){try{return JSON.parse(value)}catch{return fallback}}
   function normalizeMatricula(value){
-    return String(value||'').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'');
+    return String(value||'').replace(/\D/g,'');
   }
   function emailFor(matricula){
     const m=normalizeMatricula(matricula);
