@@ -2542,11 +2542,16 @@ const UsersAdmin=(()=>{
       if(!u)return;
       if(u.role==='ti'&&AppState.getUser()?.role!=='ti'){UI.toast('Somente o TI pode alterar contas TI.');return;}
       if(e.target.closest('.change-user-password')){
+        const self=AppState.getUser()?.matricula===m;
+        if(self && Operation.hasActiveMovement?.()){
+          UI.toast('Aguarde ou cancele a movimentação atual antes de alterar sua própria senha.');
+          return;
+        }
         const senha=prompt(`Nova senha para ${m}:`);if(senha===null)return;
         const r=await safe(()=>SecurityApi.changePassword(m,senha));
         if(!r?.ok){UI.toast(r?.message);return;}
-        const self=AppState.getUser()?.matricula===m;
         if(self){
+          TabletManager.releaseCurrent('alteracao-senha');
           await SecurityApi.logout();
           AppState.clearUser();
           AppState.clearTablet();
@@ -2563,9 +2568,13 @@ const UsersAdmin=(()=>{
       if(e.target.closest('.delete-user')){
         if(!confirm(`Excluir ${u.nome}?`))return;
         const self=AppState.getUser()?.matricula===m;
+        if(self && Operation.hasActiveMovement?.()){
+          UI.toast('Aguarde ou cancele a movimentação atual antes de excluir sua própria conta.');
+          return;
+        }
         if(self&&u.role==='ti'&&!confirm('Excluir sua própria conta TI e encerrar a sessão?'))return;
         const r=await safe(()=>SecurityApi.deleteUser(m));
-        if(r?.ok){if(self){await SecurityApi.logout();AppState.clearUser();location.reload();return;}await render();UI.toast('Usuário excluído.');}else UI.toast(r?.message);
+        if(r?.ok){if(self){TabletManager.releaseCurrent('exclusao-conta');await SecurityApi.logout();AppState.clearUser();AppState.clearTablet();location.reload();return;}await render();UI.toast('Usuário excluído.');}else UI.toast(r?.message);
       }
     });
     document.addEventListener('view:changed',e=>{if(e.detail.name==='usuarios')render();});
