@@ -579,11 +579,8 @@ const TabletManager = (() => {
       .filter(item=>item.active !== false)
       .sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR',{numeric:true,sensitivity:'base'}));
   }
-  function canUseDevice(user, device){
-    if(!user || !device || device.active === false) return false;
-    // Empilhador trabalha apenas com tablets. Computadores de Encarregado/TI nunca aparecem nem podem ser informados manualmente.
-    if(user.role === 'empilhador') return device.type === 'tablet';
-    return true;
+  function canUseDevice(user,device){
+    return Boolean(user && device && device.active!==false && device.type!=='system' && !device.locked);
   }
   function selectableDevices(user=AppState.getUser()){
     return registeredDevices().filter(device=>canUseDevice(user,device));
@@ -644,20 +641,6 @@ const TabletManager = (() => {
     UI.toast(`${device.name} removido.`);
     return true;
   }
-  function automaticDeviceForRole(){ return ''; }
-  function ensureSystemDevice(name){
-    if(!name) return null;
-    const data=AppState.getData();
-    let device=deviceFor(name);
-    if(!device){
-      device={id:deviceId(name),name,active:true,createdAt:Date.now(),type:'system',locked:true};
-      data.registeredDevices=data.registeredDevices || [];
-      data.registeredDevices.push(device);
-      AppState.save({source:'devices'});
-    }
-    device.type='system'; device.locked=true; device.active=true;
-    return device;
-  }
   function select(name, options={}){
     const user=AppState.getUser();
     if(!user) return false;
@@ -667,18 +650,22 @@ const TabletManager = (() => {
     }
     const tabletName=normalizeName(name);
     if(!tabletName){ UI.toast('Selecione o tablet ou equipamento.'); return false; }
-    const device=options.automatic ? ensureSystemDevice(tabletName) : deviceFor(tabletName);
+    const device=deviceFor(tabletName);
     if(!device || device.active === false){
       UI.toast('Dispositivo não cadastrado. Peça ao Encarregado ou TI para adicioná-lo em Configurações.');
       return false;
     }
     if(!canUseDevice(user,device)){
-      UI.toast('Para o perfil Emp, somente tablets cadastrados podem ser selecionados.');
+      UI.toast('Selecione somente um equipamento cadastrado e disponível.');
       return false;
     }
     const data=AppState.getData();
     const previous=AppState.getTablet();
     const existing=assignmentFor(device.name);
+    if(existing && isActive(existing) && existing.userMatricula!==user.matricula){
+      UI.toast(`${device.name} está em uso por ${existing.userName||existing.userMatricula}. Escolha outro equipamento.`);
+      return false;
+    }
     const now=Date.now();
     if(previous?.name && previous.name.toLowerCase()!==device.name.toLowerCase()){
       const old=assignmentFor(previous.name);
@@ -726,7 +713,7 @@ const TabletManager = (() => {
     if(!currentDevice || !canUseDevice(user,currentDevice)){
       AppState.clearTablet();
       updateBadge();
-      UI.toast(user.role==='empilhador' ? 'Selecione um tablet cadastrado para continuar.' : `${tablet.name} não está mais cadastrado. Selecione outro equipamento.`);
+      UI.toast(user.role==='empilhador' ? 'Selecione um equipamento cadastrado para continuar.' : `${tablet.name} não está mais cadastrado. Selecione outro equipamento.`);
       openSelector({force:true});
       return;
     }
