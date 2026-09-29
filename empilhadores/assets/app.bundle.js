@@ -217,6 +217,7 @@ const AppState = (() => {
     const saved = parseStored([STORAGE_KEY, ...LEGACY_STATE_KEYS]);
     return normalizeData(saved);
   }
+  const hadStoredState = [STORAGE_KEY, ...LEGACY_STATE_KEYS].some(key=>{try{return Boolean(localStorage.getItem(key));}catch{return false;}});
   let data = load();
   let currentUser = loadSession();
   let currentTablet = loadTabletSession();
@@ -381,7 +382,8 @@ const AppState = (() => {
     clearNotifications,
     exportSnapshot,
     exportOperationalSnapshot,
-    importSnapshot
+    importSnapshot,
+    hasStoredState:()=>hadStoredState
   };
 })();;
 const SecurityApi=(()=>{
@@ -506,13 +508,35 @@ const SecurityApi=(()=>{
   }
 
   async function recordAudit(e){
+    if(accountCloud()){
+      try{return await globalThis.InfoTechSupabaseAccounts.addAudit(e);}catch{}
+      return;
+    }
     if(!server()||!sessionUser)return;
     try{await raw('/audit-secure',{method:'POST',body:JSON.stringify({action:e.action,details:e.details,category:e.category,severity:e.severity})});}catch{}
   }
-  async function getSecureAudit(){if(!server())return[];return (await raw('/audit-secure?limit=3000')).events||[];}
-  async function getSecurityStatus(){if(!server())return{mode:accountCloud()?'supabase-auth':'arquivo/demo',passwordStorage:accountCloud()?'Supabase Auth':'Local somente para demonstração',csrf:false,secureAudit:false,securityHeaders:false};return raw('/security/status');}
-  async function acquirePalletLock(req,direction){if(!server())return{ok:true,local:true};return raw('/locks/acquire',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address,direction})});}
-  async function releasePalletLock(req){if(!server())return{ok:true};try{return await raw('/locks/release',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address})});}catch{return{ok:false};}}
+  async function getSecureAudit(){
+    if(accountCloud()) return globalThis.InfoTechSupabaseAccounts.loadAudit(3000);
+    if(!server())return[];
+    return (await raw('/audit-secure?limit=3000')).events||[];
+  }
+  async function getSecurityStatus(){
+    if(accountCloud())return{mode:'supabase-central',passwordStorage:'Supabase Auth',csrf:false,secureAudit:true,securityHeaders:true,centralData:true};
+    if(!server())return{mode:'arquivo/demo',passwordStorage:'Local somente para demonstração',csrf:false,secureAudit:false,securityHeaders:false};
+    return raw('/security/status');
+  }
+  async function acquirePalletLock(req,direction){
+    if(accountCloud()) return globalThis.InfoTechSupabaseAccounts.acquirePalletLock(req,direction,AppState.getTablet()?.name||'');
+    if(!server())return{ok:true,local:true};
+    return raw('/locks/acquire',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address,direction})});
+  }
+  async function releasePalletLock(req){
+    if(accountCloud()){
+      try{return await globalThis.InfoTechSupabaseAccounts.releasePalletLock(req);}catch{return{ok:false};}
+    }
+    if(!server())return{ok:true};
+    try{return await raw('/locks/release',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address})});}catch{return{ok:false};}
+  }
   async function getIntegrationConfig(){if(!server())return null;return (await raw('/integration/config')).config||null;}
   async function saveIntegrationConfig(c){if(!server())return null;return (await raw('/integration/config',{method:'PUT',body:JSON.stringify(c)})).config||null;}
   async function integrationRead(route){if(!server())return null;return (await raw(`/integration/read?route=${encodeURIComponent(route)}`)).data;}
@@ -2262,7 +2286,7 @@ const Reports = (() => {
   }
   return {init,printOperationalReport,printSelectedProduction};
 })();;
-const Audit=(()=>{let secure=[];function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[c]);}function group(i){const t=`${i.action||''} ${i.details||''}`.toLowerCase();if(/login realizado|login negado|login bloqueado/.test(t))return'login';if(/logout/.test(t))return'logout';if(/tablet|dispositivo|equipamento/.test(t))return'dispositivo';if(/seguran|csrf|concorrente|permiss/.test(`${i.category} ${t}`))return'seguranca';if(i.category==='operacao')return'movimentacao';if(i.category==='usuario')return'usuarios';if(i.category==='integracao')return'integracao';if(i.category==='relatorio')return'relatorio';return'outros';}async function load(){if(SecurityApi.isServerMode()&&Permissions.can('audit'))try{secure=await SecurityApi.getSecureAudit();}catch{secure=[];}else secure=[];}function all(){const arr=[...secure,...(AppState.getData().auditLog||[])].sort((a,b)=>Number(b.time)-Number(a.time)),seen=new Set();return arr.filter(i=>{const k=`${Math.round(Number(i.time||0)/2000)}|${i.action}|${i.details}|${i.actorMatricula}`;if(seen.has(k))return false;seen.add(k);return true;});}function rows(){const q=(UI.$('auditSearchInput')?.value||'').toLowerCase(),cat=UI.$('auditCategoryFilter')?.value||'',actor=UI.$('auditUserFilter')?.value||'',role=UI.$('auditRoleFilter')?.value||'',event=UI.$('auditEventFilter')?.value||'',src=UI.$('auditSourceFilter')?.value||'',from=UI.$('auditDateFrom')?.value?new Date(`${UI.$('auditDateFrom').value}T00:00:00`).getTime():0,to=UI.$('auditDateTo')?.value?new Date(`${UI.$('auditDateTo').value}T23:59:59`).getTime():Infinity;return all().filter(i=>(!cat||i.category===cat)&&(!actor||i.actorMatricula===actor)&&(!role||i.actorRole===role)&&(!event||group(i)===event)&&(!src||((src==='server')===(i.source==='servidor-seguro')))&&Number(i.time)>=from&&Number(i.time)<=to&&(!q||[i.action,i.details,i.actorName,i.actorMatricula].join(' ').toLowerCase().includes(q)));}function users(){const s=UI.$('auditUserFilter');if(!s)return;const cur=s.value,map=new Map();[...AppState.users.map(u=>({matricula:u.matricula,nome:u.nome})),...all().map(i=>({matricula:i.actorMatricula,nome:i.actorName}))].filter(x=>x.matricula&&x.matricula!=='sistema').forEach(x=>map.set(x.matricula,x));const a=[...map.values()].sort((a,b)=>a.nome.localeCompare(b.nome));s.innerHTML='<option value="">Todos os usuários</option>'+a.map(x=>`<option value="${esc(x.matricula)}">${esc(x.nome)} · ${esc(x.matricula)}</option>`).join('');if(a.some(x=>x.matricula===cur))s.value=cur;}async function render(reload=true){if(!Permissions.can('audit'))return;if(reload)await load();users();const r=rows(),b=UI.$('auditTableBody');UI.$('auditCount').textContent=`${r.length} registro${r.length===1?'':'s'}`;b.innerHTML=r.length?r.slice(0,1500).map(i=>`<tr><td>${new Date(i.time).toLocaleString('pt-BR')}<small class="table-detail">${i.source==='servidor-seguro'?'Servidor seguro':'Interface'}</small></td><td><span class="audit-category ${esc(i.category)}">${esc(i.category)}</span></td><td><b>${esc(i.action)}</b><small class="table-detail">${esc(i.details)}</small></td><td>${esc(i.actorName)}<small class="table-detail">${esc(i.actorMatricula)} · ${esc(AppState.getRoleLabel(i.actorRole))}</small></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">Nenhum registro encontrado.</div></td></tr>';}function clear(){['auditCategoryFilter','auditUserFilter','auditRoleFilter','auditEventFilter','auditSourceFilter','auditDateFrom','auditDateTo','auditSearchInput'].forEach(id=>{const e=UI.$(id);if(e)e.value='';});render(false);}function exportCsv(){const r=rows(),cell=v=>`"${String(v??'').replace(/"/g,'""')}"`,csv=[['Data/Hora','Origem','Categoria','Evento','Ação','Detalhes','Usuário','Matrícula','Perfil'],...r.map(i=>[new Date(i.time).toLocaleString('pt-BR'),i.source==='servidor-seguro'?'Servidor seguro':'Interface',i.category,group(i),i.action,i.details,i.actorName,i.actorMatricula,AppState.getRoleLabel(i.actorRole)])].map(x=>x.map(cell).join(';')).join('\n'),blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='auditoria-site-selene.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);}function init(){['auditSearchInput','auditCategoryFilter','auditUserFilter','auditRoleFilter','auditEventFilter','auditSourceFilter','auditDateFrom','auditDateTo'].forEach(id=>UI.$(id)?.addEventListener(id==='auditSearchInput'?'input':'change',()=>render(false)));UI.$('auditClearFilters')?.addEventListener('click',clear);UI.$('exportAuditCsv')?.addEventListener('click',exportCsv);document.addEventListener('view:changed',e=>{if(e.detail.name==='auditoria')render();});}return{init,render};})();;
+const Audit=(()=>{let secure=[];function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[c]);}function group(i){const t=`${i.action||''} ${i.details||''}`.toLowerCase();if(/login realizado|login negado|login bloqueado/.test(t))return'login';if(/logout/.test(t))return'logout';if(/tablet|dispositivo|equipamento/.test(t))return'dispositivo';if(/seguran|csrf|concorrente|permiss/.test(`${i.category} ${t}`))return'seguranca';if(i.category==='operacao')return'movimentacao';if(i.category==='usuario')return'usuarios';if(i.category==='integracao')return'integracao';if(i.category==='relatorio')return'relatorio';return'outros';}async function load(){if((SecurityApi.isServerMode()||SecurityApi.isAccountCloud())&&Permissions.can('audit'))try{secure=await SecurityApi.getSecureAudit();}catch{secure=[];}else secure=[];}function all(){const arr=[...secure,...(AppState.getData().auditLog||[])].sort((a,b)=>Number(b.time)-Number(a.time)),seen=new Set();return arr.filter(i=>{const k=`${Math.round(Number(i.time||0)/2000)}|${i.action}|${i.details}|${i.actorMatricula}`;if(seen.has(k))return false;seen.add(k);return true;});}function rows(){const q=(UI.$('auditSearchInput')?.value||'').toLowerCase(),cat=UI.$('auditCategoryFilter')?.value||'',actor=UI.$('auditUserFilter')?.value||'',role=UI.$('auditRoleFilter')?.value||'',event=UI.$('auditEventFilter')?.value||'',src=UI.$('auditSourceFilter')?.value||'',from=UI.$('auditDateFrom')?.value?new Date(`${UI.$('auditDateFrom').value}T00:00:00`).getTime():0,to=UI.$('auditDateTo')?.value?new Date(`${UI.$('auditDateTo').value}T23:59:59`).getTime():Infinity;return all().filter(i=>(!cat||i.category===cat)&&(!actor||i.actorMatricula===actor)&&(!role||i.actorRole===role)&&(!event||group(i)===event)&&(!src||((src==='server')===(i.source==='servidor-seguro')))&&Number(i.time)>=from&&Number(i.time)<=to&&(!q||[i.action,i.details,i.actorName,i.actorMatricula].join(' ').toLowerCase().includes(q)));}function users(){const s=UI.$('auditUserFilter');if(!s)return;const cur=s.value,map=new Map();[...AppState.users.map(u=>({matricula:u.matricula,nome:u.nome})),...all().map(i=>({matricula:i.actorMatricula,nome:i.actorName}))].filter(x=>x.matricula&&x.matricula!=='sistema').forEach(x=>map.set(x.matricula,x));const a=[...map.values()].sort((a,b)=>a.nome.localeCompare(b.nome));s.innerHTML='<option value="">Todos os usuários</option>'+a.map(x=>`<option value="${esc(x.matricula)}">${esc(x.nome)} · ${esc(x.matricula)}</option>`).join('');if(a.some(x=>x.matricula===cur))s.value=cur;}async function render(reload=true){if(!Permissions.can('audit'))return;if(reload)await load();users();const r=rows(),b=UI.$('auditTableBody');UI.$('auditCount').textContent=`${r.length} registro${r.length===1?'':'s'}`;b.innerHTML=r.length?r.slice(0,1500).map(i=>`<tr><td>${new Date(i.time).toLocaleString('pt-BR')}<small class="table-detail">${i.source==='servidor-seguro'?'Servidor seguro':'Interface'}</small></td><td><span class="audit-category ${esc(i.category)}">${esc(i.category)}</span></td><td><b>${esc(i.action)}</b><small class="table-detail">${esc(i.details)}</small></td><td>${esc(i.actorName)}<small class="table-detail">${esc(i.actorMatricula)} · ${esc(AppState.getRoleLabel(i.actorRole))}</small></td></tr>`).join(''):'<tr><td colspan="4"><div class="empty">Nenhum registro encontrado.</div></td></tr>';}function clear(){['auditCategoryFilter','auditUserFilter','auditRoleFilter','auditEventFilter','auditSourceFilter','auditDateFrom','auditDateTo','auditSearchInput'].forEach(id=>{const e=UI.$(id);if(e)e.value='';});render(false);}function exportCsv(){const r=rows(),cell=v=>`"${String(v??'').replace(/"/g,'""')}"`,csv=[['Data/Hora','Origem','Categoria','Evento','Ação','Detalhes','Usuário','Matrícula','Perfil'],...r.map(i=>[new Date(i.time).toLocaleString('pt-BR'),i.source==='servidor-seguro'?'Servidor seguro':'Interface',i.category,group(i),i.action,i.details,i.actorName,i.actorMatricula,AppState.getRoleLabel(i.actorRole)])].map(x=>x.map(cell).join(';')).join('\n'),blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='auditoria-site-selene.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);}function init(){['auditSearchInput','auditCategoryFilter','auditUserFilter','auditRoleFilter','auditEventFilter','auditSourceFilter','auditDateFrom','auditDateTo'].forEach(id=>UI.$(id)?.addEventListener(id==='auditSearchInput'?'input':'change',()=>render(false)));UI.$('auditClearFilters')?.addEventListener('click',clear);UI.$('exportAuditCsv')?.addEventListener('click',exportCsv);document.addEventListener('view:changed',e=>{if(e.detail.name==='auditoria')render();});}return{init,render};})();;
 const Dashboard = (() => {
   let timer = null;
   function todayStart(){
@@ -2371,6 +2395,9 @@ const DataSync = (() => {
   let pushTimer=null;
   let pollTimer=null;
   let lastRemoteUpdatedAt=0;
+
+  function cloud(){return typeof SecurityApi!=='undefined'&&SecurityApi.isAccountCloud();}
+
   function setStatus(type,text){
     connected=type==='online';
     const badge=UI.$('centralSyncBadge');
@@ -2382,29 +2409,66 @@ const DataSync = (() => {
     const config=UI.$('centralDataMode');
     if(config) config.textContent=text;
   }
+
   async function request(path='',options={}){
+    if(cloud()){
+      if(path==='/status') return {ok:true,mode:'supabase'};
+      if(path==='/snapshot' && String(options.method||'GET').toUpperCase()==='GET'){
+        return globalThis.InfoTechSupabaseAccounts.getOperationalState();
+      }
+      if(path==='/snapshot' && String(options.method||'GET').toUpperCase()==='PUT'){
+        const snapshot=typeof options.body==='string'?JSON.parse(options.body):options.body;
+        return globalThis.InfoTechSupabaseAccounts.saveOperationalState(snapshot);
+      }
+      throw new Error('Rota central não suportada.');
+    }
     if(typeof SecurityApi!=='undefined'&&SecurityApi.isServerMode()) return SecurityApi.secureFetch(path,options);
     const response=await fetch(`${BASE}${path}`,{cache:'no-store',headers:{'Content-Type':'application/json',Accept:'application/json',...(options.headers||{})},...options});
     if(!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.status===204?null:response.json();
   }
+
   async function push(){
     if(!connected || applyingRemote || AppState.getData().settings?.centralSyncEnabled===false) return;
     try{
       const snapshot=AppState.exportOperationalSnapshot();
       const result=await request('/snapshot',{method:'PUT',body:JSON.stringify(snapshot)});
-      lastRemoteUpdatedAt=Number(result?.updatedAt || snapshot.updatedAt || Date.now());
-      setStatus('online','Servidor local sincronizado');
+      const at=Number(result?.updatedAt || snapshot.updatedAt || Date.now());
+      lastRemoteUpdatedAt=at;
+      AppState.getData().meta=AppState.getData().meta||{};
+      AppState.getData().meta.updatedAt=at;
+      AppState.getData().meta.cloudInitialized=true;
+      try{localStorage.setItem('empilhamento_2_0_state_entrega_v2',JSON.stringify(AppState.getData()));}catch{}
+      setStatus('online',cloud()?'Supabase sincronizado':'Dados centralizados');
+      return result;
     }catch(error){
-      setStatus('offline','Servidor local sem conexão');
-      console.warn('Falha ao enviar dados ao servidor local:',error);
+      setStatus('offline',cloud()?'Supabase sem conexão':'Servidor local sem conexão');
+      console.warn('Falha ao enviar dados ao servidor central:',error);
+      throw error;
     }
   }
+
   function schedulePush(){
     if(applyingRemote || !connected) return;
     clearTimeout(pushTimer);
-    pushTimer=setTimeout(push,1400);
+    pushTimer=setTimeout(()=>push().catch(()=>{}),500);
   }
+
+  async function applyRemote(remote,remoteUpdatedAt){
+    applyingRemote=true;
+    try{
+      remote.snapshot.data.meta = remote.snapshot.data.meta || {};
+      remote.snapshot.data.meta.updatedAt = remoteUpdatedAt;
+      remote.snapshot.data.meta.cloudInitialized = Boolean(remote.cloudInitialized||remote.snapshot.data.meta.cloudInitialized);
+      AppState.importSnapshot(remote.snapshot,{silent:false,skipSync:true,source:cloud()?'supabase':'servidor'});
+    }finally{
+      applyingRemote=false;
+    }
+    if(typeof Operation!=='undefined') Operation.renderAll();
+    if(typeof Dashboard!=='undefined') Dashboard.render();
+    if(typeof Notifications!=='undefined') Notifications.render();
+  }
+
   async function pull(initial=false){
     if(!connected || AppState.getData().settings?.centralSyncEnabled===false) return;
     try{
@@ -2415,27 +2479,36 @@ const DataSync = (() => {
       }
       const remoteUpdatedAt=Number(remote.updatedAt || remote.snapshot.updatedAt || 0);
       const localUpdatedAt=Number(AppState.getData().meta?.updatedAt || 0);
+      const remoteInitialized=Boolean(remote.cloudInitialized||remote.snapshot?.data?.meta?.cloudInitialized);
       lastRemoteUpdatedAt=Math.max(lastRemoteUpdatedAt,remoteUpdatedAt);
+
+      if(initial){
+        // Migração única: o computador que já vinha sendo usado pode enviar seu estado atual
+        // apenas enquanto o estado central antigo ainda não foi marcado como inicializado.
+        if(cloud() && !remoteInitialized && AppState.hasStoredState?.() && localUpdatedAt>remoteUpdatedAt+50){
+          await push();
+          return;
+        }
+        await applyRemote(remote,remoteUpdatedAt);
+        setStatus('online',cloud()?'Dados carregados do Supabase':'Dados atualizados do servidor');
+        return;
+      }
+
       if(remoteUpdatedAt>localUpdatedAt+50){
-        applyingRemote=true;
-        remote.snapshot.data.meta = remote.snapshot.data.meta || {};
-        remote.snapshot.data.meta.updatedAt = remoteUpdatedAt;
-        AppState.importSnapshot(remote.snapshot,{silent:false,skipSync:true,source:'servidor'});
-        applyingRemote=false;
-        if(typeof Operation!=='undefined') Operation.renderAll();
-        if(typeof Dashboard!=='undefined') Dashboard.render();
-        if(typeof Notifications!=='undefined') Notifications.render();
-        setStatus('online','Dados atualizados do servidor');
-      }else if(initial && localUpdatedAt>remoteUpdatedAt+50){
-        await push();
+        await applyRemote(remote,remoteUpdatedAt);
+        setStatus('online',cloud()?'Dados atualizados do Supabase':'Dados atualizados do servidor');
       }
     }catch(error){
-      setStatus('offline','Servidor local sem conexão');
-      console.warn('Falha ao receber dados do servidor local:',error);
+      setStatus('offline',cloud()?'Supabase sem conexão':'Servidor local sem conexão');
+      console.warn('Falha ao receber dados do servidor central:',error);
     }
   }
+
   async function initialize(){
-    if(!AppState.getUser()){setStatus(location.protocol==='file:'?'local':'offline',location.protocol==='file:'?'Dados somente neste navegador':'Entre para conectar ao servidor');return;}
+    if(!AppState.getUser()){
+      setStatus(location.protocol==='file:'?'local':'offline',location.protocol==='file:'?'Dados somente neste navegador':'Entre para conectar ao servidor');
+      return;
+    }
     if(location.protocol==='file:'){
       setStatus('local','Dados somente neste navegador');
       return;
@@ -2444,36 +2517,46 @@ const DataSync = (() => {
       const status=await request('/status');
       if(!status?.ok) throw new Error('Servidor não respondeu corretamente.');
       connected=true;
-      setStatus('online','Servidor local conectado');
+      setStatus('online',cloud()?'Supabase conectado':'Servidor local conectado');
       await pull(true);
-      pollTimer=setInterval(()=>pull(false),6000);
+      if(pollTimer)clearInterval(pollTimer);
+      pollTimer=setInterval(()=>pull(false),2000);
     }catch(error){
       connected=false;
-      setStatus('offline','Modo local — servidor indisponível');
+      setStatus('offline',cloud()?'Supabase indisponível':'Modo local — servidor indisponível');
     }
   }
+
   async function forceSync(){
     if(!AppState.getUser()){UI.toast('Entre no sistema antes de sincronizar.');return;}
     if(location.protocol==='file:'){
-      UI.toast('Abra pelo servidor local para compartilhar os dados.');
+      UI.toast('Abra pelo site publicado para compartilhar os dados.');
       return;
     }
     if(!connected) await initialize();
     if(connected){
       await pull(false);
       await push();
-      UI.toast('Sincronização concluída.');
-      AppState.addAudit('Sincronização manual','Dados enviados e recebidos do servidor local.',{category:'integracao'});
+      UI.toast(cloud()?'Sincronização com Supabase concluída.':'Sincronização concluída.');
+      AppState.addAudit('Sincronização manual',cloud()?'Dados enviados e recebidos do Supabase.':'Dados enviados e recebidos do servidor local.',{category:'integracao'});
     }
   }
+
   function init(){
     document.addEventListener('app:state-saved',schedulePush);
     UI.$('forceCentralSync')?.addEventListener('click',forceSync);
     initialize();
   }
-  async function reconnect(){connected=false;if(pollTimer){clearInterval(pollTimer);pollTimer=null;}await initialize();}
+
+  async function reconnect(){
+    connected=false;
+    if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+    await initialize();
+  }
+
   return {init,forceSync,reconnect,isConnected:()=>connected};
 })();;
+
 const DataTools = (() => {
   function download(filename, content, type){
     const blob = new Blob([content], {type});
@@ -2485,14 +2568,14 @@ const DataTools = (() => {
   function csvCell(value){ return `"${String(value ?? '').replace(/"/g,'""')}"`; }
   function exportBackup(){
     const stamp = new Date().toISOString().slice(0,10);
-    download(`site-selene-backup-${stamp}.json`, JSON.stringify(SecurityApi.isServerMode()?AppState.exportOperationalSnapshot():AppState.exportSnapshot(), null, 2), 'application/json');
-    AppState.addAudit('Backup exportado',SecurityApi.isServerMode()?'Backup operacional sem credenciais gerado.':'Cópia completa dos dados demo gerada.',{category:'sistema'});
+    download(`site-selene-backup-${stamp}.json`, JSON.stringify((SecurityApi.isServerMode()||SecurityApi.isAccountCloud())?AppState.exportOperationalSnapshot():AppState.exportSnapshot(), null, 2), 'application/json');
+    AppState.addAudit('Backup exportado',(SecurityApi.isServerMode()||SecurityApi.isAccountCloud())?'Backup operacional sem credenciais gerado.':'Cópia completa dos dados demo gerada.',{category:'sistema'});
     UI.toast('Backup exportado com sucesso.');
   }
   async function importBackup(file){
     try{
       const parsed = JSON.parse(await file.text());
-      if(SecurityApi.isServerMode()) delete parsed.users;
+      if(SecurityApi.isServerMode()||SecurityApi.isAccountCloud()) delete parsed.users;
       const result = AppState.importSnapshot(parsed);
       if(!result.ok) throw new Error(result.message);
       AppState.addAudit('Backup importado','Dados restaurados a partir de um arquivo JSON.',{category:'sistema'});
@@ -2515,7 +2598,7 @@ const DataTools = (() => {
   function updateEnvironment(){
     const mode=UI.$('environmentMode'), storage=UI.$('storageMode'), integration=UI.$('integrationMode');
     if(mode) mode.textContent = location.protocol === 'file:' ? 'Apresentação no Chrome' : 'Servidor local';
-    if(storage) storage.textContent = location.protocol === 'file:' ? 'Neste navegador + backup manual' : 'Servidor local + navegador';
+    if(storage) storage.textContent = location.protocol === 'file:' ? 'Neste navegador + backup manual' : 'Supabase + navegador';
     if(integration){
       const badge=document.getElementById('seleneConnectionBadge');
       integration.textContent = badge?.textContent || 'Verificando...';
