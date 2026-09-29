@@ -330,13 +330,21 @@ const AppState = (() => {
     };
   }
   function exportOperationalSnapshot(){
-    return {version:'2.0',exportedAt:Date.now(),updatedAt:Number(data.meta?.updatedAt||Date.now()),data:JSON.parse(JSON.stringify(data))};
+    const operational=JSON.parse(JSON.stringify(data));
+    delete operational.selectedCorridors;
+    return {version:'2.0',exportedAt:Date.now(),updatedAt:Number(data.meta?.updatedAt||Date.now()),data:operational};
   }
   function importSnapshot(snapshot, options={}){
     if(!snapshot || typeof snapshot !== 'object' || !snapshot.data){
       return {ok:false,message:'Arquivo de dados inválido.'};
     }
+    const preserveLocalPreferences=['supabase','servidor'].includes(String(options.source||''));
+    const localSelectedCorridors=preserveLocalPreferences && Array.isArray(data.selectedCorridors) ? [...data.selectedCorridors] : null;
     data = normalizeData(snapshot.data);
+    if(localSelectedCorridors?.length){
+      data.selectedCorridors=localSelectedCorridors.filter(item=>corridors.includes(item));
+      if(!data.selectedCorridors.includes('RECEB')) data.selectedCorridors.push('RECEB');
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     if(!options.silent){
       dispatch('app:data-changed', {source:options.source || 'import'});
@@ -653,6 +661,10 @@ const TabletManager = (() => {
   function select(name, options={}){
     const user=AppState.getUser();
     if(!user) return false;
+    if(typeof Operation!=='undefined' && Operation.hasActiveMovement?.(user)){
+      UI.toast('Aguarde ou cancele a movimentação atual antes de trocar de equipamento.');
+      return false;
+    }
     const tabletName=normalizeName(name);
     if(!tabletName){ UI.toast('Selecione o tablet ou equipamento.'); return false; }
     const device=options.automatic ? ensureSystemDevice(tabletName) : deviceFor(tabletName);
@@ -828,22 +840,6 @@ const TabletManager = (() => {
     renderDeviceOptions();
     UI.$('currentTabletBadge')?.addEventListener('click',()=>openSelector({force:false}));
     UI.$('tabletCancelButton')?.addEventListener('click',()=>UI.$('tabletDialog')?.close());
-    UI.$('tabletNameInput')?.addEventListener('change',event=>{
-      const existing=assignmentFor(event.target.value);
-      const warning=UI.$('tabletCurrentWarning');
-      if(!warning) return;
-      const typedDevice=deviceFor(event.target.value);
-      if(event.target.value && !typedDevice){
-        warning.textContent='Esse equipamento não está cadastrado. O Encarregado ou TI precisa adicioná-lo em Configurações > Dispositivos.';
-        warning.classList.remove('hidden');
-      }else if(typedDevice && !canUseDevice(AppState.getUser(),typedDevice)){
-        warning.textContent='Para o perfil Emp, somente tablets cadastrados podem ser selecionados.';
-        warning.classList.remove('hidden');
-      }else if(existing?.userMatricula && existing.userMatricula!==AppState.getUser()?.matricula){
-        warning.textContent=`Atenção: ${existing.tabletName} foi usado por último por ${existing.userName || existing.userMatricula} (${formatAgo(existing.lastSeen)}). Ao confirmar, o equipamento será vinculado ao usuário atual.`;
-        warning.classList.remove('hidden');
-      }else warning.classList.add('hidden');
-    });
     UI.$('tabletForm')?.addEventListener('submit',event=>{
       event.preventDefault();
       if(select(UI.$('tabletNameInput').value)){
@@ -1125,6 +1121,10 @@ const Auth=(()=>{
     });
     UI.$('togglePassword').addEventListener('click',()=>{const i=UI.$('loginSenha'),show=i.type==='text';i.type=show?'password':'text';UI.$('togglePassword').textContent=show?'👁':'🙈';});
     UI.$('logoutButton').addEventListener('click',async()=>{
+      if(typeof Operation!=='undefined' && Operation.hasActiveMovement?.()){
+        UI.toast('Aguarde ou cancele a movimentação de 10 segundos antes de sair.');
+        return;
+      }
       TabletManager.releaseCurrent('logout');
       if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Logout realizado','Sessão encerrada.',{category:'acesso'});
       await SecurityApi.logout();AppState.clearUser();AppState.clearTablet();location.reload();
@@ -2062,12 +2062,17 @@ const Operation = (() => {
     elapsedRefreshTimer = setInterval(updateElapsedClocks, 1000);
     resumeMovementTimers();
   }
+  function hasActiveMovement(user=AppState.getUser()){
+    if(!user)return false;
+    return AppState.getData().requests.some(item=>['lowering','returning'].includes(item.status)&&item.lastHandledByMatricula===user.matricula);
+  }
   return {
     init,
     renderAll,
     renderRequests,
     addHistory,
-    getOpenProductionRequest
+    getOpenProductionRequest,
+    hasActiveMovement
   };
 })();;
 const History = (() => {
