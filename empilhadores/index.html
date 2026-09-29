@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Site Selene 2.0 — Gestão de Paletes</title>
-  <link rel="stylesheet" href="assets/app.bundle.css">
+  <link rel="stylesheet" href="assets/app.bundle.css?v=20260929-review1">
   <link rel="stylesheet" href="assets/operation-focus.css">
   <link rel="stylesheet" href="assets/checklist-code.css">
   <meta name="author" content="InfoTech.io — Desenvolvimento inicial: Lucas Janoca">
@@ -124,9 +124,7 @@
         <div class="topbar-actions">
           <span id="centralSyncBadge" class="central-sync-badge local">Dados locais</span>
           <button id="currentTabletBadge" class="tablet-topbar-badge" type="button" title="Trocar tablet">Tablet: selecionar</button>
-          <span id="currentUserLabel" class="current-user"></span>
-          <span id="currentShiftBadge" class="production-request-badge"></span>
-          <span id="currentProductionRequest" class="production-request-badge hidden"></span>
+          <span id="currentUserLabel" class="current-user"></span>          <span id="currentProductionRequest" class="production-request-badge hidden"></span>
           <div class="notification-center">
             <button id="notificationButton" class="notification-button" type="button" aria-label="Notificações" aria-expanded="false">♧<span id="notificationCount" class="notification-count hidden">0</span></button>
             <section id="notificationPanel" class="notification-panel" aria-label="Central de notificações">
@@ -137,7 +135,7 @@
           </div>
           <button id="refreshButton" class="btn btn-soft" type="button">↻ Atualizar</button>
           <button id="logoutButton" class="btn btn-light" type="button">Sair</button>
-          <button id="shiftButton" class="shift-button inactive" type="button">
+          <button id="requestSessionButton" class="request-session-button inactive" type="button">
             ● <span>Iniciar requisição</span>
           </button>
         </div>
@@ -301,7 +299,7 @@
           </div>
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>Palet</th><th>Status</th><th>Corredor</th><th>Origem</th><th>Turno</th><th>Última ação</th></tr></thead>
+              <thead><tr><th>Palet</th><th>Status</th><th>Corredor</th><th>Requisição</th><th>Origem</th><th>Última ação</th></tr></thead>
               <tbody id="myPalletsBody"></tbody>
             </table>
           </div>
@@ -401,7 +399,6 @@
                     <th>Requisição</th>
                     <th>Empilhador</th>
                     <th>Tablet</th>
-                    <th>Turno</th>
                     <th>Início</th>
                     <th>Fim</th>
                     <th>Status</th>
@@ -503,7 +500,7 @@
             </div>
             <div class="panel-actions"><button id="exportHistoryCsv" class="btn btn-soft" type="button">Exportar CSV</button><label class="history-search" aria-label="Pesquisar histórico">
               <span>⌕</span>
-              <input id="historySearchInput" type="search" placeholder="Pesquisar requisição, palet, data ou operador...">
+              <input id="historySearchInput" type="search" placeholder="Pesquisar requisição, palet, operador ou equipamento...">
             </label></div>
           </div>
 
@@ -516,7 +513,7 @@
                   <th>Palet</th>
                   <th>Ação</th>
                   <th>Operador</th>
-                  <th>Turno</th>
+                  <th>Equipamento</th>
                 </tr>
               </thead>
               <tbody id="historyTable"></tbody>
@@ -769,9 +766,9 @@
       <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
     </form>
   </dialog>
-  <script src="../shared/supabase-accounts.js?v=20260929-prod4"></script>
+  <script src="../shared/supabase-accounts.js?v=20260929-review1"></script>
   <script src="../shared/access-code.js?v=20260926-1"></script>
-  <script src="assets/app.bundle.js?v=20260929-prod5"></script>
+  <script src="assets/app.bundle.js?v=20260929-review1"></script>
   <script src="assets/operation-focus.js"></script>
   <script src="assets/checklist-code.js"></script>
 </body>
