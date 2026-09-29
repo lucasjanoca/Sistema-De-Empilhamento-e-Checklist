@@ -2128,15 +2128,36 @@ const History = (() => {
       date.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
     ].join(' ').toLowerCase();
   }
+  function populateRequestFilter(){
+    const select=UI.$('historyRequestFilter');
+    if(!select)return;
+    const current=select.value;
+    const requests=[...new Set(
+      AppState.getData().history.map(item=>String(item.requestNumber||'').trim()).filter(Boolean)
+    )].sort((a,b)=>b.localeCompare(a,'pt-BR',{numeric:true}));
+    select.innerHTML='<option value="">Todas as requisições</option>'+requests.map(number=>`<option value="${escapeHtml(number)}">${escapeHtml(number)}</option>`).join('');
+    if(requests.includes(current))select.value=current;
+  }
   function filteredHistory(){
-    const history = AppState.getData().history;
-    const query = (UI.$('historySearchInput')?.value || '').trim().toLowerCase();
-    if(!query) return history;
-    return history.filter(item => searchableText(item).includes(query));
+    const history=AppState.getData().history;
+    const query=(UI.$('historySearchInput')?.value||'').trim().toLowerCase();
+    const requestFilter=UI.$('historyRequestFilter')?.value||'';
+    const eventFilter=UI.$('historyEventFilter')?.value||'';
+
+    return history.filter(item=>{
+      if(query && !searchableText(item).includes(query))return false;
+      if(requestFilter && String(item.requestNumber||'')!==requestFilter)return false;
+      if(eventFilter){
+        const meta=eventMeta(item);
+        if(meta.kind!==eventFilter)return false;
+      }
+      return true;
+    });
   }
   function render(){
-    const history = AppState.getData().history;
-    const filtered = filteredHistory();
+    const history=AppState.getData().history;
+    populateRequestFilter();
+    const filtered=filteredHistory();
     UI.$('liveHistory').innerHTML = history.length
       ? history.slice(0,40).map(item => {
           const directionClass = item.direction === 'down' ? 'down' : item.direction === 'up' ? 'up' : 'other';
@@ -2163,7 +2184,9 @@ const History = (() => {
     UI.$('liveUp').textContent = history.filter(h => h.direction === 'up').length;
   }
   function init(){
-    UI.$('historySearchInput')?.addEventListener('input', render);
+    UI.$('historySearchInput')?.addEventListener('input',render);
+    UI.$('historyRequestFilter')?.addEventListener('change',render);
+    UI.$('historyEventFilter')?.addEventListener('change',render);
     document.addEventListener('app:data-changed',()=>{
       if(UI.$('view-historico')?.classList.contains('active')) render();
     });
