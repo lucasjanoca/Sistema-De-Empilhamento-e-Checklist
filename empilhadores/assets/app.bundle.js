@@ -75,8 +75,8 @@ const AppState = (() => {
     if(!matricula || !nome || !senha){
       return {ok:false, message:'Preencha nome, crachá e senha.'};
     }
-    if(senha.length < 6){
-      return {ok:false, message:'A senha precisa ter pelo menos 6 caracteres.'};
+    if(senha.length < 5){
+      return {ok:false, message:'A senha precisa ter pelo menos 5 caracteres.'};
     }
     if(users.some(item => item.matricula.toLowerCase() === matricula.toLowerCase())){
       return {ok:false, message:'Já existe um usuário com esse crachá.'};
@@ -90,7 +90,7 @@ const AppState = (() => {
     const user = users.find(item => item.matricula.toLowerCase() === String(matricula).toLowerCase());
     if(!user) return {ok:false, message:'Usuário não encontrado.'};
     if(user.role === 'ti' && actor?.role !== 'ti') return {ok:false, message:'Somente o TI pode alterar a senha de uma conta TI.'};
-    if(String(senha || '').length < 8) return {ok:false, message:'A senha precisa ter pelo menos 6 caracteres.'};
+    if(String(senha || '').length < 5) return {ok:false, message:'A senha precisa ter pelo menos 5 caracteres.'};
     user.senhaHash = await sha256Hex(senha);
     saveUsers();
     return {ok:true};
