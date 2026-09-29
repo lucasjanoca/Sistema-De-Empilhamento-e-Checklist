@@ -53,7 +53,11 @@
       body:JSON.stringify({refresh_token:current.refresh_token}),
       cache:'no-store'
     });
-    const payload=await readJson(response);
+    let payload;
+    try{payload=await readJson(response);}catch(error){
+      writeSession(null);
+      throw new Error('Sua sessão encerrou. Entre novamente.');
+    }
     const next={
       access_token:payload.access_token,
       refresh_token:payload.refresh_token||current.refresh_token,
@@ -110,7 +114,7 @@
   }
   async function login(matricula,senha){
     const email=emailFor(matricula);
-    if(!email||!senha) throw new Error('Preencha a matrícula e a senha.');
+    if(!email||!senha) throw new Error('Preencha o crachá e a senha.');
     const response=await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
       method:'POST',
       headers:authHeaders(),
@@ -119,7 +123,7 @@
     });
     let payload;
     try{payload=await readJson(response)}catch(error){
-      if(error.status===400||error.status===401) throw new Error('Senha ou matrícula incorreta.');
+      if(error.status===400||error.status===401) throw new Error('Senha ou crachá incorreto.');
       throw error;
     }
     writeSession({
