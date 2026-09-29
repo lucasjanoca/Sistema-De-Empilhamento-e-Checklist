@@ -3,7 +3,6 @@
 
   const SUPABASE_URL='https://yncspxfsvlqdnodlsosb.supabase.co';
   const PUBLISHABLE_KEY='sb_publishable_jALAHHuvrV5oxj2mugWTCQ_stD_vFyN';
-  const LEGACY_ANON_JWT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InluY3NweGZzdmxxZG5vZGxzb3NiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNTE2OTQsImV4cCI6MjEwMTcyNzY5NH0.OpPIWUJGax1s9XzkiijKVTuFTGuRXx0BUakKDyo0mUk';
   const EMP_API=SUPABASE_URL+'/functions/v1/empilhadores-api';
   const CHECKLIST_API=SUPABASE_URL+'/functions/v1/checklist-api';
   const SESSION_KEY='infotech_emp_supabase_session_v1';
@@ -167,7 +166,6 @@
       method:'POST',
       headers:{
         'apikey':PUBLISHABLE_KEY,
-        'Authorization':'Bearer '+LEGACY_ANON_JWT,
         'Content-Type':'application/json',
         Accept:'application/json'
       },
