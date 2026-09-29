@@ -238,13 +238,6 @@
                 </section>
               </div>
             </section>
-
-            <div class="summary-grid">
-              <article class="summary-card blue"><span>Aguardando</span><b id="countWaiting">0</b></article>
-              <article class="summary-card red"><span>No chão</span><b id="countFloor">0</b></article>
-              <article class="summary-card teal"><span>Liberados</span><b id="countReady">0</b></article>
-              <article class="summary-card orange"><span>Em confirmação</span><b id="countMoving">0</b></article>
-            </div>
           </div>
 
           <aside class="side-column">
@@ -455,7 +448,7 @@
                 </label>
                 <label class="field">
                   <span class="field-label">Senha inicial</span>
-                  <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="Mínimo 10 caracteres + letras, número e símbolo" minlength="10" required>
+                  <input id="newUserPassword" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" minlength="6" required>
                 </label>
                 <label class="field">
                   <span class="field-label">Tipo de acesso</span>
@@ -752,21 +745,16 @@
       <div class="request-dialog-header">
         <span class="request-dialog-eyebrow">RASTREIO DE EQUIPAMENTO</span>
         <h3>Qual equipamento você está usando?</h3>
-        <p>Emp seleciona somente tablets cadastrados. Encarregado e TI recebem um computador padrão automaticamente e podem trocar para outro dispositivo cadastrado quando necessário.</p>
+        <p>Selecione um dos equipamentos cadastrados para esta sessão.</p>
       </div>
-      <label class="field"><span class="field-label">Tablet / equipamento</span><input id="tabletNameInput" list="tabletOptions" placeholder="Selecione um tablet cadastrado" autocomplete="off" required></label>
-      <datalist id="tabletOptions">
-        <option value="Tablet 01"><option value="Tablet 02"><option value="Tablet 03"><option value="Tablet 04"><option value="Tablet 05">
-        <option value="Tablet 06"><option value="Tablet 07"><option value="Tablet 08"><option value="Tablet 09"><option value="Tablet 10">
-        <option value="Tablet 11"><option value="Tablet 12">
-      </datalist>
+      <label class="field"><span class="field-label">Tablet / equipamento</span><select id="tabletNameInput" required><option value="">Selecione um equipamento</option></select></label>
       <div id="tabletCurrentWarning" class="tablet-warning hidden"></div>
       <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
     </form>
   </dialog>
-  <script src="../shared/supabase-accounts.js?v=20260929-2"></script>
+  <script src="../shared/supabase-accounts.js?v=20260929-3"></script>
   <script src="../shared/access-code.js?v=20260926-1"></script>
-  <script src="assets/app.bundle.js"></script>
+  <script src="assets/app.bundle.js?v=20260929-3"></script>
   <script src="assets/operation-focus.js"></script>
   <script src="assets/checklist-code.js"></script>
 </body>
