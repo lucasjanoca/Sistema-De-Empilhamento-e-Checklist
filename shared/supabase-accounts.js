@@ -166,7 +166,7 @@
   async function setActive(matricula,active){return invokeEmp('update-user',{matricula,updateType:'active',active})}
   async function deleteUser(matricula){return invokeEmp('delete-user',{matricula})}
   async function getOperationalState(){return invokeEmp('state-get')}
-  async function saveOperationalState(snapshot){return invokeEmp('state-save',{snapshot})}
+  async function saveOperationalState(snapshot,expectedRevision=null){return invokeEmp('state-save',{snapshot,expectedRevision})}
   async function acquirePalletLock(request,direction,deviceName=''){
     return invokeEmp('lock-acquire',{
       address:String(request?.address||request?.id||''),
