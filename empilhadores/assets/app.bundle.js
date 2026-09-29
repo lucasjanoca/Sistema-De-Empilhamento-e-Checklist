@@ -75,8 +75,8 @@ const AppState = (() => {
     if(!matricula || !nome || !senha){
       return {ok:false, message:'Preencha nome, crachá e senha.'};
     }
-    if(senha.length < 8){
-      return {ok:false, message:'A senha precisa ter pelo menos 8 caracteres.'};
+    if(senha.length < 6){
+      return {ok:false, message:'A senha precisa ter pelo menos 6 caracteres.'};
     }
     if(users.some(item => item.matricula.toLowerCase() === matricula.toLowerCase())){
       return {ok:false, message:'Já existe um usuário com esse crachá.'};
@@ -90,7 +90,7 @@ const AppState = (() => {
     const user = users.find(item => item.matricula.toLowerCase() === String(matricula).toLowerCase());
     if(!user) return {ok:false, message:'Usuário não encontrado.'};
     if(user.role === 'ti' && actor?.role !== 'ti') return {ok:false, message:'Somente o TI pode alterar a senha de uma conta TI.'};
-    if(String(senha || '').length < 8) return {ok:false, message:'A senha precisa ter pelo menos 8 caracteres.'};
+    if(String(senha || '').length < 8) return {ok:false, message:'A senha precisa ter pelo menos 6 caracteres.'};
     user.senhaHash = await sha256Hex(senha);
     saveUsers();
     return {ok:true};
@@ -143,9 +143,7 @@ const AppState = (() => {
     'U-V','W-X','Y-Z','RECEB','OUTROS'
   ];
   const defaultDevices = [
-    ...Array.from({length:12}, (_,index)=>({id:`tablet-${String(index+1).padStart(2,'0')}`, name:`Tablet ${String(index+1).padStart(2,'0')}`, active:true, createdAt:Date.now(),type:'tablet'})),
-    {id:'computer-encarregado',name:'Computador Encarregado',active:true,createdAt:Date.now(),type:'system',locked:true},
-    {id:'computer-ti',name:'Computador TI',active:true,createdAt:Date.now(),type:'system',locked:true}
+    ...Array.from({length:12}, (_,index)=>({id:`tablet-${String(index+1).padStart(2,'0')}`, name:`Tablet ${String(index+1).padStart(2,'0')}`, active:true, createdAt:Date.now(),type:'tablet'}))
   ];
   const initialState = () => ({
     version:'2.0',
@@ -188,13 +186,8 @@ const AppState = (() => {
     normalized.nextNotificationId = Number(saved?.nextNotificationId || 1);
     normalized.tabletAssignments = Array.isArray(saved?.tabletAssignments) ? saved.tabletAssignments : base.tabletAssignments;
     normalized.registeredDevices = Array.isArray(saved?.registeredDevices) && saved.registeredDevices.length
-      ? saved.registeredDevices.map(device=>({id:String(device.id || '').trim() || `device-${Date.now()}-${Math.random()}`,name:String(device.name || '').trim(),active:device.active !== false,createdAt:Number(device.createdAt || Date.now()),type:device.type || 'tablet',locked:Boolean(device.locked)})).filter(device=>device.name)
+      ? saved.registeredDevices.map(device=>({id:String(device.id || '').trim() || `device-${Date.now()}-${Math.random()}`,name:String(device.name || '').trim(),active:device.active !== false,createdAt:Number(device.createdAt || Date.now()),type:device.type || 'tablet',locked:Boolean(device.locked)})).filter(device=>device.name && device.type!=='system' && !device.locked)
       : base.registeredDevices.map(device=>({...device}));
-    base.registeredDevices.filter(device=>device.locked).forEach(systemDevice=>{
-      const existing=normalized.registeredDevices.find(device=>String(device.name).toLowerCase()===systemDevice.name.toLowerCase());
-      if(existing){ existing.id=systemDevice.id; existing.type='system'; existing.locked=true; existing.active=true; }
-      else normalized.registeredDevices.push({...systemDevice});
-    });
     normalized.tabletAssignments.forEach(item=>{
       const name=String(item.tabletName || '').trim();
       if(name && !normalized.registeredDevices.some(device=>device.name.toLowerCase()===name.toLowerCase())){
@@ -568,9 +561,12 @@ const TabletManager = (() => {
     return registeredDevices().filter(device=>canUseDevice(user,device));
   }
   function renderDeviceOptions(){
-    const datalist=UI.$('tabletOptions');
-    if(!datalist) return;
-    datalist.innerHTML=selectableDevices().map(device=>`<option value="${device.name}"></option>`).join('');
+    const select=UI.$('tabletNameInput');
+    if(!select) return;
+    const current=select.value;
+    const options=selectableDevices().filter(device=>device.type!=='system' && !device.locked);
+    select.innerHTML='<option value="">Selecione um equipamento</option>'+options.map(device=>`<option value="${device.name}">${device.name}</option>`).join('');
+    if(options.some(device=>device.name===current)) select.value=current;
   }
   function addDevice(name){
     const user=AppState.getUser();
@@ -620,11 +616,7 @@ const TabletManager = (() => {
     UI.toast(`${device.name} removido.`);
     return true;
   }
-  function automaticDeviceForRole(role){
-    if(role === 'encarregado') return 'Computador Encarregado';
-    if(role === 'ti') return 'Computador TI';
-    return '';
-  }
+  function automaticDeviceForRole(){ return ''; }
   function ensureSystemDevice(name){
     if(!name) return null;
     const data=AppState.getData();
@@ -723,13 +715,10 @@ const TabletManager = (() => {
   function updateBadge(){
     const badge=UI.$('currentTabletBadge');
     if(!badge) return;
-    const user=AppState.getUser();
     const tablet=AppState.getTablet();
-    const automaticName=automaticDeviceForRole(user?.role);
-    const usingDefault=Boolean(automaticName && tablet?.name === automaticName);
-    badge.textContent=tablet?.name ? `▣ ${tablet.name}${usingDefault ? ' · padrão' : ''}` : '▣ Selecionar equipamento';
+    badge.textContent=tablet?.name ? `▣ ${tablet.name}` : '▣ Selecionar equipamento';
     badge.classList.toggle('attention',!tablet?.name);
-    badge.classList.toggle('automatic-device',usingDefault);
+    badge.classList.remove('automatic-device');
     badge.title='Clique para trocar o equipamento atual';
   }
   function openSelector(options={}){
@@ -739,18 +728,14 @@ const TabletManager = (() => {
     const input=UI.$('tabletNameInput');
     if(!dialog || !input) return;
     renderDeviceOptions();
-    const automatic=automaticDeviceForRole(user.role);
     const current=AppState.getTablet();
     const currentDevice=current?.name ? deviceFor(current.name) : null;
-    const validCurrent=Boolean(currentDevice && canUseDevice(user,currentDevice));
-    forceSelection=Boolean(options.force && user.role==='empilhador' && !validCurrent);
-    input.value=validCurrent ? current.name : (automatic || '');
+    const validCurrent=Boolean(currentDevice && canUseDevice(user,currentDevice) && currentDevice.type!=='system' && !currentDevice.locked);
+    forceSelection=Boolean(options.force && !validCurrent);
+    input.value=validCurrent ? current.name : '';
     UI.$('tabletCancelButton')?.classList.toggle('hidden',forceSelection || !current?.name);
     const warning=UI.$('tabletCurrentWarning');
-    if(warning){
-      warning.textContent=automatic ? `Equipamento padrão do perfil: ${automatic}. Você pode manter ou selecionar outro dispositivo cadastrado.` : '';
-      warning.classList.toggle('hidden',!automatic);
-    }
+    if(warning){ warning.textContent=''; warning.classList.add('hidden'); }
     if(!dialog.open) dialog.showModal();
     setTimeout(()=>input.focus(),50);
   }
@@ -758,13 +743,6 @@ const TabletManager = (() => {
     const user=AppState.getUser();
     if(!user) return;
     const current=AppState.getTablet();
-    const automatic=automaticDeviceForRole(user.role);
-    if(automatic){
-      if(current?.name && deviceFor(current.name)) heartbeat();
-      else select(automatic,{automatic:true,silent:true});
-      updateBadge();
-      return;
-    }
     updateBadge();
     const currentDevice=current?.name ? deviceFor(current.name) : null;
     if(options.force || !current?.name || !currentDevice || !canUseDevice(user,currentDevice)){
@@ -831,7 +809,7 @@ const TabletManager = (() => {
     renderDeviceOptions();
     UI.$('currentTabletBadge')?.addEventListener('click',()=>openSelector({force:false}));
     UI.$('tabletCancelButton')?.addEventListener('click',()=>UI.$('tabletDialog')?.close());
-    UI.$('tabletNameInput')?.addEventListener('input',event=>{
+    UI.$('tabletNameInput')?.addEventListener('change',event=>{
       const existing=assignmentFor(event.target.value);
       const warning=UI.$('tabletCurrentWarning');
       if(!warning) return;
@@ -1097,7 +1075,7 @@ const Auth=(()=>{
     if(!user){
       const blocked=AppState.users.find(u=>String(u.matricula).toLowerCase()===String(m).trim().toLowerCase()&&u.active===false);
       AppState.addAudit(blocked?'Login bloqueado':'Login negado',blocked?'Tentativa de acesso com usuário bloqueado.':'Matrícula ou senha não conferiu.',{category:'acesso',severity:'warning',actor:{nome:blocked?.nome||'Tentativa de login',matricula:m||'não informada',role:blocked?.role||'sistema'}});
-      throw new Error(blocked?'Este usuário está bloqueado. Procure o Encarregado ou TI.':'Senha ou matrícula incorreta.');
+      throw new Error(blocked?'Este usuário está bloqueado. Procure o Encarregado ou TI.':'Senha ou crachá incorreto.');
     }
     return user;
   }
@@ -1105,7 +1083,7 @@ const Auth=(()=>{
     const safe={matricula:user.matricula,nome:user.nome,role:user.role};
     AppState.setUser(safe);
     if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Login realizado',`Acesso pelo perfil ${AppState.getRoleLabel(safe.role)}.`,{category:'acesso'});
-    UI.showSystem(safe);Operation.renderAll();Dashboard.render();TabletManager.ensureSelected({force:true});
+    UI.showSystem(safe);Operation.renderAll();Dashboard.render();AppState.clearTablet();TabletManager.ensureSelected({force:true});
     Notifications.push('Acesso realizado',`Bem-vindo, ${safe.nome}.`,{type:'success',toast:false,link:'painel'});
     UI.toast(`Bem-vindo, ${safe.nome}.`);DataSync.reconnect?.();
   }
@@ -1114,9 +1092,9 @@ const Auth=(()=>{
     form.addEventListener('submit',async e=>{
       e.preventDefault();UI.setLoginError('');
       const m=UI.$('loginMatricula').value.trim(),s=UI.$('loginSenha').value;
-      if(!m||!s){UI.setLoginError('Preencha a matrícula e a senha.');return;}
+      if(!m||!s){UI.setLoginError('Preencha o crachá e a senha.');return;}
       const b=form.querySelector('button[type="submit"]');if(b)b.disabled=true;
-      try{const u=await login(m,s);if(!u){UI.setLoginError('Senha ou matrícula incorreta.');return;}finish(u);}
+      try{const u=await login(m,s);if(!u){UI.setLoginError('Senha ou crachá incorreto.');return;}finish(u);}
       catch(err){UI.setLoginError(err.message||'Não foi possível entrar.');}
       finally{if(b)b.disabled=false;}
     });
@@ -1374,10 +1352,10 @@ const Operation = (() => {
       : (UI.$('availableOnly').checked
           ? '<div class="empty">Nenhum palet disponível para subir.</div>'
           : '<div class="empty">Nenhum palet baixado.</div>');
-    UI.$('countWaiting').textContent = data.requests.filter(r => r.status === 'waiting').length;
-    UI.$('countFloor').textContent = data.requests.filter(r => r.status === 'floor').length;
-    UI.$('countReady').textContent = data.requests.filter(r => r.status === 'ready').length;
-    UI.$('countMoving').textContent = data.requests.filter(r => ['lowering','returning'].includes(r.status)).length;
+    if(UI.$('countWaiting')) UI.$('countWaiting').textContent = data.requests.filter(r => r.status === 'waiting').length;
+    if(UI.$('countFloor')) UI.$('countFloor').textContent = data.requests.filter(r => r.status === 'floor').length;
+    if(UI.$('countReady')) UI.$('countReady').textContent = data.requests.filter(r => r.status === 'ready').length;
+    if(UI.$('countMoving')) UI.$('countMoving').textContent = data.requests.filter(r => ['lowering','returning'].includes(r.status)).length;
   }
   function updateElapsedClocks(){
     const unlocked = unlockDueFloorRequests();
@@ -2220,7 +2198,18 @@ const UsersAdmin=(()=>{
       if(u.role==='ti'&&AppState.getUser()?.role!=='ti'){UI.toast('Somente o TI pode alterar contas TI.');return;}
       if(e.target.closest('.change-user-password')){
         const senha=prompt(`Nova senha para ${m}:`);if(senha===null)return;
-        const r=await safe(()=>SecurityApi.changePassword(m,senha));UI.toast(r?.ok?'Senha alterada.':r?.message);
+        const r=await safe(()=>SecurityApi.changePassword(m,senha));
+        if(!r?.ok){UI.toast(r?.message);return;}
+        const self=AppState.getUser()?.matricula===m;
+        if(self){
+          await SecurityApi.logout();
+          AppState.clearUser();
+          AppState.clearTablet();
+          alert('Senha alterada com sucesso. Entre novamente com a nova senha.');
+          location.reload();
+          return;
+        }
+        UI.toast('Senha alterada.');
       }
       if(e.target.closest('.toggle-user-active')){
         if(!confirm(`${u.active===false?'Desbloquear':'Bloquear'} ${u.nome}?`))return;
