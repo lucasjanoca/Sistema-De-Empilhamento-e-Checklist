@@ -567,96 +567,6 @@ border-radius:9px;
 background:#f6f9f7;
 }
 .corridor-options input{width:auto}
-.current-shift{
-padding:7px 9px;
-border-radius:999px;
-background:#eef8f4;
-color:var(--green);
-border:1px solid #cde5db;
-font-size:9px;
-font-weight:800;
-white-space:nowrap;
-}
-.shift-select-dialog{
-width:min(620px,calc(100% - 30px));
-}
-.shift-select-dialog::backdrop{
-background:rgba(5,35,27,.76);
-backdrop-filter:blur(4px);
-}
-.shift-dialog-header{
-padding-bottom:5px;
-}
-.shift-dialog-header h3{
-margin:5px 0 6px;
-font-size:24px;
-}
-.shift-dialog-header p{
-margin:0;
-color:var(--muted);
-font-size:12px;
-}
-.shift-dialog-eyebrow{
-color:var(--green);
-font-size:10px;
-font-weight:900;
-letter-spacing:1px;
-}
-.shift-options{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:11px;
-}
-.shift-option{
-position:relative;
-display:grid;
-grid-template-columns:auto 1fr;
-gap:11px;
-align-items:center;
-padding:15px;
-border:1px solid var(--line);
-border-radius:14px;
-background:#f8fbf9;
-cursor:pointer;
-transition:.18s;
-}
-.shift-option:hover{
-transform:translateY(-2px);
-border-color:#9fcfbd;
-background:#eef9f4;
-}
-.shift-option input{
-position:absolute;
-opacity:0;
-pointer-events:none;
-}
-.shift-option:has(input:checked){
-border-color:var(--green);
-background:linear-gradient(145deg,#e9f7f1,#d8efe6);
-box-shadow:0 0 0 3px rgba(15,107,82,.09);
-}
-.shift-option-icon{
-width:42px;
-height:42px;
-display:grid;
-place-items:center;
-border-radius:12px;
-background:#fff;
-border:1px solid var(--line);
-font-size:20px;
-}
-.shift-option-content b,
-.shift-option-content small{
-display:block;
-}
-.shift-option-content b{
-font-size:13px;
-}
-.shift-option-content small{
-margin-top:4px;
-color:var(--muted);
-font-size:10px;
-}
 .pallet-card.waiting{
 position:relative;
 overflow:hidden;
@@ -1261,8 +1171,6 @@ border-radius:13px;
 .topbar-actions .btn span{display:none}
 }
 @media(max-width:650px){
-.shift-options{grid-template-columns:1fr}
-.current-shift{display:none}
 }
 @media(max-width:900px){
 .request-layout{grid-template-columns:1fr}
