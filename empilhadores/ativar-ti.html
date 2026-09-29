@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ativar acesso TI · Site Selene</title>
+  <meta name="referrer" content="no-referrer">
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#071d16;color:#edf8f2;font-family:Arial,sans-serif;padding:20px}
+    .card{width:min(480px,100%);background:#0d2a1f;border:1px solid #265744;border-radius:22px;padding:24px;box-shadow:0 22px 60px rgba(0,0,0,.35)}
+    .logo{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;background:#22b573;color:#062016;font-size:20px;font-weight:900;margin-bottom:18px}
+    h1{margin:0 0 8px;font-size:26px}p{color:#a6c7b8;line-height:1.45;margin:0 0 20px}
+    label{display:block;margin:14px 0 6px;font-weight:800;font-size:13px}
+    input{width:100%;padding:14px 15px;border-radius:13px;border:1px solid #32604d;background:#09241b;color:#fff;font-size:17px;outline:none}
+    input:focus{border-color:#22b573;box-shadow:0 0 0 3px rgba(34,181,115,.13)}
+    button{width:100%;margin-top:18px;padding:14px;border:0;border-radius:13px;background:#22b573;color:#062016;font-size:16px;font-weight:900;cursor:pointer}
+    button:disabled{opacity:.6;cursor:wait}.msg{margin-top:14px;padding:12px;border-radius:12px;display:none;font-size:14px;line-height:1.4}
+    .msg.ok{display:block;background:#123d2d;border:1px solid #2d7556;color:#d8f7e8}.msg.err{display:block;background:#42201f;border:1px solid #87413d;color:#ffd9d6}
+    .note{margin-top:16px;font-size:12px;color:#7ea893}.back{display:block;margin-top:18px;text-align:center;color:#8fd8b8;text-decoration:none;font-weight:800}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo">TI</div>
+    <h1>Ativar acesso TI</h1>
+    <p>Use esta página uma única vez para transformar seu acesso em uma conta real do Supabase vinculada ao crachá.</p>
+
+    <form id="form">
+      <label for="matricula">Número do crachá</label>
+      <input id="matricula" inputmode="numeric" autocomplete="username" value="0174340" readonly>
+
+      <label for="senha">Sua senha</label>
+      <input id="senha" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="Digite a senha que você quer usar" required>
+
+      <label for="setupCode">Código de ativação</label>
+      <input id="setupCode" type="password" autocomplete="off" placeholder="Cole o código de ativação" required>
+
+      <button id="submit" type="submit">Ativar minha conta TI</button>
+      <div id="message" class="msg"></div>
+    </form>
+
+    <div class="note">A senha é enviada diretamente ao Supabase e não é salva nesta página.</div>
+    <a class="back" href="./">← Voltar para o login</a>
+  </main>
+
+  <script>
+    const endpoint='https://yncspxfsvlqdnodlsosb.supabase.co/functions/v1/emp-bootstrap-once';
+    const form=document.getElementById('form');
+    const button=document.getElementById('submit');
+    const message=document.getElementById('message');
+
+    function show(text,type){
+      message.textContent=text;
+      message.className='msg '+type;
+    }
+
+    form.addEventListener('submit',async(event)=>{
+      event.preventDefault();
+      button.disabled=true;
+      button.textContent='Ativando...';
+      message.className='msg';
+
+      try{
+        const response=await fetch(endpoint,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            matricula:document.getElementById('matricula').value,
+            senha:document.getElementById('senha').value,
+            setupCode:document.getElementById('setupCode').value
+          }),
+          cache:'no-store'
+        });
+
+        let data={};
+        try{data=await response.json()}catch{}
+
+        if(!response.ok) throw new Error(data.message||'Não foi possível ativar a conta.');
+
+        document.getElementById('senha').value='';
+        document.getElementById('setupCode').value='';
+        show('Conta TI ativada. Agora você já pode entrar usando o crachá 0174340 e sua senha.','ok');
+        setTimeout(()=>location.href='./',1800);
+      }catch(error){
+        show(error.message||'Falha na ativação.','err');
+      }finally{
+        button.disabled=false;
+        button.textContent='Ativar minha conta TI';
+      }
+    });
+  </script>
+</body>
+</html>
