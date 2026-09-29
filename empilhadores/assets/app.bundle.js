@@ -1527,6 +1527,9 @@ const Operation = (() => {
     request.lastHandledByName=user?.nome||'';
     request.lastHandledTablet=tablet?.name||tablet?.id||'';
     request.lastHandledAt=Date.now();
+    request.movementActorName=user?.nome||'Sistema';
+    request.movementActorMatricula=user?.matricula||'sistema';
+    request.movementActorRole=user?.role||'sistema';
     request.previousStatus=request.status;
     request.status=direction==='down'?'lowering':'returning';
     request.movementRequestId=production.id;
@@ -1642,8 +1645,20 @@ const Operation = (() => {
         ? 'Descida cancelada — palet voltou para cima'
         : 'Subida cancelada — palet voltou para baixo',
       null,
-      {requestNumber:movementRequestNumber,tabletName:movementTablet}
+      {
+        requestNumber:movementRequestNumber,
+        tabletName:movementTablet,
+        actor:{
+          nome:request.movementActorName||request.lastHandledByName||'Sistema',
+          matricula:request.movementActorMatricula||request.lastHandledByMatricula||'sistema',
+          role:request.movementActorRole||'sistema'
+        }
+      }
     );
+
+    delete request.movementActorName;
+    delete request.movementActorMatricula;
+    delete request.movementActorRole;
 
     AppState.save({source:'operation'});
     renderAll();
@@ -1685,9 +1700,20 @@ const Operation = (() => {
           ? 'EXP-PIC desceu e foi liberado imediatamente para subir'
           : 'Palet desceu e foi confirmado pelo Site Selene',
         'down',
-        {requestNumber:movementRequestNumber,tabletName:request.lastHandledTablet||''}
+        {
+          requestNumber:movementRequestNumber,
+          tabletName:request.lastHandledTablet||'',
+          actor:{
+            nome:request.movementActorName||request.lastHandledByName||'Sistema',
+            matricula:request.movementActorMatricula||request.lastHandledByMatricula||'sistema',
+            role:request.movementActorRole||'sistema'
+          }
+        }
       );
       addProductionMovement('down',movementRequestId);
+      delete request.movementActorName;
+      delete request.movementActorMatricula;
+      delete request.movementActorRole;
 
       Notifications.push(
         request.isPic?'EXP-PIC no chão':'Palet baixado',
@@ -1723,7 +1749,15 @@ const Operation = (() => {
         request.address,
         'Palet subiu e movimentação foi concluída pelo Site Selene',
         'up',
-        {requestNumber:movementRequestNumber,tabletName:request.lastHandledTablet||''}
+        {
+          requestNumber:movementRequestNumber,
+          tabletName:request.lastHandledTablet||'',
+          actor:{
+            nome:request.movementActorName||request.lastHandledByName||'Sistema',
+            matricula:request.movementActorMatricula||request.lastHandledByMatricula||'sistema',
+            role:request.movementActorRole||'sistema'
+          }
+        }
       );
       addProductionMovement('up',movementRequestId);
 
@@ -2059,7 +2093,8 @@ const Operation = (() => {
     renderRequests,
     addHistory,
     getOpenProductionRequest,
-    hasActiveMovement
+    hasActiveMovement,
+    resumeMovementTimers
   };
 })();;
 const History = (() => {
@@ -2753,7 +2788,10 @@ const DataSync = (() => {
     }finally{
       applyingRemote=false;
     }
-    if(typeof Operation!=='undefined') Operation.renderAll();
+    if(typeof Operation!=='undefined'){
+      Operation.renderAll();
+      Operation.resumeMovementTimers?.();
+    }
     if(typeof Dashboard!=='undefined') Dashboard.render();
     if(typeof Notifications!=='undefined') Notifications.render();
   }
