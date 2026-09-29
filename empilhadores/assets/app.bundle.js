@@ -1277,13 +1277,13 @@ const Operation = (() => {
   }
   function waitingCard(request){
     const alertDue = waitingAlertDue(request);
-    const hazardActive = request.isPic || alertDue;
+    const hazardActive = alertDue;
     const statusLabel = request.isPic ? 'EXP-PIC' : (alertDue ? '⚠ ALERTA · +10 min' : 'Aguardando');
     return `
       <button class="pallet-card waiting wait-normal ${request.isPic ? 'pic' : ''} ${hazardActive ? 'hazard-blink' : ''}" data-id="${request.id}" data-external="${request.external ? 'true' : 'false'}">
         <div>
           <div class="pallet-title-line"><b>${request.address}</b>${request.isPic ? '<span class="pic-badge">EXP-PIC</span>' : ''}</div>
-          <small>${request.operator}</small>
+          <small>${request.operator}${request.originRequestNumber ? ` · ${request.originRequestNumber}` : ''}</small>
           ${handlerMarkup(request)}
         </div>
         ${request.isPic ? '<div class="pic-message">⚠ Avisar armazenista</div>' : ''}
@@ -1324,10 +1324,10 @@ const Operation = (() => {
       }
     }
     return `
-      <button class="pallet-card ${request.status} ${request.isPic ? 'pic hazard-blink' : ''} ${picOverdue ? 'pic-overdue' : ''}" data-id="${request.id}" data-external="${request.external ? 'true' : 'false'}">
+      <button class="pallet-card ${request.status} ${request.isPic ? 'pic' : ''} ${picOverdue ? 'pic-overdue hazard-blink' : ''}" data-id="${request.id}" data-external="${request.external ? 'true' : 'false'}">
         <div>
           <div class="pallet-title-line"><b>${request.address}</b>${request.isPic ? '<span class="pic-badge">EXP-PIC</span>' : ''}</div>
-          <small>${request.operator}</small>
+          <small>${request.operator}${request.originRequestNumber ? ` · ${request.originRequestNumber}` : ''}</small>
           ${handlerMarkup(request)}
         </div>
         ${request.isPic ? '<div class="pic-message">⚠ Avisar armazenista</div>' : ''}
@@ -1338,10 +1338,10 @@ const Operation = (() => {
   function movingCard(request){
     const lowering = request.status === 'lowering';
     return `
-      <article class="pallet-card ${request.status} ${request.isPic ? 'pic hazard-blink' : ''}" data-id="${request.id}" data-external="${request.external ? 'true' : 'false'}">
+      <article class="pallet-card ${request.status} ${request.isPic ? 'pic' : ''}" data-id="${request.id}" data-external="${request.external ? 'true' : 'false'}">
         <div>
           <div class="pallet-title-line"><b>${request.address}</b>${request.isPic ? '<span class="pic-badge">EXP-PIC</span>' : ''}</div>
-          <small>${request.operator}</small>
+          <small>${request.operator}${request.originRequestNumber ? ` · ${request.originRequestNumber}` : ''}</small>
           ${handlerMarkup(request)}
         </div>
         <div>
@@ -1397,7 +1397,7 @@ const Operation = (() => {
       const card = element.closest('.pallet-card');
       if(!card || request.status !== 'waiting') return;
       const alertDue = waitingAlertDue(request);
-      card.classList.toggle('hazard-blink', request.isPic || alertDue);
+      card.classList.toggle('hazard-blink', alertDue);
       const status = card.querySelector('.wait-status');
       if(status) status.textContent = request.isPic ? 'EXP-PIC' : (alertDue ? '⚠ ALERTA · +10 min' : 'Aguardando');
     });
@@ -1416,7 +1416,7 @@ const Operation = (() => {
       if(!request || !request.isPic || request.status !== 'ready') return;
       const overdue = picReturnOverdue(request);
       const card = element.closest('.pallet-card');
-      card?.classList.toggle('hazard-blink', true);
+      card?.classList.toggle('hazard-blink', overdue);
       card?.classList.toggle('pic-overdue', overdue);
       element.classList.toggle('overdue', overdue);
       element.textContent = overdue ? `Atrasado · ${floorElapsedClock(request)}` : `Tempo restante ${picReturnClock(request)}`;
@@ -1831,12 +1831,16 @@ const Operation = (() => {
       ? 'Encerrar requisição'
       : 'Iniciar requisição';
   }
-  function formatRequestNumber(id, startedAt){
-    const date = new Date(startedAt);
-    const y = date.getFullYear();
-    const m = String(date.getMonth()+1).padStart(2,'0');
-    const d = String(date.getDate()).padStart(2,'0');
-    return `REQ-${y}${m}${d}-${String(id).padStart(4,'0')}`;
+  function formatRequestNumber(startedAt,user){
+    const date=new Date(startedAt);
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    const hh=String(date.getHours()).padStart(2,'0');
+    const mm=String(date.getMinutes()).padStart(2,'0');
+    const ss=String(date.getSeconds()).padStart(2,'0');
+    const cracha=String(user?.matricula||'0000').replace(/\D/g,'').slice(-4).padStart(4,'0');
+    return `REQ-${y}${m}${d}-${hh}${mm}${ss}-${cracha}`;
   }
   function getOpenProductionRequest(user = AppState.getUser()){
     if(!user) return null;
@@ -1846,47 +1850,81 @@ const Operation = (() => {
     ) || null;
   }
   function createProductionRequest(){
-    const data = AppState.getData();
-    const user = AppState.getUser();
-    if(!user) return null;
-    const existing = getOpenProductionRequest(user);
-    if(existing) return existing;
-    const startedAt = Date.now();
-    const id = data.nextProductionRequestId++;
-    const request = {
+    const data=AppState.getData();
+    const user=AppState.getUser();
+    if(!user)return null;
+
+    const existing=getOpenProductionRequest(user);
+    if(existing)return existing;
+
+    const tablet=AppState.getTablet();
+    if(!tablet?.name){
+      UI.toast('Selecione um equipamento antes de iniciar a requisição.');
+      TabletManager.ensureSelected({force:true});
+      return null;
+    }
+
+    const startedAt=Date.now();
+    const id=startedAt*1000+Math.floor(Math.random()*1000);
+    const request={
       id,
-      number:formatRequestNumber(id, startedAt),
+      number:formatRequestNumber(startedAt,user),
       userMatricula:user.matricula,
       userName:user.nome,
-      tabletName:AppState.getTablet()?.name || '',
+      tabletName:tablet.name,
       startedAt,
       endedAt:null,
       status:'open',
       downCount:0,
       upCount:0
     };
+
     data.productionRequests.unshift(request);
     AppState.save({source:'requisition'});
-    addHistory('—', `Requisição ${request.number} iniciada`);
-    Notifications.push('Requisição iniciada', `${request.number} foi criada para ${request.userName}.`, {type:'success',toast:false,link:'requisicoes'});
+    addHistory('—',`Requisição ${request.number} iniciada`);
+    Notifications.push(
+      'Requisição iniciada',
+      `${request.number} foi criada para ${request.userName}.`,
+      {type:'success',toast:false,link:'requisicoes'}
+    );
     return request;
   }
   function closeProductionRequest(){
-    const request = getOpenProductionRequest();
-    if(!request) return null;
-    request.status = 'closed';
-    request.endedAt = Date.now();
-    addHistory('—', `Requisição ${request.number} encerrada`);
-    Notifications.push('Requisição encerrada', `${request.number} terminou com ${request.downCount + request.upCount} movimentações.`, {type:'info',toast:false,link:'requisicoes'});
+    const request=getOpenProductionRequest();
+    if(!request)return null;
+
+    const user=AppState.getUser();
+    const movementInProgress=AppState.getData().requests.some(item =>
+      ['lowering','returning'].includes(item.status) &&
+      item.lastHandledByMatricula===user?.matricula
+    );
+
+    if(movementInProgress){
+      UI.toast('Aguarde a confirmação da movimentação antes de encerrar a requisição.');
+      return null;
+    }
+
+    request.status='closed';
+    request.endedAt=Date.now();
+    addHistory('—',`Requisição ${request.number} encerrada`);
+    Notifications.push(
+      'Requisição encerrada',
+      `${request.number} terminou com ${request.downCount+request.upCount} movimentações.`,
+      {type:'info',toast:false,link:'requisicoes'}
+    );
     AppState.save({source:'requisition'});
     return request;
   }
   function addProductionMovement(direction){
-    const request = getOpenProductionRequest();
-    if(!request) return;
-    if(direction === 'down') request.downCount += 1;
-    if(direction === 'up') request.upCount += 1;
-    AppState.save();
+    const request=getOpenProductionRequest();
+    if(!request){
+      UI.toast('Movimentação não contabilizada: nenhuma requisição aberta.');
+      return false;
+    }
+    if(direction==='down')request.downCount+=1;
+    if(direction==='up')request.upCount+=1;
+    AppState.save({source:'requisition'});
+    return true;
   }
   function renderProductionRequest(){
     const user = AppState.getUser();
@@ -1965,12 +2003,14 @@ const Operation = (() => {
       const openRequest = getOpenProductionRequest();
       if(!openRequest){
         const request = createProductionRequest();
+        if(!request)return;
         renderAll();
         UI.toast(`${request.number} iniciada para ${request.userName}.`);
         if(UI.$('view-requisicoes')?.classList.contains('active')) ProductionRequests.render();
         return;
       }
       const request = closeProductionRequest();
+      if(!request)return;
       renderAll();
       if(UI.$('view-requisicoes')?.classList.contains('active')) ProductionRequests.render();
       UI.toast(`${request.number} encerrada com ${request.downCount + request.upCount} movimentações.`);
