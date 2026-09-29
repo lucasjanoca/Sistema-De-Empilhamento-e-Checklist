@@ -19,6 +19,10 @@
     const m=normalizeMatricula(matricula);
     return m ? m+'@empilhadores.selene.local' : '';
   }
+  function toAuthPassword(value){
+    const raw=String(value||'');
+    return raw.length===5 ? 'P5:'+raw : raw;
+  }
   function readSession(){
     const stored=safeParse(sessionStorage.getItem(SESSION_KEY),null);
     return stored && stored.access_token ? stored : null;
@@ -118,7 +122,7 @@
     const response=await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
       method:'POST',
       headers:authHeaders(),
-      body:JSON.stringify({email,password:String(senha)}),
+      body:JSON.stringify({email,password:toAuthPassword(senha)}),
       cache:'no-store'
     });
     let payload;
