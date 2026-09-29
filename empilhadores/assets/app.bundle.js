@@ -754,8 +754,7 @@ const TabletManager = (() => {
     forceSelection=Boolean(options.force && !validCurrent);
     input.value=validCurrent ? current.name : '';
     UI.$('tabletCancelButton')?.classList.toggle('hidden',forceSelection || !current?.name);
-    const warning=UI.$('tabletCurrentWarning');
-    if(warning){ warning.textContent=''; warning.classList.add('hidden'); }
+
     if(!dialog.open) dialog.showModal();
     setTimeout(()=>input.focus(),50);
   }
@@ -1161,25 +1160,35 @@ const Operation = (() => {
     };
     return map[n] || 'OUTROS';
   }
-  function addHistory(address, action, direction=null){
-    const data = AppState.getData();
-    const user = AppState.getUser();
-    const production = getOpenProductionRequest(user);
+  function addHistory(address,action,direction=null,options={}){
+    const data=AppState.getData();
+    const currentUser=AppState.getUser();
+    const production=getOpenProductionRequest(currentUser);
+    const actor=options.actor||currentUser||{nome:'Sistema',matricula:'sistema',role:'sistema'};
+    const requestNumber=String(options.requestNumber ?? production?.number ?? '');
+    const tabletName=String(options.tabletName ?? AppState.getTablet()?.name ?? '');
+
     data.history.unshift({
-      id:Date.now() + Math.random(),
+      id:Date.now()+Math.random(),
       address,
       action,
       direction,
-      operator:user?.nome || 'Sistema',
-      operatorMatricula:user?.matricula || 'sistema',
-      requestNumber:production?.number || '',
-      tabletName:AppState.getTablet()?.name || '',
+      operator:actor.nome||'Sistema',
+      operatorMatricula:actor.matricula||'sistema',
+      requestNumber,
+      tabletName,
       time:Date.now()
     });
-    AppState.addAudit(action, `${address && address !== '—' ? `Palet ${address}. ` : ''}${production ? `Requisição ${production.number}.` : ''}`.trim(), {
-      category: action.toLowerCase().includes('requisição') ? 'requisicao' : 'operacao',
-      save:false
-    });
+
+    AppState.addAudit(
+      action,
+      `${address && address!=='—' ? `Palet ${address}. ` : ''}${requestNumber ? `Requisição ${requestNumber}.` : ''}`.trim(),
+      {
+        category:action.toLowerCase().includes('requisição')?'requisicao':'operacao',
+        save:false,
+        actor
+      }
+    );
     AppState.save({source:'operation'});
   }
   function elapsedMinutes(request){
@@ -1249,7 +1258,16 @@ const Operation = (() => {
       if(!request.isPic && request.status === 'floor' && floorElapsedMs(request) >= FLOOR_UNLOCK_MS){
         request.status = 'ready';
         request.unlockedAt = Date.now();
-        addHistory(request.address, 'Palet liberado automaticamente após 1 hora e 30 minutos');
+        addHistory(
+          request.address,
+          'Palet liberado automaticamente após 1 hora e 30 minutos',
+          null,
+          {
+            actor:{nome:'Sistema',matricula:'sistema',role:'sistema'},
+            requestNumber:request.lastMovementRequestNumber||request.originRequestNumber||'',
+            tabletName:''
+          }
+        );
         Notifications.push('Palet liberado', `${request.address} completou 1 hora e 30 minutos e está pronto para subir.`, {type:'success',toast:false,link:'operacao'});
         changed = true;
       }
@@ -1378,10 +1396,6 @@ const Operation = (() => {
       : (UI.$('availableOnly').checked
           ? '<div class="empty">Nenhum palet disponível para subir.</div>'
           : '<div class="empty">Nenhum palet baixado.</div>');
-    if(UI.$('countWaiting')) UI.$('countWaiting').textContent = data.requests.filter(r => r.status === 'waiting').length;
-    if(UI.$('countFloor')) UI.$('countFloor').textContent = data.requests.filter(r => r.status === 'floor').length;
-    if(UI.$('countReady')) UI.$('countReady').textContent = data.requests.filter(r => r.status === 'ready').length;
-    if(UI.$('countMoving')) UI.$('countMoving').textContent = data.requests.filter(r => ['lowering','returning'].includes(r.status)).length;
   }
   function updateElapsedClocks(){
     const unlocked = unlockDueFloorRequests();
@@ -1462,7 +1476,7 @@ const Operation = (() => {
         request.manualUnlockedBy=user.matricula;
         request.manualUnlockedByName=user.nome;
         request.manualUnlockedRole=user.role;
-        addHistory(request.address,`Palet liberado pelo ${AppState.getRoleLabel(user.role)}${user.nome ? ` · ${user.nome}` : ''}`);
+        addHistory(request.address,`Palet liberado pelo ${AppState.getRoleLabel(user.role)}${user.nome ? ` · ${user.nome}` : ''}`,null,{requestNumber:request.lastMovementRequestNumber||request.originRequestNumber||'',tabletName:AppState.getTablet()?.name||''});
         AppState.addAudit(
           'Liberação antecipada',
           `Palet ${request.address} liberado pelo ${AppState.getRoleLabel(user.role)} ${user.nome || user.matricula} antes de 1h30. É necessário clicar novamente para iniciar a subida.`,
@@ -1538,7 +1552,9 @@ const Operation = (() => {
       request.address,
       direction==='down'
         ? 'Descida iniciada — 10s para cancelar'
-        : 'Subida iniciada — 10s para voltar'
+        : 'Subida iniciada — 10s para voltar',
+      null,
+      {requestNumber:production.number,tabletName:tablet?.name||''}
     );
 
     AppState.save({source:'operation'});
@@ -1573,7 +1589,7 @@ const Operation = (() => {
       const counter=UI.$(`countdown-${id}`);
       if(counter)counter.textContent=`${current.remaining}s`;
 
-      AppState.save({silent:true});
+      AppState.save({silent:true,preserveTimestamp:true});
 
       if(Date.now()>=deadline){
         const active=timers.get(id);
@@ -1623,6 +1639,9 @@ const Operation = (() => {
     const wasLowering=request.status==='lowering';
     request.status=wasLowering?'waiting':(request.previousStatus||'ready');
 
+    const movementRequestNumber=request.movementRequestNumber||request.lastMovementRequestNumber||request.originRequestNumber||'';
+    const movementTablet=request.lastHandledTablet||AppState.getTablet()?.name||'';
+
     delete request.remaining;
     delete request.movementStartedAt;
     delete request.movementDeadlineAt;
@@ -1634,7 +1653,9 @@ const Operation = (() => {
       request.address,
       wasLowering
         ? 'Descida cancelada — palet voltou para cima'
-        : 'Subida cancelada — palet voltou para baixo'
+        : 'Subida cancelada — palet voltou para baixo',
+      null,
+      {requestNumber:movementRequestNumber,tabletName:movementTablet}
     );
 
     AppState.save({source:'operation'});
@@ -1666,14 +1687,20 @@ const Operation = (() => {
 
       delete request.previousStatus;
 
+      const movementRequestId=request.movementRequestId;
+      const movementRequestNumber=request.movementRequestNumber||request.originRequestNumber||'';
+      request.lastMovementRequestId=movementRequestId||request.lastMovementRequestId||null;
+      request.lastMovementRequestNumber=movementRequestNumber||request.lastMovementRequestNumber||'';
+
       addHistory(
         request.address,
         request.isPic
           ? 'EXP-PIC desceu e foi liberado imediatamente para subir'
           : 'Palet desceu e foi confirmado pelo Site Selene',
-        'down'
+        'down',
+        {requestNumber:movementRequestNumber,tabletName:request.lastHandledTablet||''}
       );
-      addProductionMovement('down');
+      addProductionMovement('down',movementRequestId);
 
       Notifications.push(
         request.isPic?'EXP-PIC no chão':'Palet baixado',
@@ -1702,12 +1729,16 @@ const Operation = (() => {
       delete request.movementStartedAt;
       delete request.movementDeadlineAt;
 
+      const movementRequestId=request.movementRequestId;
+      const movementRequestNumber=request.movementRequestNumber||request.lastMovementRequestNumber||request.originRequestNumber||'';
+
       addHistory(
         request.address,
         'Palet subiu e movimentação foi concluída pelo Site Selene',
-        'up'
+        'up',
+        {requestNumber:movementRequestNumber,tabletName:request.lastHandledTablet||''}
       );
-      addProductionMovement('up');
+      addProductionMovement('up',movementRequestId);
 
       data.requests.splice(index,1);
       Notifications.push(
@@ -1773,7 +1804,7 @@ const Operation = (() => {
       data.selectedCorridors.push(corridor);
     }
 
-    addHistory(normalized,'Palet solicitado manualmente');
+    addHistory(normalized,'Palet solicitado manualmente',null,{requestNumber:production.number,tabletName:AppState.getTablet()?.name||''});
     Notifications.push(
       'Novo palet solicitado',
       `${normalized} foi enviado para a fila por ${operator.trim()||AppState.getUser()?.nome||'Operador'} · ${production.number}.`,
@@ -1881,7 +1912,7 @@ const Operation = (() => {
 
     data.productionRequests.unshift(request);
     AppState.save({source:'requisition'});
-    addHistory('—',`Requisição ${request.number} iniciada`);
+    addHistory('—',`Requisição ${request.number} iniciada`,null,{requestNumber:request.number,tabletName:request.tabletName});
     Notifications.push(
       'Requisição iniciada',
       `${request.number} foi criada para ${request.userName}.`,
@@ -1906,7 +1937,7 @@ const Operation = (() => {
 
     request.status='closed';
     request.endedAt=Date.now();
-    addHistory('—',`Requisição ${request.number} encerrada`);
+    addHistory('—',`Requisição ${request.number} encerrada`,null,{requestNumber:request.number,tabletName:request.tabletName});
     Notifications.push(
       'Requisição encerrada',
       `${request.number} terminou com ${request.downCount+request.upCount} movimentações.`,
@@ -1915,14 +1946,18 @@ const Operation = (() => {
     AppState.save({source:'requisition'});
     return request;
   }
-  function addProductionMovement(direction){
-    const request=getOpenProductionRequest();
+  function addProductionMovement(direction,requestId=null){
+    const data=AppState.getData();
+    const request=requestId
+      ? data.productionRequests.find(item=>String(item.id)===String(requestId))
+      : getOpenProductionRequest();
+
     if(!request){
-      UI.toast('Movimentação não contabilizada: nenhuma requisição aberta.');
+      UI.toast('Movimentação não contabilizada: requisição de origem não encontrada.');
       return false;
     }
-    if(direction==='down')request.downCount+=1;
-    if(direction==='up')request.upCount+=1;
+    if(direction==='down')request.downCount=Number(request.downCount||0)+1;
+    if(direction==='up')request.upCount=Number(request.upCount||0)+1;
     AppState.save({source:'requisition'});
     return true;
   }
