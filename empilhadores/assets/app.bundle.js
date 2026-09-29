@@ -1865,10 +1865,10 @@ const Operation = (() => {
     const data = AppState.getData();
     data.selectedCorridors = [...UI.$('corridorOptions').querySelectorAll('input:checked')]
       .map(input => input.value);
-    AppState.save();
+    AppState.save({silent:true,preserveTimestamp:true});
     UI.$('corridorDialog').close();
     renderAll();
-    UI.toast('Corredores atualizados.');
+    UI.toast('Corredores atualizados para este aparelho.');
   }
   function renderSelectedCorridors(){
     const selected = AppState.getData().selectedCorridors;
