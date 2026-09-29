@@ -26,7 +26,7 @@
         </a>
       </h1>
 
-      <p class="login-subtitle">Entre com seu acesso de Emp, Encarregado ou TI.</p>
+      <p class="login-subtitle">Entre com o número do crachá e sua senha.</p>
 
       <form id="loginForm" class="login-form">
         <label class="field">
@@ -431,7 +431,7 @@
             <div>
               <span class="production-eyebrow">GESTÃO DE ACESSOS</span>
               <h3>Gerenciar usuários</h3>
-              <p>Crie acessos para empilhadores sem precisar alterar os arquivos do site.</p>
+              <p>Cadastre Nome, Crachá e Senha. O crachá é usado no login; o nome identifica as ações no sistema.</p>
             </div>
             <div class="production-hero-icon">♙</div>
           </section>
@@ -441,7 +441,7 @@
               <div class="panel-header">
                 <div>
                   <h3>Criar novo usuário</h3>
-                  <p>O empilhador inicia uma requisição para registrar sua produção.</p>
+                  <p>O nome cadastrado será exibido em requisições, movimentações, histórico e registros do operador.</p>
                 </div>
               </div>
               <form id="createUserForm" class="panel-body user-form">
@@ -466,7 +466,7 @@
                   </select>
                 </label>
                 <button class="btn btn-primary btn-full" type="submit">Criar usuário</button>
-                <p class="user-storage-note">No modo servidor, os acessos podem ser centralizados. Em produção, o TI poderá manter essa autenticação ou integrar ao padrão corporativo.</p>
+                <p class="user-storage-note">A conta é salva no Supabase. O crachá é usado para entrar; o nome é usado para identificar o operador nas ações.</p>
               </form>
             </section>
 
@@ -706,7 +706,8 @@
 
       <label class="field">
         <span class="field-label">Solicitante</span>
-        <input id="requestOperator" required>
+        <input id="requestOperator" readonly required>
+        <small>Preenchido automaticamente com o nome da conta logada.</small>
       </label>
 
       <label class="pic-option">
@@ -763,7 +764,7 @@
       <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
     </form>
   </dialog>
-  <script src="../shared/supabase-accounts.js?v=20260929-1"></script>
+  <script src="../shared/supabase-accounts.js?v=20260929-2"></script>
   <script src="../shared/access-code.js?v=20260926-1"></script>
   <script src="assets/app.bundle.js"></script>
   <script src="assets/operation-focus.js"></script>
