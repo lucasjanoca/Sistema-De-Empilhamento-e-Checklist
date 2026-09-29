@@ -165,6 +165,31 @@
   async function changeRole(matricula,role){return invokeEmp('update-user',{matricula,updateType:'role',role})}
   async function setActive(matricula,active){return invokeEmp('update-user',{matricula,updateType:'active',active})}
   async function deleteUser(matricula){return invokeEmp('delete-user',{matricula})}
+  async function getOperationalState(){return invokeEmp('state-get')}
+  async function saveOperationalState(snapshot){return invokeEmp('state-save',{snapshot})}
+  async function acquirePalletLock(request,direction,deviceName=''){
+    return invokeEmp('lock-acquire',{
+      address:String(request?.address||request?.id||''),
+      palletId:String(request?.id||''),
+      direction:String(direction||''),
+      deviceName:String(deviceName||'')
+    });
+  }
+  async function releasePalletLock(request){
+    return invokeEmp('lock-release',{
+      address:String(request?.address||request?.id||''),
+      palletId:String(request?.id||'')
+    });
+  }
+  async function addAudit(entry={}){
+    return invokeEmp('audit-add',{
+      auditAction:String(entry.action||'Evento'),
+      details:String(entry.details||''),
+      category:String(entry.category||'sistema'),
+      severity:String(entry.severity||'info')
+    });
+  }
+  async function loadAudit(limit=1000){return (await invokeEmp('audit-list',{limit})).events||[]}
   async function generateChecklistCode(){return invokeEmp('generate-code')}
 
   async function validateChecklistCode(code){
@@ -214,6 +239,12 @@
     changeRole,
     setActive,
     deleteUser,
+    getOperationalState,
+    saveOperationalState,
+    acquirePalletLock,
+    releasePalletLock,
+    addAudit,
+    loadAudit,
     generateChecklistCode,
     validateChecklistCode,
     storeChecklistSession
