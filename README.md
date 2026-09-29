@@ -1,28 +1,43 @@
 # Sistema de Empilhamento e Checklist
 
-Repositório integrado dos sistemas operacionais desenvolvidos pela InfoTech.io.
+Sistema operacional da InfoTech.io para gestão de paletes e acesso integrado ao Checklist.
 
-## Estrutura
+## Empilhadores
 
-- `index.html` — Checklist Operacional com acesso por código.
-- `checklist/index.html` — cópia do Checklist para testes.
-- `empilhadores/index.html` — gerador de código do Sistema de Empilhadores.
-- `shared/access-code.js` — regras compartilhadas do código temporário.
+- Login por número do crachá + senha usando Supabase Auth.
+- Perfis Emp, Encarregado e TI.
+- Usuários centralizados no Supabase.
+- Nome do operador usado nas requisições, movimentações, histórico e auditoria.
+- Seleção manual de equipamento cadastrado a cada sessão.
+- Paletes para baixar e subir, confirmação de movimentação, cancelamento e histórico.
+- EXP-PIC com tratamento prioritário e regra operacional de retorno.
+- Requisições de produção por usuário.
+- Corredores, busca, filtros, relatórios e exportações.
+- Locks centrais para impedir movimentação simultânea do mesmo palete.
+- Estado operacional sincronizado pelo Supabase entre computadores/tablets.
+- Auditoria administrativa central.
+- Backup diário do snapshot operacional anterior no Supabase.
 
-## Fluxo de acesso integrado
+## Checklist
 
-1. O operador abre o Sistema de Empilhadores.
-2. Informa matrícula/nome e gera um código numérico de 6 dígitos.
-3. O código fica válido por 2 minutos.
-4. No Checklist, o operador digita o código.
-5. O Checklist recebe a identidade e o perfil.
-6. O código é marcado como utilizado e não pode ser usado novamente.
-7. Tentativas repetidas incorretas recebem bloqueio temporário.
+O acesso ao Checklist usa código de 6 dígitos gerado no Sistema de Empilhadores, válido por 2 minutos e de uso único. A validação é feita pelo backend Supabase, permitindo gerar em um aparelho e usar em outro.
 
-## Estado atual do teste online
+## Integração com o sistema oficial da empresa
 
-Nesta etapa o armazenamento compartilhado usa o navegador/origem do site para permitir validação imediata durante os testes. Isso funciona quando gerador e Checklist são usados no mesmo navegador/origem.
+O Site Selene funciona como aplicação operacional independente. A integração automática com a API/sistema interno da empresa continua protegida até a TI fornecer e homologar:
+- URL/servidor oficial;
+- autenticação/sessão;
+- rotas de leitura;
+- rota de escrita para descer/subir;
+- parâmetros/payloads e retornos;
+- origem oficial do EXP-PIC.
 
-A próxima etapa de integração substituirá apenas essa camada por Supabase/backend compartilhado, preservando as telas e as regras, para o código funcionar entre dispositivos diferentes (por exemplo, código gerado em um terminal e digitado em outro tablet).
+Nenhuma credencial corporativa deve ser colocada no frontend público.
 
-> Ambiente de desenvolvimento/testes. Perfis e emissão de códigos administrativos devem ser controlados pelo backend antes do uso real em produção.
+## Publicação
+
+Empilhadores:
+https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/empilhadores/
+
+Checklist:
+https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/checklist/
