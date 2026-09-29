@@ -2076,6 +2076,19 @@ const Operation = (() => {
   };
 })();;
 const History = (() => {
+  function eventMeta(item){
+    const text=String(item?.action||'').toLowerCase();
+    if(item?.direction==='down') return {label:'↓ Descida',kind:'down'};
+    if(item?.direction==='up') return {label:'↑ Subida',kind:'up'};
+    if(text.includes('cancelada')) return {label:'↩ Cancelamento',kind:'cancel'};
+    if(text.includes('liberad')) return {label:'✓ Liberação',kind:'release'};
+    if(text.includes('requisição')) return {label:'▤ Requisição',kind:'request'};
+    return {label:'• Evento',kind:'event'};
+  }
+  function eventHtml(item){
+    const meta=eventMeta(item);
+    return '<span class="history-event-badge '+meta.kind+'">'+meta.label+'</span><small class="history-event-detail">'+escapeHtml(item.action)+'</small>';
+  }
   function escapeHtml(value=''){
     return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[char]);
   }
@@ -2119,8 +2132,8 @@ const History = (() => {
         <td>${new Date(item.time).toLocaleString('pt-BR')}</td>
         <td>${item.requestNumber ? `<span class="request-number-cell">${escapeHtml(item.requestNumber)}</span>` : '—'}</td>
         <td>${escapeHtml(item.address)}</td>
-        <td>${escapeHtml(item.action)}</td>
-        <td>${escapeHtml(item.operator)}</td>
+        <td>${eventHtml(item)}</td>
+        <td><b>${escapeHtml(item.operator)}</b><small class="history-event-detail">${escapeHtml(item.operatorMatricula||'')}</small></td>
         <td>${escapeHtml(item.tabletName || '—')}</td>
       </tr>`).join('') : `
       <tr><td colspan="6"><div class="empty">Nenhum registro encontrado na pesquisa.</div></td></tr>`;
