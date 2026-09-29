@@ -391,7 +391,147 @@ const AppState = (() => {
     importSnapshot
   };
 })();;
-const SecurityApi=(()=>{const BASE='/api/site-selene';let available=false,csrf=sessionStorage.getItem('site_selene_csrf')||'',sessionUser=null;async function raw(path='',options={}){const headers={Accept:'application/json',...(options.headers||{})};if(options.body!==undefined&&!headers['Content-Type'])headers['Content-Type']='application/json';if(csrf&&!['GET','HEAD'].includes(String(options.method||'GET').toUpperCase()))headers['X-CSRF-Token']=csrf;const r=await fetch(`${BASE}${path}`,{cache:'no-store',credentials:'same-origin',...options,headers});let p=null;try{p=await r.json();}catch{}if(r.status===401){const had=!!sessionUser;sessionUser=null;csrf='';sessionStorage.removeItem('site_selene_csrf');if(had)document.dispatchEvent(new CustomEvent('security:expired'));}if(!r.ok){const e=new Error(p?.message||`HTTP ${r.status}`);e.status=r.status;e.payload=p;throw e;}return p;}async function init(){if(location.protocol==='file:'){available=false;return;}try{available=!!(await raw('/status'))?.ok;}catch{available=false;return;}try{const me=await raw('/auth/me');sessionUser=me.user;csrf=me.csrfToken||'';if(csrf)sessionStorage.setItem('site_selene_csrf',csrf);}catch(e){if(e.status!==401)console.warn(e);}}async function login(matricula,senha){const r=await raw('/auth/login',{method:'POST',body:JSON.stringify({matricula,senha})});sessionUser=r.user;csrf=r.csrfToken||'';sessionStorage.setItem('site_selene_csrf',csrf);document.dispatchEvent(new CustomEvent('security:login',{detail:{user:sessionUser}}));return r;}async function logout(){if(available)try{await raw('/auth/logout',{method:'POST',body:'{}'});}catch{}sessionUser=null;csrf='';sessionStorage.removeItem('site_selene_csrf');}function server(){return location.protocol!=='file:'&&available;}async function loadUsers(){if(!server())return AppState.users;const r=await raw('/users');AppState.replaceUsers?.(r.users||[],{silent:true,serverPublic:true});return r.users||[];}async function createUser(p){if(!server())return AppState.addUser(p);const r=await raw('/users',{method:'POST',body:JSON.stringify(p)});await loadUsers();return {ok:true,user:r.user};}async function changePassword(m,s){if(!server())return AppState.updateUserPassword(m,s);await raw(`/users/${encodeURIComponent(m)}`,{method:'PATCH',body:JSON.stringify({action:'password',senha:s})});await loadUsers();return {ok:true};}async function changeRole(m,role){if(!server())return AppState.updateUserRole(m,role);await raw(`/users/${encodeURIComponent(m)}`,{method:'PATCH',body:JSON.stringify({action:'role',role})});await loadUsers();return {ok:true};}async function setActive(m,a){if(!server()){const u=AppState.users.find(x=>x.matricula===m);if(!u)return {ok:false,message:'Usuário não encontrado.'};if(u.active!==a)return AppState.toggleUserActive(m);return {ok:true,active:a};}const r=await raw(`/users/${encodeURIComponent(m)}`,{method:'PATCH',body:JSON.stringify({action:'active',active:a})});await loadUsers();return {ok:true,active:r.user?.active};}async function deleteUser(m){if(!server())return AppState.removeUser(m);const r=await raw(`/users/${encodeURIComponent(m)}`,{method:'DELETE',body:'{}'});await loadUsers();return r;}async function recordAudit(e){if(!server()||!sessionUser)return;try{await raw('/audit-secure',{method:'POST',body:JSON.stringify({action:e.action,details:e.details,category:e.category,severity:e.severity})});}catch{}}async function getSecureAudit(){if(!server())return[];return (await raw('/audit-secure?limit=3000')).events||[];}async function getSecurityStatus(){if(!server())return{mode:'arquivo/demo',passwordStorage:'Local somente para demonstração',csrf:false,secureAudit:false,securityHeaders:false};return raw('/security/status');}async function acquirePalletLock(req,direction){if(!server())return{ok:true,local:true};return raw('/locks/acquire',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address,direction})});}async function releasePalletLock(req){if(!server())return{ok:true};try{return await raw('/locks/release',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address})});}catch{return{ok:false};}}async function getIntegrationConfig(){if(!server())return null;return (await raw('/integration/config')).config||null;}async function saveIntegrationConfig(c){if(!server())return null;return (await raw('/integration/config',{method:'PUT',body:JSON.stringify(c)})).config||null;}async function integrationRead(route){if(!server())return null;return (await raw(`/integration/read?route=${encodeURIComponent(route)}`)).data;}return{init,login,logout,isServerMode:server,isAvailable:()=>available,getSessionUser:()=>sessionUser,loadUsers,createUser,changePassword,changeRole,setActive,deleteUser,recordAudit,getSecureAudit,getSecurityStatus,acquirePalletLock,releasePalletLock,getIntegrationConfig,saveIntegrationConfig,integrationRead,secureFetch:raw};})();;
+const SecurityApi=(()=>{
+  const BASE='/api/site-selene';
+  let available=false,csrf=sessionStorage.getItem('site_selene_csrf')||'',sessionUser=null;
+
+  function accountCloud(){
+    return location.protocol!=='file:' && !available && !!globalThis.InfoTechSupabaseAccounts;
+  }
+
+  async function raw(path='',options={}){
+    const headers={Accept:'application/json',...(options.headers||{})};
+    if(options.body!==undefined&&!headers['Content-Type'])headers['Content-Type']='application/json';
+    if(csrf&&!['GET','HEAD'].includes(String(options.method||'GET').toUpperCase()))headers['X-CSRF-Token']=csrf;
+    const r=await fetch(`${BASE}${path}`,{cache:'no-store',credentials:'same-origin',...options,headers});
+    let p=null;try{p=await r.json();}catch{}
+    if(r.status===401){
+      const had=!!sessionUser;sessionUser=null;csrf='';sessionStorage.removeItem('site_selene_csrf');
+      if(had)document.dispatchEvent(new CustomEvent('security:expired'));
+    }
+    if(!r.ok){const e=new Error(p?.message||`HTTP ${r.status}`);e.status=r.status;e.payload=p;throw e;}
+    return p;
+  }
+
+  async function init(){
+    if(location.protocol==='file:'){available=false;return;}
+    try{available=!!(await raw('/status'))?.ok;}catch{available=false;}
+    if(available){
+      try{
+        const me=await raw('/auth/me');
+        sessionUser=me.user;csrf=me.csrfToken||'';
+        if(csrf)sessionStorage.setItem('site_selene_csrf',csrf);
+      }catch(e){if(e.status!==401)console.warn(e);}
+      return;
+    }
+    if(globalThis.InfoTechSupabaseAccounts){
+      try{
+        await globalThis.InfoTechSupabaseAccounts.init();
+        sessionUser=globalThis.InfoTechSupabaseAccounts.getSessionUser();
+      }catch{sessionUser=null;}
+    }
+  }
+
+  async function login(matricula,senha){
+    if(accountCloud()){
+      const r=await globalThis.InfoTechSupabaseAccounts.login(matricula,senha);
+      sessionUser=r.user;
+      document.dispatchEvent(new CustomEvent('security:login',{detail:{user:sessionUser}}));
+      return r;
+    }
+    const r=await raw('/auth/login',{method:'POST',body:JSON.stringify({matricula,senha})});
+    sessionUser=r.user;csrf=r.csrfToken||'';sessionStorage.setItem('site_selene_csrf',csrf);
+    document.dispatchEvent(new CustomEvent('security:login',{detail:{user:sessionUser}}));
+    return r;
+  }
+
+  async function logout(){
+    if(accountCloud()){
+      await globalThis.InfoTechSupabaseAccounts.logout();
+    }else if(available){
+      try{await raw('/auth/logout',{method:'POST',body:'{}'});}catch{}
+    }
+    sessionUser=null;csrf='';sessionStorage.removeItem('site_selene_csrf');
+  }
+
+  function server(){return location.protocol!=='file:'&&available;}
+
+  async function loadUsers(){
+    if(accountCloud()){
+      const users=await globalThis.InfoTechSupabaseAccounts.loadUsers();
+      AppState.replaceUsers?.(users||[],{silent:true,serverPublic:true});
+      return users||[];
+    }
+    if(!server())return AppState.users;
+    const r=await raw('/users');
+    AppState.replaceUsers?.(r.users||[],{silent:true,serverPublic:true});
+    return r.users||[];
+  }
+
+  async function createUser(p){
+    if(accountCloud()){
+      const r=await globalThis.InfoTechSupabaseAccounts.createUser(p);
+      await loadUsers();
+      return r;
+    }
+    if(!server())return AppState.addUser(p);
+    const r=await raw('/users',{method:'POST',body:JSON.stringify(p)});
+    await loadUsers();return {ok:true,user:r.user};
+  }
+
+  async function changePassword(m,s){
+    if(accountCloud()){const r=await globalThis.InfoTechSupabaseAccounts.changePassword(m,s);await loadUsers();return r;}
+    if(!server())return AppState.updateUserPassword(m,s);
+    await raw(`/users/${encodeURIComponent(m)}`,{method:'PATCH',body:JSON.stringify({action:'password',senha:s})});
+    await loadUsers();return {ok:true};
+  }
+
+  async function changeRole(m,role){
+    if(accountCloud()){const r=await globalThis.InfoTechSupabaseAccounts.changeRole(m,role);await loadUsers();return r;}
+    if(!server())return AppState.updateUserRole(m,role);
+    await raw(`/users/${encodeURIComponent(m)}`,{method:'PATCH',body:JSON.stringify({action:'role',role})});
+    await loadUsers();return {ok:true};
+  }
+
+  async function setActive(m,a){
+    if(accountCloud()){const r=await globalThis.InfoTechSupabaseAccounts.setActive(m,a);await loadUsers();return {ok:true,active:r.user?.active??a};}
+    if(!server()){
+      const u=AppState.users.find(x=>x.matricula===m);
+      if(!u)return {ok:false,message:'Usuário não encontrado.'};
+      if(u.active!==a)return AppState.toggleUserActive(m);
+      return {ok:true,active:a};
+    }
+    const r=await raw(`/users/${encodeURIComponent(m)}`,{method:'PATCH',body:JSON.stringify({action:'active',active:a})});
+    await loadUsers();return {ok:true,active:r.user?.active};
+  }
+
+  async function deleteUser(m){
+    if(accountCloud()){const r=await globalThis.InfoTechSupabaseAccounts.deleteUser(m);await loadUsers();return r;}
+    if(!server())return AppState.removeUser(m);
+    const r=await raw(`/users/${encodeURIComponent(m)}`,{method:'DELETE',body:'{}'});
+    await loadUsers();return r;
+  }
+
+  async function recordAudit(e){
+    if(!server()||!sessionUser)return;
+    try{await raw('/audit-secure',{method:'POST',body:JSON.stringify({action:e.action,details:e.details,category:e.category,severity:e.severity})});}catch{}
+  }
+  async function getSecureAudit(){if(!server())return[];return (await raw('/audit-secure?limit=3000')).events||[];}
+  async function getSecurityStatus(){if(!server())return{mode:accountCloud()?'supabase-auth':'arquivo/demo',passwordStorage:accountCloud()?'Supabase Auth':'Local somente para demonstração',csrf:false,secureAudit:false,securityHeaders:false};return raw('/security/status');}
+  async function acquirePalletLock(req,direction){if(!server())return{ok:true,local:true};return raw('/locks/acquire',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address,direction})});}
+  async function releasePalletLock(req){if(!server())return{ok:true};try{return await raw('/locks/release',{method:'POST',body:JSON.stringify({palletId:req.id,address:req.address})});}catch{return{ok:false};}}
+  async function getIntegrationConfig(){if(!server())return null;return (await raw('/integration/config')).config||null;}
+  async function saveIntegrationConfig(c){if(!server())return null;return (await raw('/integration/config',{method:'PUT',body:JSON.stringify(c)})).config||null;}
+  async function integrationRead(route){if(!server())return null;return (await raw(`/integration/read?route=${encodeURIComponent(route)}`)).data;}
+
+  return{
+    init,login,logout,isServerMode:server,isAccountCloud:accountCloud,isAvailable:()=>available,
+    getSessionUser:()=>sessionUser||globalThis.InfoTechSupabaseAccounts?.getSessionUser?.()||null,
+    loadUsers,createUser,changePassword,changeRole,setActive,deleteUser,recordAudit,getSecureAudit,
+    getSecurityStatus,acquirePalletLock,releasePalletLock,getIntegrationConfig,saveIntegrationConfig,
+    integrationRead,secureFetch:raw
+  };
+})();;
 const TabletManager = (() => {
   const ACTIVE_WINDOW_MS = 10 * 60 * 1000;
   let heartbeatTimer = null;
@@ -941,7 +1081,54 @@ const Notifications = (() => {
   }
   return {init, render, push};
 })();;
-const Auth=(()=>{async function login(m,s){if(SecurityApi.isServerMode()){const r=await SecurityApi.login(m,s);if(['encarregado','ti'].includes(r.user?.role))try{await SecurityApi.loadUsers();}catch{}return r.user;}const user=await AppState.verifyLocalPassword(m,s);if(!user){const blocked=AppState.users.find(u=>String(u.matricula).toLowerCase()===String(m).trim().toLowerCase()&&u.active===false);AppState.addAudit(blocked?'Login bloqueado':'Login negado',blocked?'Tentativa de acesso com usuário bloqueado.':'Matrícula ou senha não conferiu.',{category:'acesso',severity:'warning',actor:{nome:blocked?.nome||'Tentativa de login',matricula:m||'não informada',role:blocked?.role||'sistema'}});throw new Error(blocked?'Este usuário está bloqueado. Procure o Encarregado ou TI.':'Senha ou matrícula incorreta.');}return user;}function finish(user){const safe={matricula:user.matricula,nome:user.nome,role:user.role};AppState.setUser(safe);if(!SecurityApi.isServerMode())AppState.addAudit('Login realizado',`Acesso pelo perfil ${AppState.getRoleLabel(safe.role)}.`,{category:'acesso'});UI.showSystem(safe);Operation.renderAll();Dashboard.render();TabletManager.ensureSelected({force:true});Notifications.push('Acesso realizado',`Bem-vindo, ${safe.nome}.`,{type:'success',toast:false,link:'painel'});UI.toast(`Bem-vindo, ${safe.nome}.`);DataSync.reconnect?.();}function init(){const form=UI.$('loginForm');form.addEventListener('submit',async e=>{e.preventDefault();UI.setLoginError('');const m=UI.$('loginMatricula').value.trim(),s=UI.$('loginSenha').value;if(!m||!s){UI.setLoginError('Preencha a matrícula e a senha.');return;}const b=form.querySelector('button[type="submit"]');if(b)b.disabled=true;try{const u=await login(m,s);if(!u){UI.setLoginError('Senha ou matrícula incorreta.');return;}finish(u);}catch(err){UI.setLoginError(err.message||'Não foi possível entrar.');}finally{if(b)b.disabled=false;}});UI.$('togglePassword').addEventListener('click',()=>{const i=UI.$('loginSenha'),show=i.type==='text';i.type=show?'password':'text';UI.$('togglePassword').textContent=show?'👁':'🙈';});UI.$('logoutButton').addEventListener('click',async()=>{TabletManager.releaseCurrent('logout');if(!SecurityApi.isServerMode())AppState.addAudit('Logout realizado','Sessão encerrada.',{category:'acesso'});await SecurityApi.logout();AppState.clearUser();AppState.clearTablet();location.reload();});}return{init,finishLogin:finish};})();;
+const Auth=(()=>{
+  async function login(m,s){
+    if(SecurityApi.isAccountCloud()){
+      const r=await SecurityApi.login(m,s);
+      if(['encarregado','ti'].includes(r.user?.role))try{await SecurityApi.loadUsers();}catch{}
+      return r.user;
+    }
+    if(SecurityApi.isServerMode()){
+      const r=await SecurityApi.login(m,s);
+      if(['encarregado','ti'].includes(r.user?.role))try{await SecurityApi.loadUsers();}catch{}
+      return r.user;
+    }
+    const user=await AppState.verifyLocalPassword(m,s);
+    if(!user){
+      const blocked=AppState.users.find(u=>String(u.matricula).toLowerCase()===String(m).trim().toLowerCase()&&u.active===false);
+      AppState.addAudit(blocked?'Login bloqueado':'Login negado',blocked?'Tentativa de acesso com usuário bloqueado.':'Matrícula ou senha não conferiu.',{category:'acesso',severity:'warning',actor:{nome:blocked?.nome||'Tentativa de login',matricula:m||'não informada',role:blocked?.role||'sistema'}});
+      throw new Error(blocked?'Este usuário está bloqueado. Procure o Encarregado ou TI.':'Senha ou matrícula incorreta.');
+    }
+    return user;
+  }
+  function finish(user){
+    const safe={matricula:user.matricula,nome:user.nome,role:user.role};
+    AppState.setUser(safe);
+    if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Login realizado',`Acesso pelo perfil ${AppState.getRoleLabel(safe.role)}.`,{category:'acesso'});
+    UI.showSystem(safe);Operation.renderAll();Dashboard.render();TabletManager.ensureSelected({force:true});
+    Notifications.push('Acesso realizado',`Bem-vindo, ${safe.nome}.`,{type:'success',toast:false,link:'painel'});
+    UI.toast(`Bem-vindo, ${safe.nome}.`);DataSync.reconnect?.();
+  }
+  function init(){
+    const form=UI.$('loginForm');
+    form.addEventListener('submit',async e=>{
+      e.preventDefault();UI.setLoginError('');
+      const m=UI.$('loginMatricula').value.trim(),s=UI.$('loginSenha').value;
+      if(!m||!s){UI.setLoginError('Preencha a matrícula e a senha.');return;}
+      const b=form.querySelector('button[type="submit"]');if(b)b.disabled=true;
+      try{const u=await login(m,s);if(!u){UI.setLoginError('Senha ou matrícula incorreta.');return;}finish(u);}
+      catch(err){UI.setLoginError(err.message||'Não foi possível entrar.');}
+      finally{if(b)b.disabled=false;}
+    });
+    UI.$('togglePassword').addEventListener('click',()=>{const i=UI.$('loginSenha'),show=i.type==='text';i.type=show?'password':'text';UI.$('togglePassword').textContent=show?'👁':'🙈';});
+    UI.$('logoutButton').addEventListener('click',async()=>{
+      TabletManager.releaseCurrent('logout');
+      if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Logout realizado','Sessão encerrada.',{category:'acesso'});
+      await SecurityApi.logout();AppState.clearUser();AppState.clearTablet();location.reload();
+    });
+  }
+  return{init,finishLogin:finish};
+})();;
 const Operation = (() => {
   const timers = new Map();
   let elapsedRefreshTimer = null;
@@ -1984,7 +2171,7 @@ const UsersAdmin=(()=>{
       .filter(([value])=>value!=='ti'||actor?.role==='ti'||sel==='ti')
       .map(([value,meta])=>`<option value="${value}" ${value===sel?'selected':''}>${esc(meta.label)}</option>`).join('');
   }
-  async function refresh(){if(SecurityApi.isServerMode())try{await SecurityApi.loadUsers();}catch(e){UI.toast(e.message||'Falha ao carregar usuários.');}}
+  async function refresh(){if(SecurityApi.isServerMode()||SecurityApi.isAccountCloud())try{await SecurityApi.loadUsers();}catch(e){UI.toast(e.message||'Falha ao carregar usuários.');}}
   async function render(){
     if(!Permissions.can('manageUsers'))return;
     await refresh();
@@ -2016,7 +2203,7 @@ const UsersAdmin=(()=>{
       const p={nome:UI.$('newUserName').value,matricula:UI.$('newUserMatricula').value,senha:UI.$('newUserPassword').value,role:UI.$('newUserRole').value};
       if(p.role==='ti'&&AppState.getUser()?.role!=='ti'){UI.toast('Somente TI pode criar outro TI.');return;}
       const r=await safe(()=>SecurityApi.createUser(p));if(!r?.ok){UI.toast(r?.message);return;}
-      if(!SecurityApi.isServerMode())AppState.addAudit('Usuário criado',`${p.nome} · ${p.matricula}.`,{category:'usuario'});
+      if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Usuário criado',`${p.nome} · ${p.matricula}.`,{category:'usuario'});
       form.reset();await render();UI.toast('Usuário criado.');
     });
     UI.$('usersList').addEventListener('change',async e=>{
@@ -2357,4 +2544,31 @@ const DataTools = (() => {
   return {init};
 })();;
 const TechnicalPanel=(()=>{function bytes(v){if(v<1024)return`${v} B`;if(v<1048576)return`${(v/1024).toFixed(1)} KB`;return`${(v/1048576).toFixed(2)} MB`;}function ls(){let t=0;for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i)||'';t+=k.length+(localStorage.getItem(k)||'').length;}return t*2;}function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[c]);}function map(){try{return SeleneIntegration.integrationMap();}catch{return{writeEnabled:false};}}function download(name,content,type='application/json'){const b=new Blob([content],{type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),500);}async function security(){const box=UI.$('techSecurityDetails'),mode=UI.$('techSecurityMode');if(!box)return;let s;try{s=await SecurityApi.getSecurityStatus();}catch(e){s={mode:'indisponível',passwordStorage:'—'};}const server=SecurityApi.isServerMode();mode.textContent=server?'SERVIDOR SEGURO':'MODO DIRETO';const items=[['Senhas',s.passwordStorage||'Local',server?'Hash no servidor; não entram no snapshot.':'Credenciais locais somente para avaliação.'],['Sessão',server?'Cookie HttpOnly':'SessionStorage',server?`Protegida do JavaScript · ${s.sessionIdleMinutes||'—'} min de inatividade`:'Modo direto de avaliação.'],['CSRF',s.csrf?'ATIVO':'LOCAL',s.csrf?'Toda alteração exige token da sessão.':'Ativo somente no servidor.'],['Auditoria',s.secureAudit?'SERVIDOR + LOCAL':'LOCAL',s.secureAudit?'Registro append-only fora do navegador.':'Somente navegador.'],['Web',s.securityHeaders?'CABEÇALHOS ATIVOS':'N/A',s.securityHeaders?'Anti-frame, nosniff, CSP e permissões restritas.':'Abra pelo servidor para ativar.'],['Sistema oficial',server?'VIA SERVIDOR':'LOCAL',server?'O navegador não acessa o sistema oficial diretamente.':'Para produção, preferir a camada de servidor.'],['Área privada',s.staticIsolation?'BLOQUEADA':'N/A',s.staticIsolation?'Servidor publica somente /public; private/server/docs não são servidos.':'Abra pelo servidor.'],['Tentativas de login',s.rateLimit?'PROTEGIDAS':'N/A',s.rateLimit?'Bloqueio temporário após repetidas tentativas inválidas.':'Abra pelo servidor.'],['Integridade da auditoria',s.auditIntegrity?'ÍNTEGRA':'VERIFICAR',s.auditIntegrity?`${s.auditEvents||0} evento(s) com cadeia de integridade.`:'A cadeia da auditoria precisa ser verificada.'],['Backups',s.automaticBackups?'AUTOMÁTICOS':'N/A',s.automaticBackups?'Cópias privadas diárias com retenção limitada.':'Abra pelo servidor.']];box.innerHTML=items.map(([l,v,d])=>`<article class="${server?'good':'warn'}"><span>${esc(l)}</span><b>${esc(v)}</b><small>${esc(d)}</small></article>`).join('');}async function render(){if(!Permissions.can('technical'))return;await SeleneIntegration.loadServerConfig?.();const d=AppState.getData(),m=map(),c=SeleneIntegration.getSettings();UI.$('techVersion').textContent=d.version||'2.0';UI.$('techProtocol').textContent=location.protocol.replace(':','').toUpperCase();UI.$('techHost').textContent=location.host||'arquivo local';UI.$('techStorage').textContent=bytes(ls());const rows=[['Usuários',AppState.users.length],['Contas TI',AppState.users.filter(u=>u.role==='ti').length],['Requisições abertas',(d.productionRequests||[]).filter(r=>r.status==='open').length],['Paletes na operação',(d.requests||[]).length],['Sincronização',DataSync.isConnected()?'Conectada':'Local/offline'],['Autenticação',SecurityApi.isServerMode()?'Servidor + sessão':'Modo local'],['Sistema oficial pelo navegador',SecurityApi.isServerMode()?'NÃO':'Direto no navegador'],['Escrita oficial',m.writeEnabled?'LIBERADA':'BLOQUEADA']];UI.$('techDiagnostics').innerHTML=rows.map(([l,v])=>`<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('');UI.$('techIntegrationMap').textContent=JSON.stringify(m,null,2);UI.$('techApiBase').value=c.serverBase||'';UI.$('techCodGrupo').value=c.codGrupo||'';UI.$('techCodEmp').value=c.codEmp||'';UI.$('techRoutePending').value=c.routePending||'';UI.$('techRouteAttendance').value=c.routeAttendance||'';UI.$('techInterval').value=Math.round(Number(c.interval||10000)/1000);UI.$('techIntegrationEnabled').checked=c.enabled!==false;UI.$('techIntegrationGuide').textContent=SeleneIntegration.integrationGuide();UI.$('techIntegrationNotes').value=d.settings?.tiIntegrationNotes||'';await security();}function result(r){const b=UI.$('techConnectionResult');if(!b)return;b.className=`tech-test-result ${r?.ok?'ok':'error'}`;b.innerHTML=`<div class="tech-test-head"><b>${r?.ok?'✓ Leitura validada':'⚠ Verificação incompleta'}</b><span>${r?.durationMs??''} ms</span></div>${(r?.checks||[]).map(c=>`<div class="tech-test-line"><span class="${c.ok?'ok':'bad'}">${c.ok?'✓':'×'}</span><div><b>${esc(c.name)}</b><small>${esc(c.detail)}</small></div></div>`).join('')}`;}async function saveCfg(){const b=UI.$('techSaveIntegration');b.disabled=true;b.textContent='Salvando...';try{const n=await SeleneIntegration.saveSettings({enabled:UI.$('techIntegrationEnabled').checked,serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,interval:Number(UI.$('techInterval').value||10)*1000});AppState.addAudit('Configuração de integração alterada',`Servidor ${n.serverBase} · grupo ${n.codGrupo} · empresa ${n.codEmp}.`,{category:'integracao',secure:!SecurityApi.isServerMode()});UI.toast(SecurityApi.isServerMode()?'Configuração salva no servidor.':'Configuração local salva no navegador.');}catch(e){UI.toast(e.message);}finally{b.disabled=false;b.textContent='Salvar configuração';render();}}async function test(){const b=UI.$('techTestConnection');b.disabled=true;b.textContent='Testando...';try{const r=await SeleneIntegration.testConnection();result(r);AppState.addAudit('Validação de integração',r.ok?'Leitura validada.':'Leitura não concluída.',{category:'integracao',severity:r.ok?'info':'warning'});}finally{b.disabled=false;b.textContent='Testar conexão e leitura';render();}}function notes(){const d=AppState.getData();d.settings=d.settings||{};d.settings.tiIntegrationNotes=UI.$('techIntegrationNotes').value||'';AppState.save({source:'technical-notes'});UI.toast('Anotações salvas.');}async function guide(){const t=SeleneIntegration.integrationGuide();try{await navigator.clipboard.writeText(t);UI.toast('Roteiro copiado.');}catch{download('roteiro-integracao-selene.txt',t,'text/plain;charset=utf-8');}}function init(){UI.$('techRefresh')?.addEventListener('click',render);UI.$('techForceSync')?.addEventListener('click',()=>DataSync.forceSync());UI.$('techRefreshSelene')?.addEventListener('click',async()=>{await SeleneIntegration.refresh();render();});UI.$('techSaveIntegration')?.addEventListener('click',saveCfg);UI.$('techTestConnection')?.addEventListener('click',test);UI.$('techCopyGuide')?.addEventListener('click',guide);UI.$('techSaveNotes')?.addEventListener('click',notes);UI.$('techDownloadMap')?.addEventListener('click',()=>download('mapa-integracao-site-selene.json',JSON.stringify(map(),null,2)));UI.$('techDownloadSnapshot')?.addEventListener('click',()=>download(`site-selene-snapshot-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(AppState.exportOperationalSnapshot(),null,2)));document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});}return{init,render};})();;
-document.addEventListener('DOMContentLoaded',async()=>{await SecurityApi.init();if(!SecurityApi.isServerMode()){document.body.classList.add('local-test-mode');}TabletManager.init();Auth.init();Operation.init();History.init();LoginAnimation.init();ProductionRequests.init();SeleneIntegration.init();UsersAdmin.init();Reports.init();Audit.init();Dashboard.init();Notifications.init();DataSync.init();DataTools.init();TechnicalPanel.init();UI.$('menuButton').addEventListener('click',UI.openMenu);UI.$('closeMenu').addEventListener('click',UI.closeMenu);UI.$('overlay').addEventListener('click',UI.closeMenu);document.querySelectorAll('.nav-button').forEach(b=>b.addEventListener('click',()=>UI.openView(b.dataset.view)));document.addEventListener('security:expired',()=>{AppState.clearUser();AppState.clearTablet();UI.toast('Sua sessão expirou. Entre novamente.');setTimeout(()=>location.reload(),700);},{once:true});let user=SecurityApi.isServerMode()?SecurityApi.getSessionUser():AppState.getUser();if(user){if(SecurityApi.isServerMode()){AppState.setUser({matricula:user.matricula,nome:user.nome,role:user.role});if(['encarregado','ti'].includes(user.role))try{await SecurityApi.loadUsers();}catch{}}else{const ex=AppState.users.find(x=>x.matricula===user.matricula&&x.active!==false);if(!ex){AppState.clearUser();UI.showLogin();return;}user={matricula:ex.matricula,nome:ex.nome,role:ex.role};AppState.setUser(user);}UI.showSystem(user);Operation.renderAll();Dashboard.render();TabletManager.ensureSelected();}else{AppState.clearUser();UI.showLogin();}});
+document.addEventListener('DOMContentLoaded',async()=>{
+  await SecurityApi.init();
+  if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())document.body.classList.add('local-test-mode');
+  TabletManager.init();Auth.init();Operation.init();History.init();LoginAnimation.init();ProductionRequests.init();
+  SeleneIntegration.init();UsersAdmin.init();Reports.init();Audit.init();Dashboard.init();Notifications.init();
+  DataSync.init();DataTools.init();TechnicalPanel.init();
+  UI.$('menuButton').addEventListener('click',UI.openMenu);
+  UI.$('closeMenu').addEventListener('click',UI.closeMenu);
+  UI.$('overlay').addEventListener('click',UI.closeMenu);
+  document.querySelectorAll('.nav-button').forEach(b=>b.addEventListener('click',()=>UI.openView(b.dataset.view)));
+  document.addEventListener('security:expired',()=>{AppState.clearUser();AppState.clearTablet();UI.toast('Sua sessão expirou. Entre novamente.');setTimeout(()=>location.reload(),700);},{once:true});
+
+  const remoteAuth=SecurityApi.isServerMode()||SecurityApi.isAccountCloud();
+  let user=remoteAuth?SecurityApi.getSessionUser():AppState.getUser();
+  if(user){
+    if(remoteAuth){
+      AppState.setUser({matricula:user.matricula,nome:user.nome,role:user.role});
+      if(['encarregado','ti'].includes(user.role))try{await SecurityApi.loadUsers();}catch{}
+    }else{
+      const ex=AppState.users.find(x=>x.matricula===user.matricula&&x.active!==false);
+      if(!ex){AppState.clearUser();UI.showLogin();return;}
+      user={matricula:ex.matricula,nome:ex.nome,role:ex.role};AppState.setUser(user);
+    }
+    UI.showSystem(user);Operation.renderAll();Dashboard.render();TabletManager.ensureSelected();
+  }else{
+    AppState.clearUser();UI.showLogin();
+  }
+});
