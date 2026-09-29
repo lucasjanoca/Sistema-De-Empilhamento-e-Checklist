@@ -30,9 +30,9 @@
 
       <form id="loginForm" class="login-form">
         <label class="field">
-          <span class="field-label">▣ Matrícula</span>
-          <input id="loginMatricula" type="text" autocomplete="username"
-                 placeholder="Digite sua matrícula" required>
+          <span class="field-label">▣ Número do crachá</span>
+          <input id="loginMatricula" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="username"
+                 placeholder="Ex.: 0174340" required>
         </label>
 
         <label class="field">
@@ -450,8 +450,8 @@
                   <input id="newUserName" autocomplete="off" placeholder="Ex.: Operador 01" required>
                 </label>
                 <label class="field">
-                  <span class="field-label">Matrícula</span>
-                  <input id="newUserMatricula" autocomplete="off" placeholder="Ex.: 1548" required>
+                  <span class="field-label">Número do crachá</span>
+                  <input id="newUserMatricula" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Ex.: 0174340" required>
                 </label>
                 <label class="field">
                   <span class="field-label">Senha inicial</span>
