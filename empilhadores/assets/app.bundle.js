@@ -171,9 +171,11 @@ const AppState = (() => {
     normalized.version = '2.0';
     normalized.meta = Object.assign(base.meta, saved?.meta || {});
     normalized.productionRequests = Array.isArray(saved?.productionRequests) ? saved.productionRequests : base.productionRequests;
+    normalized.productionRequests.forEach(request=>{ delete request.shift; });
     normalized.nextProductionRequestId = Number(saved?.nextProductionRequestId || 1);
     normalized.requests = Array.isArray(saved?.requests) ? saved.requests : base.requests;
     normalized.history = Array.isArray(saved?.history) ? saved.history : base.history;
+    normalized.history.forEach(item=>{ delete item.shift; });
     normalized.auditLog = Array.isArray(saved?.auditLog) ? saved.auditLog : base.auditLog;
     normalized.notifications = Array.isArray(saved?.notifications) ? saved.notifications : base.notifications;
     normalized.nextNotificationId = Number(saved?.nextNotificationId || 1);
@@ -192,6 +194,7 @@ const AppState = (() => {
     normalized.selectedCorridors = normalized.selectedCorridors.map(value => String(value).toUpperCase()).filter((value,index,array)=>array.indexOf(value)===index);
     if(!normalized.selectedCorridors.includes('RECEB')) normalized.selectedCorridors.push('RECEB');
     normalized.requests.forEach(request => {
+      delete request.shift;
       if(['floor','ready'].includes(request.status) && !request.loweredAt){
         request.loweredAt = Number(request.createdAt || Date.now());
       }
@@ -907,20 +910,6 @@ const Permissions = (() => {
   }
   return {can, apply, describe, matrix};
 })();;
-const ShiftInfo=(()=>{
-  function at(value=Date.now()){
-    const d=value instanceof Date?value:new Date(value);
-    const minutes=d.getHours()*60+d.getMinutes();
-    if(minutes>=300 && minutes<795) return {code:'T1',label:'T1 · 05:00–13:15'};
-    if(minutes>=795 && minutes<1290) return {code:'T2',label:'T2 · 13:15–21:30'};
-    return {code:'T3',label:'T3 · 21:30–05:00'};
-  }
-  function render(){
-    const el=document.getElementById('currentShiftBadge');
-    if(el) el.textContent=at().label;
-  }
-  return {at,render};
-})();;
 const UI = (() => {
   const $ = id => document.getElementById(id);
   function toast(message){
@@ -1003,7 +992,6 @@ const UI = (() => {
     $('loginView')?.classList.add('hidden');
     $('systemView')?.classList.remove('hidden');
     $('currentUserLabel').textContent = `${user.nome} · ${AppState.roleMeta[user.role]?.short || AppState.getRoleLabel(user.role)}`;
-    ShiftInfo.render();
     Permissions.apply(user);
     $('permissionText').textContent = Permissions.describe(user.role);
     $('requestButton')?.classList.toggle('permission-hidden', !Permissions.can('requestPallet', user));
@@ -1186,7 +1174,6 @@ const Operation = (() => {
       operatorMatricula:user?.matricula || 'sistema',
       requestNumber:production?.number || '',
       tabletName:AppState.getTablet()?.name || '',
-      shift:ShiftInfo.at().code,
       time:Date.now()
     });
     AppState.addAudit(action, `${address && address !== '—' ? `Palet ${address}. ` : ''}${production ? `Requisição ${production.number}.` : ''}`.trim(), {
@@ -1630,7 +1617,6 @@ const Operation = (() => {
       requestedByMatricula:AppState.getUser()?.matricula || '',
       status:'waiting',
       corridor,
-      shift:ShiftInfo.at().code,
       createdAt:Date.now(),
       isPic:Boolean(options.isPic),
       sourceType:options.isPic ? 'PIC' : 'MANUAL'
@@ -1686,8 +1672,8 @@ const Operation = (() => {
   }
   function updateRequestButton(){
     const active = Boolean(getOpenProductionRequest());
-    UI.$('shiftButton').classList.toggle('inactive', !active);
-    UI.$('shiftButton').querySelector('span').textContent = active
+    UI.$('requestSessionButton').classList.toggle('inactive', !active);
+    UI.$('requestSessionButton').querySelector('span').textContent = active
       ? 'Encerrar requisição'
       : 'Iniciar requisição';
   }
@@ -1719,7 +1705,6 @@ const Operation = (() => {
       userMatricula:user.matricula,
       userName:user.nome,
       tabletName:AppState.getTablet()?.name || '',
-      shift:ShiftInfo.at(startedAt).code,
       startedAt,
       endedAt:null,
       status:'open',
@@ -1822,7 +1807,7 @@ const Operation = (() => {
       event.preventDefault();
       saveCorridors();
     });
-    UI.$('shiftButton').addEventListener('click', () => {
+    UI.$('requestSessionButton').addEventListener('click', () => {
       const openRequest = getOpenProductionRequest();
       if(!openRequest){
         const request = createProductionRequest();
@@ -1868,7 +1853,7 @@ const History = (() => {
       item.action,
       item.operator,
       item.operatorMatricula,
-      item.shift || ShiftInfo.at(item.time).code,
+      item.tabletName,
       date.toLocaleString('pt-BR'),
       date.toLocaleDateString('pt-BR'),
       date.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
@@ -1902,7 +1887,7 @@ const History = (() => {
         <td>${escapeHtml(item.address)}</td>
         <td>${escapeHtml(item.action)}</td>
         <td>${escapeHtml(item.operator)}</td>
-        <td>${escapeHtml(item.shift || ShiftInfo.at(item.time).code)}</td>
+        <td>${escapeHtml(item.tabletName || '—')}</td>
       </tr>`).join('') : `
       <tr><td colspan="6"><div class="empty">Nenhum registro encontrado na pesquisa.</div></td></tr>`;
     UI.$('liveDown').textContent = history.filter(h => h.direction === 'down').length;
@@ -1935,8 +1920,7 @@ const MyPallets=(()=>{
     body.innerHTML=items.length?items.map(item=>{
       const last=Number(item.lastHandledAt||item.createdAt||0);
       const origin=item.isPic?'EXP-PIC':(item.sourceType==='OFICIAL'?'Oficial':'Manual');
-      const shift=item.shift||ShiftInfo.at(item.createdAt||Date.now()).code;
-      return '<tr><td><b>'+esc(item.address)+'</b></td><td>'+esc(statusLabel(item.status))+'</td><td>'+esc(item.corridor||'—')+'</td><td>'+esc(origin)+'</td><td>'+esc(shift)+'</td><td>'+(last?new Date(last).toLocaleString('pt-BR'):'—')+'</td></tr>';
+      return '<tr><td><b>'+esc(item.address)+'</b></td><td>'+esc(statusLabel(item.status))+'</td><td>'+esc(item.corridor||'—')+'</td><td>'+esc(item.originRequestNumber||'—')+'</td><td>'+esc(origin)+'</td><td>'+(last?new Date(last).toLocaleString('pt-BR'):'—')+'</td></tr>';
     }).join(''):'<tr><td colspan="6"><div class="empty">Nenhum palete vinculado a você no momento.</div></td></tr>';
   }
   function init(){
@@ -2132,7 +2116,6 @@ const ProductionRequests = (() => {
           <td><b>${request.number}</b></td>
           <td>${request.userName}</td>
           <td>${request.tabletName || '—'}</td>
-          <td>${request.shift || ShiftInfo.at(request.startedAt).code}</td>
           <td>${formatDateTime(request.startedAt)}</td>
           <td>${formatDateTime(request.endedAt)}</td>
           <td><span class="request-status ${request.status}">${statusLabel}</span></td>
@@ -2333,8 +2316,8 @@ const Reports = (() => {
     const down=history.filter(item=>item.direction==='down').length;
     const up=history.filter(item=>item.direction==='up').length;
     const open=data.productionRequests.filter(item=>item.status==='open').length;
-    const rows=data.productionRequests.slice(0,50).map(request=>`<tr><td>${escapeHtml(request.number)}</td><td>${escapeHtml(request.userName)}</td><td>${escapeHtml(request.tabletName || '—')}</td><td>${escapeHtml(request.shift || ShiftInfo.at(request.startedAt).code)}</td><td>${new Date(request.startedAt).toLocaleString('pt-BR')}</td><td>${request.status==='open'?'Em andamento':'Encerrada'}</td><td>${request.downCount||0}</td><td>${request.upCount||0}</td><td>${(request.downCount||0)+(request.upCount||0)}</td></tr>`).join('');
-    openPrintable('Relatório operacional',`<div class="grid"><div class="card"><span>Desceram</span><b>${down}</b></div><div class="card"><span>Subiram</span><b>${up}</b></div><div class="card"><span>Paletes em aberto</span><b>${data.requests.length}</b></div><div class="card"><span>Requisições abertas</span><b>${open}</b></div></div><h2>Requisições recentes</h2><table><thead><tr><th>Requisição</th><th>Operador</th><th>Tablet</th><th>Turno</th><th>Início</th><th>Status</th><th>Desceu</th><th>Subiu</th><th>Total</th></tr></thead><tbody>${rows || '<tr><td colspan="9">Nenhuma requisição registrada.</td></tr>'}</tbody></table>`);
+    const rows=data.productionRequests.slice(0,50).map(request=>`<tr><td>${escapeHtml(request.number)}</td><td>${escapeHtml(request.userName)}</td><td>${escapeHtml(request.tabletName || '—')}</td><td>${new Date(request.startedAt).toLocaleString('pt-BR')}</td><td>${request.status==='open'?'Em andamento':'Encerrada'}</td><td>${request.downCount||0}</td><td>${request.upCount||0}</td><td>${(request.downCount||0)+(request.upCount||0)}</td></tr>`).join('');
+    openPrintable('Relatório operacional',`<div class="grid"><div class="card"><span>Desceram</span><b>${down}</b></div><div class="card"><span>Subiram</span><b>${up}</b></div><div class="card"><span>Paletes em aberto</span><b>${data.requests.length}</b></div><div class="card"><span>Requisições abertas</span><b>${open}</b></div></div><h2>Requisições recentes</h2><table><thead><tr><th>Requisição</th><th>Operador</th><th>Tablet</th><th>Início</th><th>Status</th><th>Desceu</th><th>Subiu</th><th>Total</th></tr></thead><tbody>${rows || '<tr><td colspan="8">Nenhuma requisição registrada.</td></tr>'}</tbody></table>`);
   }
   function printSelectedProduction(){
     printOperationalReport();
@@ -2643,14 +2626,14 @@ const DataTools = (() => {
     }catch(error){ UI.toast(error.message || 'Não foi possível importar o backup.'); }
   }
   function exportHistory(){
-    const rows = AppState.getData().history.map(item => [new Date(item.time).toLocaleString('pt-BR'), item.requestNumber || '', item.address, item.action, item.operator, item.tabletName || '', item.shift || ShiftInfo.at(item.time).code]);
-    const csv = [['Data/Hora','Requisição','Palet','Ação','Operador','Tablet','Turno'], ...rows].map(row => row.map(csvCell).join(';')).join('\n');
+    const rows = AppState.getData().history.map(item => [new Date(item.time).toLocaleString('pt-BR'), item.requestNumber || '', item.address, item.action, item.operator, item.tabletName || '']);
+    const csv = [['Data/Hora','Requisição','Palet','Ação','Operador','Equipamento'], ...rows].map(row => row.map(csvCell).join(';')).join('\n');
     download('historico-site-selene.csv', '\ufeff'+csv, 'text/csv;charset=utf-8');
     AppState.addAudit('Histórico exportado','Arquivo CSV de movimentações gerado.',{category:'relatorio'});
   }
   function exportProduction(){
-    const rows = AppState.getData().productionRequests.map(r => [r.number,r.userName,r.tabletName||'',r.shift||ShiftInfo.at(r.startedAt).code,new Date(r.startedAt).toLocaleString('pt-BR'),r.endedAt?new Date(r.endedAt).toLocaleString('pt-BR'):'',r.status==='open'?'Em andamento':'Encerrada',r.downCount||0,r.upCount||0,(r.downCount||0)+(r.upCount||0)]);
-    const csv = [['Requisição','Empilhador','Tablet','Turno','Início','Fim','Situação','Desceram','Subiram','Total'],...rows].map(row => row.map(csvCell).join(';')).join('\n');
+    const rows = AppState.getData().productionRequests.map(r => [r.number,r.userName,r.tabletName||'',new Date(r.startedAt).toLocaleString('pt-BR'),r.endedAt?new Date(r.endedAt).toLocaleString('pt-BR'):'',r.status==='open'?'Em andamento':'Encerrada',r.downCount||0,r.upCount||0,(r.downCount||0)+(r.upCount||0)]);
+    const csv = [['Requisição','Empilhador','Equipamento','Início','Fim','Situação','Desceram','Subiram','Total'],...rows].map(row => row.map(csvCell).join(';')).join('\n');
     download('requisicoes-site-selene.csv','\ufeff'+csv,'text/csv;charset=utf-8');
     AppState.addAudit('Requisições exportadas','Arquivo CSV de produção gerado.',{category:'relatorio'});
   }
@@ -2690,7 +2673,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())document.body.classList.add('local-test-mode');
   TabletManager.init();Auth.init();Operation.init();History.init();MyPallets.init();LoginAnimation.init();ProductionRequests.init();
   SeleneIntegration.init();UsersAdmin.init();Reports.init();Audit.init();Dashboard.init();Notifications.init();
-  DataSync.init();DataTools.init();TechnicalPanel.init();ShiftInfo.render();setInterval(ShiftInfo.render,60000);
+  DataSync.init();DataTools.init();TechnicalPanel.init()
   UI.$('menuButton').addEventListener('click',UI.openMenu);
   UI.$('closeMenu').addEventListener('click',UI.closeMenu);
   UI.$('overlay').addEventListener('click',UI.closeMenu);
