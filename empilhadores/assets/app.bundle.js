@@ -73,13 +73,13 @@ const AppState = (() => {
     const senha = String(user.senha || '');
     const role = roleMeta[user.role] ? user.role : 'empilhador';
     if(!matricula || !nome || !senha){
-      return {ok:false, message:'Preencha nome, matrícula e senha.'};
+      return {ok:false, message:'Preencha nome, crachá e senha.'};
     }
     if(senha.length < 8){
       return {ok:false, message:'A senha precisa ter pelo menos 8 caracteres.'};
     }
     if(users.some(item => item.matricula.toLowerCase() === matricula.toLowerCase())){
-      return {ok:false, message:'Já existe um usuário com essa matrícula.'};
+      return {ok:false, message:'Já existe um usuário com esse crachá.'};
     }
     const senhaHash = await sha256Hex(senha);
     users.push(normalizeUser({matricula, nome, senhaHash, role, active:true, createdAt:Date.now()}));
@@ -1783,7 +1783,7 @@ const Operation = (() => {
       event.preventDefault();
       const created = requestPallet(
         UI.$('requestAddress').value,
-        UI.$('requestOperator').value,
+        AppState.getUser()?.nome || 'Operador',
         {isPic:Boolean(UI.$('requestIsPic')?.checked)}
       );
       if(created){
@@ -2185,7 +2185,7 @@ const UsersAdmin=(()=>{
       const protectionTitle=protectedTi?'Somente o TI pode alterar contas TI.':'';
       return `<article class="user-card ${u.active===false?'blocked':''}" data-matricula="${esc(u.matricula)}">
         <div class="user-avatar">${esc(u.nome.charAt(0).toUpperCase())}</div>
-        <div class="user-card-info"><strong>${esc(u.nome)}</strong><span>Matrícula: ${esc(u.matricula)}</span><small class="user-role ${u.role}">${esc(AppState.getRoleLabel(u.role))}</small><small class="user-status ${u.active===false?'off':'on'}">${u.active===false?'Bloqueado':'Ativo'}</small>${protectedTi?'<small class="ti-protected-note">🔒 Conta protegida pelo TI</small>':''}</div>
+        <div class="user-card-info"><strong>${esc(u.nome)}</strong><span>Crachá: ${esc(u.matricula)}</span><small class="user-role ${u.role}">${esc(AppState.getRoleLabel(u.role))}</small><small class="user-status ${u.active===false?'off':'on'}">${u.active===false?'Bloqueado':'Ativo'}</small>${protectedTi?'<small class="ti-protected-note">🔒 Conta protegida pelo TI</small>':''}</div>
         <div class="user-card-actions">
           <select class="user-role-select" ${protectedTi?'disabled':''} title="${protectionTitle}">${roleOptions(u.role)}</select>
           <button class="btn btn-soft change-user-password" type="button" ${protectedTi?'disabled':''} title="${protectionTitle}">Alterar senha</button>
@@ -2200,7 +2200,9 @@ const UsersAdmin=(()=>{
     const form=UI.$('createUserForm');if(!form)return;
     form.addEventListener('submit',async e=>{
       e.preventDefault();
-      const p={nome:UI.$('newUserName').value,matricula:UI.$('newUserMatricula').value,senha:UI.$('newUserPassword').value,role:UI.$('newUserRole').value};
+      const p={nome:UI.$('newUserName').value.trim(),matricula:UI.$('newUserMatricula').value.replace(/\D/g,''),senha:UI.$('newUserPassword').value,role:UI.$('newUserRole').value};
+      if(!p.nome){UI.toast('Informe o nome da pessoa.');return;}
+      if(!p.matricula){UI.toast('Informe o número do crachá.');return;}
       if(p.role==='ti'&&AppState.getUser()?.role!=='ti'){UI.toast('Somente TI pode criar outro TI.');return;}
       const r=await safe(()=>SecurityApi.createUser(p));if(!r?.ok){UI.toast(r?.message);return;}
       if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Usuário criado',`${p.nome} · ${p.matricula}.`,{category:'usuario'});
