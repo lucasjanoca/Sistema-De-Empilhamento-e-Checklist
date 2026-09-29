@@ -907,6 +907,20 @@ const Permissions = (() => {
   }
   return {can, apply, describe, matrix};
 })();;
+const ShiftInfo=(()=>{
+  function at(value=Date.now()){
+    const d=value instanceof Date?value:new Date(value);
+    const minutes=d.getHours()*60+d.getMinutes();
+    if(minutes>=300 && minutes<795) return {code:'T1',label:'T1 · 05:00–13:15'};
+    if(minutes>=795 && minutes<1290) return {code:'T2',label:'T2 · 13:15–21:30'};
+    return {code:'T3',label:'T3 · 21:30–05:00'};
+  }
+  function render(){
+    const el=document.getElementById('currentShiftBadge');
+    if(el) el.textContent=at().label;
+  }
+  return {at,render};
+})();;
 const UI = (() => {
   const $ = id => document.getElementById(id);
   function toast(message){
@@ -966,6 +980,7 @@ const UI = (() => {
     const meta = {
       painel:['Painel geral','Visão rápida da operação e das prioridades.'],
       operacao:['Operação','Controle de movimentação dos paletes.'],
+      'meus-paletes':['Meus Paletes','Paletes vinculados ao usuário logado.'],
       requisicoes:['Requisições','Produção registrada por empilhador.'],
       usuarios:['Usuários','Criação, perfis e gerenciamento de acessos.'],
       historico:['Histórico','Registro completo das movimentações.'],
@@ -988,6 +1003,7 @@ const UI = (() => {
     $('loginView')?.classList.add('hidden');
     $('systemView')?.classList.remove('hidden');
     $('currentUserLabel').textContent = `${user.nome} · ${AppState.roleMeta[user.role]?.short || AppState.getRoleLabel(user.role)}`;
+    ShiftInfo.render();
     Permissions.apply(user);
     $('permissionText').textContent = Permissions.describe(user.role);
     $('requestButton')?.classList.toggle('permission-hidden', !Permissions.can('requestPallet', user));
@@ -1165,6 +1181,7 @@ const Operation = (() => {
       operatorMatricula:user?.matricula || 'sistema',
       requestNumber:production?.number || '',
       tabletName:AppState.getTablet()?.name || '',
+      shift:ShiftInfo.at().code,
       time:Date.now()
     });
     AppState.addAudit(action, `${address && address !== '—' ? `Palet ${address}. ` : ''}${production ? `Requisição ${production.number}.` : ''}`.trim(), {
@@ -1604,8 +1621,11 @@ const Operation = (() => {
       id:data.nextId++,
       address:normalized,
       operator:operator.trim() || AppState.getUser()?.nome || 'Operador',
+      requestedByName:AppState.getUser()?.nome || operator.trim() || 'Operador',
+      requestedByMatricula:AppState.getUser()?.matricula || '',
       status:'waiting',
       corridor,
+      shift:ShiftInfo.at().code,
       createdAt:Date.now(),
       isPic:Boolean(options.isPic),
       sourceType:options.isPic ? 'PIC' : 'MANUAL'
@@ -1694,6 +1714,7 @@ const Operation = (() => {
       userMatricula:user.matricula,
       userName:user.nome,
       tabletName:AppState.getTablet()?.name || '',
+      shift:ShiftInfo.at(startedAt).code,
       startedAt,
       endedAt:null,
       status:'open',
@@ -1842,6 +1863,7 @@ const History = (() => {
       item.action,
       item.operator,
       item.operatorMatricula,
+      item.shift || ShiftInfo.at(item.time).code,
       date.toLocaleString('pt-BR'),
       date.toLocaleDateString('pt-BR'),
       date.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
@@ -1875,8 +1897,9 @@ const History = (() => {
         <td>${escapeHtml(item.address)}</td>
         <td>${escapeHtml(item.action)}</td>
         <td>${escapeHtml(item.operator)}</td>
+        <td>${escapeHtml(item.shift || ShiftInfo.at(item.time).code)}</td>
       </tr>`).join('') : `
-      <tr><td colspan="5"><div class="empty">Nenhum registro encontrado na pesquisa.</div></td></tr>`;
+      <tr><td colspan="6"><div class="empty">Nenhum registro encontrado na pesquisa.</div></td></tr>`;
     UI.$('liveDown').textContent = history.filter(h => h.direction === 'down').length;
     UI.$('liveUp').textContent = history.filter(h => h.direction === 'up').length;
   }
@@ -1887,6 +1910,36 @@ const History = (() => {
     });
   }
   return { init, render };
+})();;
+const MyPallets=(()=>{
+  function esc(value=''){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[char]);}
+  function statusLabel(status){return ({waiting:'Aguardando',lowering:'Descendo',floor:'No chão',ready:'Liberado',returning:'Subindo'})[status]||status||'—';}
+  function rows(){
+    const user=AppState.getUser();
+    if(!user) return [];
+    return (AppState.getData().requests||[]).filter(item=>
+      item.requestedByMatricula===user.matricula ||
+      item.lastHandledByMatricula===user.matricula ||
+      (!item.requestedByMatricula && String(item.operator||'')===String(user.nome||''))
+    ).sort((a,b)=>Number(b.lastHandledAt||b.createdAt||0)-Number(a.lastHandledAt||a.createdAt||0));
+  }
+  function render(){
+    const body=UI.$('myPalletsBody');
+    if(!body)return;
+    const items=rows();
+    body.innerHTML=items.length?items.map(item=>{
+      const last=Number(item.lastHandledAt||item.createdAt||0);
+      const origin=item.isPic?'EXP-PIC':(item.sourceType==='OFICIAL'?'Oficial':'Manual');
+      const shift=item.shift||ShiftInfo.at(item.createdAt||Date.now()).code;
+      return '<tr><td><b>'+esc(item.address)+'</b></td><td>'+esc(statusLabel(item.status))+'</td><td>'+esc(item.corridor||'—')+'</td><td>'+esc(origin)+'</td><td>'+esc(shift)+'</td><td>'+(last?new Date(last).toLocaleString('pt-BR'):'—')+'</td></tr>';
+    }).join(''):'<tr><td colspan="6"><div class="empty">Nenhum palete vinculado a você no momento.</div></td></tr>';
+  }
+  function init(){
+    UI.$('refreshMyPallets')?.addEventListener('click',()=>{render();DataSync.forceSync?.();});
+    document.addEventListener('view:changed',event=>{if(event.detail.name==='meus-paletes')render();});
+    document.addEventListener('app:data-changed',()=>{if(UI.$('view-meus-paletes')?.classList.contains('active'))render();});
+  }
+  return {init,render};
 })();;
 const Indicators = (() => {
   function render(){
@@ -2080,6 +2133,7 @@ const ProductionRequests = (() => {
           <td><b>${request.number}</b></td>
           <td>${request.userName}</td>
           <td>${request.tabletName || '—'}</td>
+          <td>${request.shift || ShiftInfo.at(request.startedAt).code}</td>
           <td>${formatDateTime(request.startedAt)}</td>
           <td>${formatDateTime(request.endedAt)}</td>
           <td><span class="request-status ${request.status}">${statusLabel}</span></td>
@@ -2280,8 +2334,8 @@ const Reports = (() => {
     const down=history.filter(item=>item.direction==='down').length;
     const up=history.filter(item=>item.direction==='up').length;
     const open=data.productionRequests.filter(item=>item.status==='open').length;
-    const rows=data.productionRequests.slice(0,50).map(request=>`<tr><td>${escapeHtml(request.number)}</td><td>${escapeHtml(request.userName)}</td><td>${escapeHtml(request.tabletName || '—')}</td><td>${new Date(request.startedAt).toLocaleString('pt-BR')}</td><td>${request.status==='open'?'Em andamento':'Encerrada'}</td><td>${request.downCount||0}</td><td>${request.upCount||0}</td><td>${(request.downCount||0)+(request.upCount||0)}</td></tr>`).join('');
-    openPrintable('Relatório operacional',`<div class="grid"><div class="card"><span>Desceram</span><b>${down}</b></div><div class="card"><span>Subiram</span><b>${up}</b></div><div class="card"><span>Paletes em aberto</span><b>${data.requests.length}</b></div><div class="card"><span>Requisições abertas</span><b>${open}</b></div></div><h2>Requisições recentes</h2><table><thead><tr><th>Requisição</th><th>Operador</th><th>Tablet</th><th>Início</th><th>Status</th><th>Desceu</th><th>Subiu</th><th>Total</th></tr></thead><tbody>${rows || '<tr><td colspan="8">Nenhuma requisição registrada.</td></tr>'}</tbody></table>`);
+    const rows=data.productionRequests.slice(0,50).map(request=>`<tr><td>${escapeHtml(request.number)}</td><td>${escapeHtml(request.userName)}</td><td>${escapeHtml(request.tabletName || '—')}</td><td>${escapeHtml(request.shift || ShiftInfo.at(request.startedAt).code)}</td><td>${new Date(request.startedAt).toLocaleString('pt-BR')}</td><td>${request.status==='open'?'Em andamento':'Encerrada'}</td><td>${request.downCount||0}</td><td>${request.upCount||0}</td><td>${(request.downCount||0)+(request.upCount||0)}</td></tr>`).join('');
+    openPrintable('Relatório operacional',`<div class="grid"><div class="card"><span>Desceram</span><b>${down}</b></div><div class="card"><span>Subiram</span><b>${up}</b></div><div class="card"><span>Paletes em aberto</span><b>${data.requests.length}</b></div><div class="card"><span>Requisições abertas</span><b>${open}</b></div></div><h2>Requisições recentes</h2><table><thead><tr><th>Requisição</th><th>Operador</th><th>Tablet</th><th>Turno</th><th>Início</th><th>Status</th><th>Desceu</th><th>Subiu</th><th>Total</th></tr></thead><tbody>${rows || '<tr><td colspan="9">Nenhuma requisição registrada.</td></tr>'}</tbody></table>`);
   }
   function printSelectedProduction(){
     printOperationalReport();
@@ -2590,14 +2644,14 @@ const DataTools = (() => {
     }catch(error){ UI.toast(error.message || 'Não foi possível importar o backup.'); }
   }
   function exportHistory(){
-    const rows = AppState.getData().history.map(item => [new Date(item.time).toLocaleString('pt-BR'), item.requestNumber || '', item.address, item.action, item.operator, item.tabletName || '']);
-    const csv = [['Data/Hora','Requisição','Palet','Ação','Operador','Tablet'], ...rows].map(row => row.map(csvCell).join(';')).join('\n');
+    const rows = AppState.getData().history.map(item => [new Date(item.time).toLocaleString('pt-BR'), item.requestNumber || '', item.address, item.action, item.operator, item.tabletName || '', item.shift || ShiftInfo.at(item.time).code]);
+    const csv = [['Data/Hora','Requisição','Palet','Ação','Operador','Tablet','Turno'], ...rows].map(row => row.map(csvCell).join(';')).join('\n');
     download('historico-site-selene.csv', '\ufeff'+csv, 'text/csv;charset=utf-8');
     AppState.addAudit('Histórico exportado','Arquivo CSV de movimentações gerado.',{category:'relatorio'});
   }
   function exportProduction(){
-    const rows = AppState.getData().productionRequests.map(r => [r.number,r.userName,r.tabletName||'',new Date(r.startedAt).toLocaleString('pt-BR'),r.endedAt?new Date(r.endedAt).toLocaleString('pt-BR'):'',r.status==='open'?'Em andamento':'Encerrada',r.downCount||0,r.upCount||0,(r.downCount||0)+(r.upCount||0)]);
-    const csv = [['Requisição','Empilhador','Tablet','Início','Fim','Situação','Desceram','Subiram','Total'],...rows].map(row => row.map(csvCell).join(';')).join('\n');
+    const rows = AppState.getData().productionRequests.map(r => [r.number,r.userName,r.tabletName||'',r.shift||ShiftInfo.at(r.startedAt).code,new Date(r.startedAt).toLocaleString('pt-BR'),r.endedAt?new Date(r.endedAt).toLocaleString('pt-BR'):'',r.status==='open'?'Em andamento':'Encerrada',r.downCount||0,r.upCount||0,(r.downCount||0)+(r.upCount||0)]);
+    const csv = [['Requisição','Empilhador','Tablet','Turno','Início','Fim','Situação','Desceram','Subiram','Total'],...rows].map(row => row.map(csvCell).join(';')).join('\n');
     download('requisicoes-site-selene.csv','\ufeff'+csv,'text/csv;charset=utf-8');
     AppState.addAudit('Requisições exportadas','Arquivo CSV de produção gerado.',{category:'relatorio'});
   }
@@ -2635,9 +2689,9 @@ const TechnicalPanel=(()=>{function bytes(v){if(v<1024)return`${v} B`;if(v<10485
 document.addEventListener('DOMContentLoaded',async()=>{
   await SecurityApi.init();
   if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())document.body.classList.add('local-test-mode');
-  TabletManager.init();Auth.init();Operation.init();History.init();LoginAnimation.init();ProductionRequests.init();
+  TabletManager.init();Auth.init();Operation.init();History.init();MyPallets.init();LoginAnimation.init();ProductionRequests.init();
   SeleneIntegration.init();UsersAdmin.init();Reports.init();Audit.init();Dashboard.init();Notifications.init();
-  DataSync.init();DataTools.init();TechnicalPanel.init();
+  DataSync.init();DataTools.init();TechnicalPanel.init();ShiftInfo.render();setInterval(ShiftInfo.render,60000);
   UI.$('menuButton').addEventListener('click',UI.openMenu);
   UI.$('closeMenu').addEventListener('click',UI.closeMenu);
   UI.$('overlay').addEventListener('click',UI.closeMenu);
