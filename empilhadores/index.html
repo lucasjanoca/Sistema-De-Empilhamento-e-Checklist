@@ -52,7 +52,7 @@
         <button class="btn btn-primary btn-full" type="submit">Entrar</button>
       </form>
 
-      <div class="demo-box security-login-note"><strong>Acesso protegido</strong><span>Use as credenciais temporárias fornecidas pelo responsável do projeto. Em produção, o TI deverá substituí-las.</span></div>
+      <div class="demo-box security-login-note"><strong>Acesso protegido</strong><span>Entre com o número do crachá e a senha cadastrada pelo TI ou Encarregado autorizado.</span></div>
     </div>
 
     <div class="login-visual">
@@ -546,7 +546,7 @@
                 <div><span>Armazenamento</span><b id="storageMode">Neste navegador</b></div>
                 <div><span>Integração Selene</span><b id="integrationMode">Verificando...</b></div>
               </div>
-              <p class="settings-help">A movimentação oficial permanece bloqueada até o TI validar os parâmetros completos da API.</p>
+              <p class="settings-help">A integração de escrita com o sistema oficial permanece bloqueada até o TI validar as rotas, autenticação e parâmetros da API interna. A operação do Site Selene funciona de forma independente.</p>
             </section>
             <section class="settings-block">
               <h4>Dados operacionais compartilhados</h4>
@@ -595,7 +595,7 @@
           <article><span>Versão</span><b id="techVersion">2.0</b><small>build operacional</small></article>
           <article><span>Ambiente</span><b id="techProtocol">—</b><small id="techHost">—</small></article>
           <article><span>Dados locais</span><b id="techStorage">—</b><small>estimativa do navegador</small></article>
-          <article><span>Proteção API</span><b class="tech-safe">ATIVA</b><small>escrita real bloqueada até validação</small></article>
+          <article><span>Proteção API</span><b class="tech-safe">ATIVA</b><small>operação central ativa; integração oficial aguarda homologação</small></article>
         </div>
 
         <section class="panel tech-security-panel">
@@ -627,7 +627,7 @@
           <section class="panel">
             <div class="panel-header"><div><h3>3. Ferramentas do TI</h3><p>Ações para suporte, análise e implantação.</p></div><span class="ti-only-pill">SOMENTE TI</span></div>
             <div class="panel-body technical-actions">
-              <button id="techForceSync" class="btn btn-primary" type="button">Sincronizar dados do servidor local</button>
+              <button id="techForceSync" class="btn btn-primary" type="button">Sincronizar dados do Supabase</button>
               <button id="techCopyGuide" class="btn btn-secondary" type="button">Copiar roteiro de integração</button>
               <button id="techDownloadMap" class="btn btn-soft" type="button">Baixar mapa de integração</button>
               <button id="techDownloadSnapshot" class="btn btn-light" type="button">Exportar snapshot técnico</button>
@@ -636,7 +636,7 @@
         </div>
 
         <section class="panel tech-guide-panel">
-          <div class="panel-header"><div><h3>4. O que falta para integrar de verdade</h3><p>Checklist de trabalho para o TI. A escrita permanece bloqueada até todos os itens críticos serem confirmados.</p></div><span class="tech-safe-pill">ESCRITA PROTEGIDA</span></div>
+          <div class="panel-header"><div><h3>4. Integração com o sistema oficial</h3><p>A operação do Site Selene já é centralizada. Esta etapa serve apenas para conectar leitura/escrita à API corporativa quando o TI fornecer os dados oficiais.</p></div><span class="tech-safe-pill">ESCRITA PROTEGIDA</span></div>
           <div class="tech-guide-layout">
             <ol class="tech-checklist">
               <li><b>Validar acesso à API</b><span>Confirmar servidor, grupo e empresa e executar a validação de leitura acima.</span></li>
@@ -754,9 +754,9 @@
       <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
     </form>
   </dialog>
-  <script src="../shared/supabase-accounts.js?v=20260929-prod1"></script>
+  <script src="../shared/supabase-accounts.js?v=20260929-prod2"></script>
   <script src="../shared/access-code.js?v=20260926-1"></script>
-  <script src="assets/app.bundle.js?v=20260929-prod1"></script>
+  <script src="assets/app.bundle.js?v=20260929-prod2"></script>
   <script src="assets/operation-focus.js"></script>
   <script src="assets/checklist-code.js"></script>
 </body>
