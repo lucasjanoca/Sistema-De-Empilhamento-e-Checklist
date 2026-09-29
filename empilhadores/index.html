@@ -69,24 +69,16 @@
       </div>
 
       <div id="visualPallets" class="visual-pallet-grid">
-        <article class="visual-pallet waiting">
-          <b>20-003-3</b><span>Aguardando</span>
-        </article>
-        <article class="visual-pallet lowering">
-          <b>04-042-3</b><span>Descendo</span>
-        </article>
-        <article class="visual-pallet floor">
-          <b>03-033-2</b><span>No chão</span>
-        </article>
-        <article class="visual-pallet ready">
-          <b>19-003-4</b><span>Liberado</span>
-        </article>
+        <article class="visual-pallet waiting"><b>Fila</b><span>Aguardando</span></article>
+        <article class="visual-pallet lowering"><b>Confirmação</b><span>Descendo</span></article>
+        <article class="visual-pallet floor"><b>Atendimento</b><span>No chão</span></article>
+        <article class="visual-pallet ready"><b>Retorno</b><span>Liberado</span></article>
       </div>
 
       <div class="visual-stats">
-        <div><span>↓</span><b id="visualDown">18</b><small>desceram</small></div>
-        <div><span>↑</span><b id="visualUp">14</b><small>subiram</small></div>
-        <div><span>✓</span><b id="visualTotal">32</b><small>movimentações</small></div>
+        <div><span>☁</span><b id="visualDown">ON</b><small>Supabase</small></div>
+        <div><span>▣</span><b id="visualUp">LOG</b><small>rastreabilidade</small></div>
+        <div><span>✓</span><b id="visualTotal">SYNC</b><small>multi-dispositivo</small></div>
       </div>
     </div>
   </section>
@@ -578,7 +570,7 @@
                 <div><span>Integração oficial</span><b>Dependente do TI</b></div>
                 <div><span>Proteção de escrita</span><b>Ativada</b></div>
               </div>
-              <p class="settings-help">Ao abrir pelo servidor, notebooks e tablets autorizados na mesma rede podem compartilhar os dados operacionais. O armazenamento definitivo será definido pelo TI.</p>
+              <p class="settings-help">Notebooks e tablets autenticados compartilham os dados operacionais pelo Supabase. Alterações sincronizadas ficam disponíveis nos demais aparelhos.</p>
               <div class="settings-actions"><button id="forceCentralSync" class="btn btn-secondary" type="button">Sincronizar agora</button></div>
             </section>
             <section class="settings-block">
@@ -592,7 +584,7 @@
             </section>
             <section class="settings-block device-admin-block" data-roles="encarregado,ti">
               <div class="device-admin-heading">
-                <div><h4>Dispositivos / tablets</h4><p class="settings-help">Cadastre aqui os equipamentos autorizados. Emp escolhe um tablet; Encarregado e TI recebem um computador padrão automaticamente e podem trocar manualmente quando necessário.</p></div>
+                <div><h4>Dispositivos / tablets</h4><p class="settings-help">Cadastre aqui os equipamentos autorizados. Todo usuário escolhe manualmente um equipamento cadastrado ao entrar no sistema.</p></div>
                 <span class="admin-only-pill">ENC / TI</span>
               </div>
               <form id="deviceAdminForm" class="device-admin-form">
@@ -777,9 +769,9 @@
       <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
     </form>
   </dialog>
-  <script src="../shared/supabase-accounts.js?v=20260929-prod3"></script>
+  <script src="../shared/supabase-accounts.js?v=20260929-prod4"></script>
   <script src="../shared/access-code.js?v=20260926-1"></script>
-  <script src="assets/app.bundle.js?v=20260929-prod3"></script>
+  <script src="assets/app.bundle.js?v=20260929-prod4"></script>
   <script src="assets/operation-focus.js"></script>
   <script src="assets/checklist-code.js"></script>
 </body>
