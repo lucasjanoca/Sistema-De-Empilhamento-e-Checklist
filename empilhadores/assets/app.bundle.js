@@ -1425,23 +1425,36 @@ const Operation = (() => {
     });
   }
   function moveRequest(id){
-    const data = AppState.getData();
-    const user = AppState.getUser();
-    const request = data.requests.find(r => r.id === id);
-    if(!request || !user) return;
-    if(!Permissions.can('operate', user)){
+    const data=AppState.getData();
+    const user=AppState.getUser();
+    const request=data.requests.find(r=>r.id===id);
+    if(!request || !user)return;
+
+    if(!Permissions.can('operate',user)){
       UI.toast('Seu perfil não possui permissão para movimentar paletes.');
       return;
     }
+
     if(request.external){
       UI.toast('Palet recebido da Selene em modo de leitura. A baixa real ainda não está ativada.');
       return;
     }
-    if(request.status === 'waiting'){
-      startMovement(request, 'down');
+
+    if(request.status==='waiting'){
+      if(!getOpenProductionRequest(user)){
+        UI.toast('Inicie uma requisição antes de baixar paletes.');
+        return;
+      }
+      if(!AppState.getTablet()?.name){
+        UI.toast('Selecione um equipamento antes de movimentar paletes.');
+        TabletManager.ensureSelected({force:true});
+        return;
+      }
+      startMovement(request,'down');
       return;
     }
-    if(request.status === 'floor'){
+
+    if(request.status==='floor'){
       if(['encarregado','ti'].includes(user.role)){
         request.status='ready';
         request.unlockedAt=Date.now();
@@ -1449,8 +1462,12 @@ const Operation = (() => {
         request.manualUnlockedBy=user.matricula;
         request.manualUnlockedByName=user.nome;
         request.manualUnlockedRole=user.role;
-        addHistory(request.address, `Palet liberado pelo ${AppState.getRoleLabel(user.role)}${user.nome ? ` · ${user.nome}` : ''}`);
-        AppState.addAudit('Liberação antecipada',`Palet ${request.address} liberado pelo ${AppState.getRoleLabel(user.role)} ${user.nome || user.matricula} antes de 1h30. É necessário clicar novamente para iniciar a subida.`,{category:'operacao',save:false});
+        addHistory(request.address,`Palet liberado pelo ${AppState.getRoleLabel(user.role)}${user.nome ? ` · ${user.nome}` : ''}`);
+        AppState.addAudit(
+          'Liberação antecipada',
+          `Palet ${request.address} liberado pelo ${AppState.getRoleLabel(user.role)} ${user.nome || user.matricula} antes de 1h30. É necessário clicar novamente para iniciar a subida.`,
+          {category:'operacao',save:false}
+        );
         AppState.save({source:'operation'});
         renderAll();
         UI.toast(`${request.address} foi LIBERADO. Clique novamente no palet se quiser iniciar a subida.`);
@@ -1459,93 +1476,168 @@ const Operation = (() => {
       UI.toast(`${request.address} será liberado automaticamente após 1 hora e 30 minutos. Faltam ${floorUnlockClock(request)}.`);
       return;
     }
-    if(request.status === 'ready'){
-      startMovement(request, 'up');
+
+    if(request.status==='ready'){
+      if(!getOpenProductionRequest(user)){
+        UI.toast('Inicie uma requisição antes de subir paletes.');
+        return;
+      }
+      if(!AppState.getTablet()?.name){
+        UI.toast('Selecione um equipamento antes de movimentar paletes.');
+        TabletManager.ensureSelected({force:true});
+        return;
+      }
+      startMovement(request,'up');
     }
   }
-  async function startMovement(request, direction){
-    if(timers.has(request.id)||request.__locking) return;
+
+  async function startMovement(request,direction){
+    if(timers.has(request.id)||request.__locking)return;
+
     request.__locking=true;
-    try{await SecurityApi.acquirePalletLock(request,direction);}catch(error){request.__locking=false;UI.toast(error?.payload?.lockedBy?`Palet já está sendo movimentado por ${error.payload.lockedBy}.`:(error?.message||'Este palet já está sendo movimentado.'));AppState.addAudit('Movimentação concorrente bloqueada',`Tentativa bloqueada no palet ${request.address}.`,{category:'seguranca',severity:'warning'});return;}
+    try{
+      await SecurityApi.acquirePalletLock(request,direction);
+    }catch(error){
+      request.__locking=false;
+      UI.toast(
+        error?.payload?.lockedBy
+          ? `Palet já está sendo movimentado por ${error.payload.lockedBy}.`
+          : (error?.message||'Este palet já está sendo movimentado.')
+      );
+      AppState.addAudit(
+        'Movimentação concorrente bloqueada',
+        `Tentativa bloqueada no palet ${request.address}.`,
+        {category:'seguranca',severity:'warning'}
+      );
+      return;
+    }
     request.__locking=false;
-    const user = AppState.getUser();
-    const tablet = AppState.getTablet();
-    request.lastHandledByMatricula = user?.matricula || '';
-    request.lastHandledByName = user?.nome || '';
-    request.lastHandledTablet = tablet?.name || tablet?.id || '';
-    request.lastHandledAt = Date.now();
-    request.previousStatus = request.status;
-    request.status = direction === 'down' ? 'lowering' : 'returning';
-    request.remaining = 10;
-    request.movementStartedAt = Date.now();
+
+    const user=AppState.getUser();
+    const tablet=AppState.getTablet();
+    const production=getOpenProductionRequest(user);
+    if(!production){
+      await SecurityApi.releasePalletLock(request);
+      UI.toast('A requisição foi encerrada. Inicie outra antes de movimentar.');
+      return;
+    }
+
+    request.lastHandledByMatricula=user?.matricula||'';
+    request.lastHandledByName=user?.nome||'';
+    request.lastHandledTablet=tablet?.name||tablet?.id||'';
+    request.lastHandledAt=Date.now();
+    request.previousStatus=request.status;
+    request.status=direction==='down'?'lowering':'returning';
+    request.movementRequestId=production.id;
+    request.movementRequestNumber=production.number;
+    request.movementStartedAt=Date.now();
+    request.movementDeadlineAt=request.movementStartedAt+10_000;
+    request.remaining=10;
+
     addHistory(
       request.address,
-      direction === 'down'
-        ? 'Descida iniciada — aguardando confirmação'
-        : 'Subida iniciada — aguardando confirmação'
+      direction==='down'
+        ? 'Descida iniciada — 10s para cancelar'
+        : 'Subida iniciada — 10s para voltar'
     );
-    AppState.save();
+
+    AppState.save({source:'operation'});
     renderAll();
     UI.toast(
-      direction === 'down'
+      direction==='down'
         ? 'O palet já foi para baixo. Você tem 10 segundos para cancelar.'
         : 'O palet já foi para cima. Você tem 10 segundos para voltar.'
     );
     startTimer(request.id);
   }
+
   function startTimer(id){
-    if(timers.has(id)) return;
-    const timer = setInterval(() => {
-      const current = AppState.getData().requests.find(r => r.id === id);
+    if(timers.has(id))return;
+
+    const tick=()=>{
+      const current=AppState.getData().requests.find(r=>r.id===id);
       if(!current || !['lowering','returning'].includes(current.status)){
-        clearInterval(timer);
+        const active=timers.get(id);
+        if(active)clearInterval(active);
         timers.delete(id);
         return;
       }
-      current.remaining = Math.max(0, Number(current.remaining ?? 10) - 1);
-      const counter = UI.$(`countdown-${id}`);
-      if(counter) counter.textContent = `${current.remaining}s`;
-      AppState.save();
-      if(current.remaining <= 0){
-        clearInterval(timer);
+
+      const deadline=Number(
+        current.movementDeadlineAt ||
+        (Number(current.movementStartedAt||Date.now())+10_000)
+      );
+      current.movementDeadlineAt=deadline;
+      current.remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+
+      const counter=UI.$(`countdown-${id}`);
+      if(counter)counter.textContent=`${current.remaining}s`;
+
+      AppState.save({silent:true});
+
+      if(Date.now()>=deadline){
+        const active=timers.get(id);
+        if(active)clearInterval(active);
         timers.delete(id);
         finalizeMovement(id);
       }
-    }, 1000);
-    timers.set(id, timer);
+    };
+
+    tick();
+    const current=AppState.getData().requests.find(r=>r.id===id);
+    if(current && ['lowering','returning'].includes(current.status)){
+      const timer=setInterval(tick,250);
+      timers.set(id,timer);
+    }
   }
+
   function resumeMovementTimers(){
-    AppState.getData().requests
-      .filter(request => ['lowering','returning'].includes(request.status))
-      .forEach(request => {
-        if(typeof request.remaining !== 'number'){
-          request.remaining = 10;
+    [...AppState.getData().requests]
+      .filter(request=>['lowering','returning'].includes(request.status))
+      .forEach(request=>{
+        if(!request.movementDeadlineAt){
+          const started=Number(request.movementStartedAt||0);
+          request.movementDeadlineAt=started
+            ? started+10_000
+            : Date.now()+Math.max(0,Number(request.remaining??10))*1000;
         }
-        startTimer(request.id);
+
+        if(Date.now()>=Number(request.movementDeadlineAt)){
+          finalizeMovement(request.id);
+        }else{
+          startTimer(request.id);
+        }
       });
   }
+
   function undoMovement(id){
-    const timer = timers.get(id);
-    if(timer) clearInterval(timer);
+    const timer=timers.get(id);
+    if(timer)clearInterval(timer);
     timers.delete(id);
-    const request = AppState.getData().requests.find(r => r.id === id);
-    if(!request) return;
+
+    const request=AppState.getData().requests.find(r=>r.id===id);
+    if(!request)return;
+
     SecurityApi.releasePalletLock(request);
-    const wasLowering = request.status === 'lowering';
-    request.status = wasLowering ? 'waiting' : (request.previousStatus || 'ready');
+
+    const wasLowering=request.status==='lowering';
+    request.status=wasLowering?'waiting':(request.previousStatus||'ready');
+
     delete request.remaining;
     delete request.movementStartedAt;
+    delete request.movementDeadlineAt;
     delete request.previousStatus;
-    if(!wasLowering){
-      request.createdAt = Date.now();
-    }
+    delete request.movementRequestId;
+    delete request.movementRequestNumber;
+
     addHistory(
       request.address,
       wasLowering
         ? 'Descida cancelada — palet voltou para cima'
         : 'Subida cancelada — palet voltou para baixo'
     );
-    AppState.save();
+
+    AppState.save({source:'operation'});
     renderAll();
     UI.toast(
       wasLowering
@@ -1553,79 +1645,141 @@ const Operation = (() => {
         : `${request.address} voltou para Paletes baixados.`
     );
   }
+
   function finalizeMovement(id){
-    const data = AppState.getData();
-    const index = data.requests.findIndex(r => r.id === id);
-    if(index < 0) return;
-    const request = data.requests[index];
+    const data=AppState.getData();
+    const index=data.requests.findIndex(r=>r.id===id);
+    if(index<0)return;
+
+    const request=data.requests[index];
     SecurityApi.releasePalletLock(request);
-    if(request.status === 'lowering'){
-      request.status = request.isPic ? 'ready' : 'floor';
+
+    if(request.status==='lowering'){
+      request.status=request.isPic?'ready':'floor';
       delete request.remaining;
       delete request.movementStartedAt;
-      request.createdAt = Date.now();
-      request.loweredAt = Date.now();
-      if(request.isPic) request.unlockedAt = request.loweredAt;
+      delete request.movementDeadlineAt;
+      request.loweredAt=Date.now();
+
+      if(request.isPic)request.unlockedAt=request.loweredAt;
       else delete request.unlockedAt;
+
       delete request.previousStatus;
-      addHistory(request.address, request.isPic ? 'EXP-PIC desceu e foi liberado imediatamente para subir' : 'Palet desceu e foi confirmado pelo Site Selene', 'down');
+
+      addHistory(
+        request.address,
+        request.isPic
+          ? 'EXP-PIC desceu e foi liberado imediatamente para subir'
+          : 'Palet desceu e foi confirmado pelo Site Selene',
+        'down'
+      );
       addProductionMovement('down');
+
       Notifications.push(
-        request.isPic ? 'EXP-PIC no chão' : 'Palet baixado',
+        request.isPic?'EXP-PIC no chão':'Palet baixado',
         request.isPic
           ? `${request.address} é EXP-PIC, está liberado para subir e deve retornar em até 10 minutos. Avisar armazenista.`
           : `${request.address} foi confirmado e será liberado em 1 hora e 30 minutos.`,
         {type:request.isPic?'warning':'info',toast:false,link:'operacao'}
       );
+
+      delete request.movementRequestId;
+      delete request.movementRequestNumber;
+
       AppState.save({source:'operation'});
       renderAll();
-      UI.toast(request.isPic ? `${request.address} EXP-PIC liberado para subir · limite: 10 min.` : `${request.address} foi confirmado em Paletes baixados.`);
+      UI.toast(
+        request.isPic
+          ? `${request.address} EXP-PIC liberado para subir · limite: 10 min.`
+          : `${request.address} foi confirmado em Paletes baixados.`
+      );
       return;
     }
-    if(request.status === 'returning'){
+
+    if(request.status==='returning'){
       delete request.previousStatus;
-      addHistory(request.address, 'Palet subiu e movimentação foi concluída pelo Site Selene', 'up');
+      delete request.remaining;
+      delete request.movementStartedAt;
+      delete request.movementDeadlineAt;
+
+      addHistory(
+        request.address,
+        'Palet subiu e movimentação foi concluída pelo Site Selene',
+        'up'
+      );
       addProductionMovement('up');
-      data.requests.splice(index, 1);
-      Notifications.push('Movimentação concluída', `${request.address} retornou e foi retirado da operação.`, {type:'success',toast:false,link:'historico'});
+
+      data.requests.splice(index,1);
+      Notifications.push(
+        'Movimentação concluída',
+        `${request.address} retornou e foi retirado da operação.`,
+        {type:'success',toast:false,link:'historico'}
+      );
+
       AppState.save({source:'operation'});
       renderAll();
       UI.toast(`${request.address} foi concluído.`);
     }
   }
-  function requestPallet(address, operator, options={}){
+
+  function requestPallet(address,operator,options={}){
     if(!Permissions.can('requestPallet')){
       UI.toast('Seu perfil não possui permissão para pedir paletes.');
       return false;
     }
-    const data = AppState.getData();
-    const normalized = address.trim().toUpperCase();
-    const corridor = corridorFor(normalized);
+
+    const production=getOpenProductionRequest();
+    if(!production){
+      UI.toast('Inicie uma requisição antes de pedir ou movimentar paletes.');
+      return false;
+    }
+
+    if(!AppState.getTablet()?.name){
+      UI.toast('Selecione um equipamento antes de continuar.');
+      TabletManager.ensureSelected({force:true});
+      return false;
+    }
+
+    const data=AppState.getData();
+    const normalized=address.trim().toUpperCase();
+    const corridor=corridorFor(normalized);
+
     if(!normalized){
       UI.toast('Informe o endereço do palet.');
       return false;
     }
-    if(data.requests.some(item => item.address.toUpperCase() === normalized)){
+
+    if(data.requests.some(item=>item.address.toUpperCase()===normalized)){
       UI.toast('Esse palet já está na operação.');
       return false;
     }
+
     data.requests.unshift({
-      id:data.nextId++,
+      id:Date.now()*1000+Math.floor(Math.random()*1000),
       address:normalized,
-      operator:operator.trim() || AppState.getUser()?.nome || 'Operador',
-      requestedByName:AppState.getUser()?.nome || operator.trim() || 'Operador',
-      requestedByMatricula:AppState.getUser()?.matricula || '',
+      operator:operator.trim()||AppState.getUser()?.nome||'Operador',
+      requestedByName:AppState.getUser()?.nome||operator.trim()||'Operador',
+      requestedByMatricula:AppState.getUser()?.matricula||'',
+      originRequestId:production.id,
+      originRequestNumber:production.number,
       status:'waiting',
       corridor,
       createdAt:Date.now(),
       isPic:Boolean(options.isPic),
-      sourceType:options.isPic ? 'PIC' : 'MANUAL'
+      sourceType:options.isPic?'PIC':'MANUAL'
     });
+
     if(!data.selectedCorridors.includes(corridor)){
       data.selectedCorridors.push(corridor);
     }
-    addHistory(normalized, 'Palet solicitado manualmente');
-    Notifications.push('Novo palet solicitado', `${normalized} foi enviado para a fila por ${operator.trim() || AppState.getUser()?.nome || 'Operador'}.`, {type:'info',toast:false,link:'operacao'});
+
+    addHistory(normalized,'Palet solicitado manualmente');
+    Notifications.push(
+      'Novo palet solicitado',
+      `${normalized} foi enviado para a fila por ${operator.trim()||AppState.getUser()?.nome||'Operador'} · ${production.number}.`,
+      {type:'info',toast:false,link:'operacao'}
+    );
+
     AppState.save({source:'operation'});
     renderAll();
     UI.toast(`${normalized} apareceu na tela de Paletes.`);
