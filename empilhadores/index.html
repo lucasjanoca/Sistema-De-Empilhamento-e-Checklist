@@ -107,6 +107,7 @@
       <nav class="sidebar-nav">
         <button class="nav-button active" data-view="painel" data-permission="dashboard">⌂ Painel geral</button>
         <button class="nav-button" data-view="operacao" data-permission="operate">▦ Operação</button>
+        <button class="nav-button" data-view="meus-paletes" data-permission="operate">▣ Meus Paletes</button>
         <button class="nav-button" data-view="requisicoes" data-permission="manageRequests">▤ Requisições</button>
         <button class="nav-button" data-view="usuarios" data-permission="manageUsers">♙ Usuários</button>
         <button class="nav-button" data-view="historico" data-permission="history">◷ Histórico</button>
@@ -132,6 +133,7 @@
           <span id="centralSyncBadge" class="central-sync-badge local">Dados locais</span>
           <button id="currentTabletBadge" class="tablet-topbar-badge" type="button" title="Trocar tablet">Tablet: selecionar</button>
           <span id="currentUserLabel" class="current-user"></span>
+          <span id="currentShiftBadge" class="production-request-badge"></span>
           <span id="currentProductionRequest" class="production-request-badge hidden"></span>
           <div class="notification-center">
             <button id="notificationButton" class="notification-button" type="button" aria-label="Notificações" aria-expanded="false">♧<span id="notificationCount" class="notification-count hidden">0</span></button>
@@ -295,6 +297,25 @@
       </section>
 
 
+      <!-- MEUS PALETES -->
+      <section id="view-meus-paletes" class="view">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Meus Paletes</h3>
+              <p>Paletes solicitados ou movimentados pelo usuário logado.</p>
+            </div>
+            <button id="refreshMyPallets" class="btn btn-soft" type="button">↻ Atualizar</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Palet</th><th>Status</th><th>Corredor</th><th>Origem</th><th>Turno</th><th>Última ação</th></tr></thead>
+              <tbody id="myPalletsBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
       <!-- REQUISIÇÕES DE PRODUÇÃO — ENCARREGADO / TI -->
       <section id="view-requisicoes" class="view">
         <div class="production-page">
@@ -388,6 +409,7 @@
                     <th>Requisição</th>
                     <th>Empilhador</th>
                     <th>Tablet</th>
+                    <th>Turno</th>
                     <th>Início</th>
                     <th>Fim</th>
                     <th>Status</th>
@@ -502,6 +524,7 @@
                   <th>Palet</th>
                   <th>Ação</th>
                   <th>Operador</th>
+                  <th>Turno</th>
                 </tr>
               </thead>
               <tbody id="historyTable"></tbody>
@@ -754,9 +777,9 @@
       <div class="dialog-actions"><button id="tabletCancelButton" class="btn btn-light hidden" type="button">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar equipamento</button></div>
     </form>
   </dialog>
-  <script src="../shared/supabase-accounts.js?v=20260929-prod2"></script>
+  <script src="../shared/supabase-accounts.js?v=20260929-prod3"></script>
   <script src="../shared/access-code.js?v=20260926-1"></script>
-  <script src="assets/app.bundle.js?v=20260929-prod2"></script>
+  <script src="assets/app.bundle.js?v=20260929-prod3"></script>
   <script src="assets/operation-focus.js"></script>
   <script src="assets/checklist-code.js"></script>
 </body>
