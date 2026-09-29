@@ -2666,6 +2666,7 @@ const DataSync = (() => {
   let pushTimer=null;
   let pollTimer=null;
   let lastRemoteUpdatedAt=0;
+  let lastRemoteRevision=null;
 
   function cloud(){return typeof SecurityApi!=='undefined'&&SecurityApi.isAccountCloud();}
 
@@ -2689,7 +2690,7 @@ const DataSync = (() => {
       }
       if(path==='/snapshot' && String(options.method||'GET').toUpperCase()==='PUT'){
         const snapshot=typeof options.body==='string'?JSON.parse(options.body):options.body;
-        return globalThis.InfoTechSupabaseAccounts.saveOperationalState(snapshot);
+        return globalThis.InfoTechSupabaseAccounts.saveOperationalState(snapshot,lastRemoteRevision);
       }
       throw new Error('Rota central não suportada.');
     }
@@ -2706,6 +2707,7 @@ const DataSync = (() => {
       const result=await request('/snapshot',{method:'PUT',body:JSON.stringify(snapshot)});
       const at=Number(result?.updatedAt || snapshot.updatedAt || Date.now());
       lastRemoteUpdatedAt=at;
+      lastRemoteRevision=Number(result?.revision ?? lastRemoteRevision ?? 0);
       AppState.getData().meta=AppState.getData().meta||{};
       AppState.getData().meta.updatedAt=at;
       AppState.getData().meta.cloudInitialized=true;
@@ -2713,6 +2715,14 @@ const DataSync = (() => {
       setStatus('online',cloud()?'Supabase sincronizado':'Dados centralizados');
       return result;
     }catch(error){
+      if(cloud() && error?.status===409 && error?.payload?.snapshot){
+        lastRemoteRevision=Number(error.payload.revision||0);
+        lastRemoteUpdatedAt=Number(error.payload.updatedAt||0);
+        await applyRemote(error.payload,lastRemoteUpdatedAt);
+        setStatus('online','Supabase sincronizado · conflito evitado');
+        UI.toast('Outro equipamento atualizou a operação ao mesmo tempo. Os dados mais novos foram carregados; confira e repita sua última ação.');
+        return {conflict:true};
+      }
       setStatus('offline',cloud()?'Supabase sem conexão':'Servidor local sem conexão');
       console.warn('Falha ao enviar dados ao servidor central:',error);
       throw error;
@@ -2726,6 +2736,9 @@ const DataSync = (() => {
   }
 
   async function applyRemote(remote,remoteUpdatedAt){
+    if(remote?.revision!==undefined && remote?.revision!==null){
+      lastRemoteRevision=Number(remote.revision||0);
+    }
     applyingRemote=true;
     try{
       remote.snapshot.data.meta = remote.snapshot.data.meta || {};
@@ -2749,6 +2762,7 @@ const DataSync = (() => {
         return;
       }
       const remoteUpdatedAt=Number(remote.updatedAt || remote.snapshot.updatedAt || 0);
+      lastRemoteRevision=Number(remote.revision ?? lastRemoteRevision ?? 0);
       const localUpdatedAt=Number(AppState.getData().meta?.updatedAt || 0);
       const remoteInitialized=Boolean(remote.cloudInitialized||remote.snapshot?.data?.meta?.cloudInitialized);
       lastRemoteUpdatedAt=Math.max(lastRemoteUpdatedAt,remoteUpdatedAt);
