@@ -1265,3 +1265,12 @@ border-radius:13px;
   .pallet-card.pic{animation:none!important;outline:4px solid #e01818!important;box-shadow:0 0 0 7px rgba(224,24,24,.22),0 12px 28px rgba(91,40,148,.34)!important}
   .pallet-card.pic::before{animation:none!important;box-shadow:0 0 0 7px rgba(224,24,24,.22)}
 }
+
+.history-event-badge{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;font-size:8px;font-weight:900;white-space:nowrap}
+.history-event-badge.down{background:#e9f2ff;color:#2d68b4}
+.history-event-badge.up{background:#e5f7ef;color:#237254}
+.history-event-badge.cancel{background:#fff0ef;color:#9a4941}
+.history-event-badge.release{background:#fff7da;color:#7b620d}
+.history-event-badge.request{background:#f0eafb;color:#654c96}
+.history-event-badge.event{background:#eef2f0;color:#53635d}
+.history-event-detail{display:block;margin-top:4px;color:var(--muted);font-size:8px;line-height:1.35}
