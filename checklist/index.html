@@ -232,6 +232,7 @@ dialog{width:min(580px,calc(100vw - 24px));border:1px solid var(--line);border-r
 
 <div class="toast" id="toast"></div>
 
+<script src="../shared/supabase-accounts.js?v=20260929-1"></script>
 <script src="../shared/access-code.js?v=20260926-1"></script>
 <script>
 (()=>{
@@ -394,16 +395,29 @@ function openIssue(id){const i=issues.find(x=>x.id===id);if(!i)return;$('#issueI
 function saveIssue(ev){ev.preventDefault();const i=issues.find(x=>x.id===$('#issueId').value);if(!i)return;i.status=$('#issueStatus').value;i.resolution=$('#issueResolution').value.trim();audit.unshift({at:new Date().toISOString(),user:currentUser.name,event:'ISSUE_UPDATED',origin:'ADM',detail:`${i.code} • ${i.status}`});$('#issueDialog').close();renderAdmin();toast('Pendência atualizada.')}
 
 $('#accessCode').addEventListener('input',e=>{const v=InfoTechAccessCode.normalizeCode(e.target.value);e.target.value=InfoTechAccessCode.formatCode(v)});
-$('#loginForm').addEventListener('submit',e=>{
+$('#loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  const result=InfoTechAccessCode.validate($('#accessCode').value);
-  if(!result.ok){
-    const messages={invalid_format:'Digite os 6 dígitos do código.',locked:'Muitas tentativas. Aguarde 1 minuto.',used:'Esse código já foi utilizado.',expired:'Esse código expirou. Gere outro no Sistema de Empilhadores.',not_found:'Nenhum código ativo foi encontrado.',wrong:'Código incorreto.'};
-    $('#loginError').textContent=messages[result.reason]||'Código inválido.';
-    $('#loginError').classList.remove('hidden');
-    return;
-  }
-  enterWithIdentity(result.identity);
+  const errorBox=$('#loginError');
+  errorBox.classList.add('hidden');
+  const submit=e.currentTarget.querySelector('button[type="submit"]');
+  if(submit)submit.disabled=true;
+  try{
+    if(location.protocol!=='file:'&&globalThis.InfoTechSupabaseAccounts){
+      const result=await globalThis.InfoTechSupabaseAccounts.validateChecklistCode($('#accessCode').value);
+      const stored=globalThis.InfoTechSupabaseAccounts.storeChecklistSession(result);
+      enterWithIdentity(stored.identity);
+      return;
+    }
+    const result=InfoTechAccessCode.validate($('#accessCode').value);
+    if(!result.ok){
+      const messages={invalid_format:'Digite os 6 dígitos do código.',locked:'Muitas tentativas. Aguarde 1 minuto.',used:'Esse código já foi utilizado.',expired:'Esse código expirou. Gere outro no Sistema de Empilhadores.',not_found:'Nenhum código ativo foi encontrado.',wrong:'Código incorreto.'};
+      throw new Error(messages[result.reason]||'Código inválido.');
+    }
+    enterWithIdentity(result.identity);
+  }catch(error){
+    errorBox.textContent=error?.message||'Código inválido ou expirado.';
+    errorBox.classList.remove('hidden');
+  }finally{if(submit)submit.disabled=false;}
 });
 $('#menuBtn').addEventListener('click',openSidebar);$('#closeSidebar').addEventListener('click',closeSidebar);$('#backdrop').addEventListener('click',closeSidebar);$('#logoutBtn').addEventListener('click',logout);$('#sideLogout').addEventListener('click',logout);$('#backToOperation').addEventListener('click',showOperation);
 $('#sideNav').addEventListener('click',e=>{const b=e.target.closest('[data-admin-page]');if(b)showAdmin(b.dataset.adminPage)});
