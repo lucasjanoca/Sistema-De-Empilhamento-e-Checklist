@@ -1112,13 +1112,18 @@ const Auth=(()=>{
     }
     return user;
   }
-  function finish(user){
+  async function finish(user){
     const safe={matricula:user.matricula,nome:user.nome,role:user.role};
     AppState.setUser(safe);
     if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Login realizado',`Acesso pelo perfil ${AppState.getRoleLabel(safe.role)}.`,{category:'acesso'});
-    UI.showSystem(safe);Operation.renderAll();Dashboard.render();AppState.clearTablet();TabletManager.ensureSelected({force:true});
+    UI.showSystem(safe);
+    await DataSync.reconnect?.();
+    Operation.renderAll();
+    Dashboard.render();
+    AppState.clearTablet();
+    TabletManager.ensureSelected({force:true});
     Notifications.push('Acesso realizado',`Bem-vindo, ${safe.nome}.`,{type:'success',toast:false,link:'painel'});
-    UI.toast(`Bem-vindo, ${safe.nome}.`);DataSync.reconnect?.();
+    UI.toast(`Bem-vindo, ${safe.nome}.`);
   }
   function init(){
     const form=UI.$('loginForm');
@@ -1127,7 +1132,7 @@ const Auth=(()=>{
       const m=UI.$('loginMatricula').value.trim(),s=UI.$('loginSenha').value;
       if(!m||!s){UI.setLoginError('Preencha o crachá e a senha.');return;}
       const b=form.querySelector('button[type="submit"]');if(b)b.disabled=true;
-      try{const u=await login(m,s);if(!u){UI.setLoginError('Senha ou crachá incorreto.');return;}finish(u);}
+      try{const u=await login(m,s);if(!u){UI.setLoginError('Senha ou crachá incorreto.');return;}await finish(u);}
       catch(err){UI.setLoginError(err.message||'Não foi possível entrar.');}
       finally{if(b)b.disabled=false;}
     });
@@ -2703,7 +2708,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
       if(!ex){AppState.clearUser();UI.showLogin();return;}
       user={matricula:ex.matricula,nome:ex.nome,role:ex.role};AppState.setUser(user);
     }
-    UI.showSystem(user);Operation.renderAll();Dashboard.render();TabletManager.ensureSelected();
+    await DataSync.reconnect?.();
+    UI.showSystem(user);Operation.renderAll();Dashboard.render();TabletManager.ensureSelected({force:!AppState.getTablet()?.name});
   }else{
     AppState.clearUser();UI.showLogin();
   }
