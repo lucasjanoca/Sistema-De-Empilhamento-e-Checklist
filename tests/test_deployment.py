@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from pathlib import Path
 
 from app.config import settings
 from app.main import app
@@ -28,3 +29,9 @@ def test_backup_is_authorized_and_fails_truthfully_without_infrastructure(client
     response = admin.send("/backups")
     assert response.status_code == 503
     assert "configurar diretório privado" in response.json()["message"]
+
+
+def test_compose_healthcheck_uses_application_readiness():
+    compose = (Path(__file__).parent.parent / "compose.yaml").read_text(encoding="utf-8")
+    assert "http://127.0.0.1:8000/health/ready" in compose
+    assert "socket.create_connection" not in compose

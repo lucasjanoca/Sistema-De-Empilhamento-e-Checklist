@@ -19,13 +19,14 @@ Este documento transforma a candidata técnica em um projeto implantável. Nenhu
 1. Aprovar o PR e publicar uma imagem GHCR; registrar o digest, nunca usar apenas `latest`.
 2. Criar banco staging, conta proprietária separada e conta runtime sem ownership; guardar segredos no cofre.
 3. Executar `migrate`, reaplicar `deploy/grant-runtime.sql` e rodar `scripts/preflight.py`.
-4. Configurar proxy TLS e executar `scripts/smoke_deployment.py` pela mesma URL usada nos tablets.
-5. Criar o primeiro administrador, cadastrar dispositivos e dados mestres mínimos.
-6. Receber o contrato Selene e preencher uma cópia privada de `deploy/selene-contract.example.json` sem segredos.
-7. Executar `scripts/verify_selene_contract.py` em staging. Conferir o mapeamento de identificadores antes de qualquer escrita.
-8. Habilitar a integração e testar um palete de homologação: sucesso, indisponibilidade temporária e reenvio sem duplicidade.
-9. Executar `scripts/homologate.py --verify-backup-restore` e guardar os resultados junto ao digest.
-10. Fazer o piloto de `PILOTO-CONTROLADO.md` em todos os modelos de tablet, turnos e áreas aplicáveis.
+4. Exportar privadamente o snapshot/perfis legados e executar `scripts/plan_supabase_migration.py`; resolver todos os bloqueios e obter aceite antes de importar no staging.
+5. Configurar proxy TLS e executar `scripts/smoke_deployment.py` pela mesma URL usada nos tablets.
+6. Criar o primeiro administrador, cadastrar dispositivos e dados mestres mínimos.
+7. Receber o contrato Selene e preencher uma cópia privada de `deploy/selene-contract.example.json` sem segredos.
+8. Executar `scripts/verify_selene_contract.py` em staging. Conferir o mapeamento de identificadores antes de qualquer escrita.
+9. Habilitar a integração e testar um palete de homologação: sucesso, indisponibilidade temporária e reenvio sem duplicidade.
+10. Executar `scripts/homologate.py --verify-backup-restore` e guardar os resultados junto ao digest.
+11. Fazer o piloto de `PILOTO-CONTROLADO.md` em todos os modelos de tablet, turnos e áreas aplicáveis.
 
 ## Critério objetivo de aprovação
 

@@ -1,133 +1,72 @@
-# Relatório final - Site Selene 2.1.2
+# Relatório final — Sistema de Empilhadores 2.2.0 RC3
 
-## ATUALIZAÇÃO 2.1.2
+Data da revisão: 08/10/2026. Branch candidata: `integracao-producao-main`.
 
-O Checklist mantém a linguagem visual clara do Empilhadores e recebeu uma revisão de uso real: cálculo automático de criticidade, bloqueio de envio duplicado, campos obrigatórios, papéis corretos, navegação de abas por teclado, estados de carregamento e tentativa de reconexão. Backup, saúde e integração agora informam somente resultados confirmados pelo servidor. O painel TI gera mapa e snapshot técnicos reais em JSON. A revisão em 320 a 1920 px eliminou o overflow restante no cabeçalho móvel e os caches PWA foram promovidos para 2.1.2. A matriz completa está em `docs/HOMOLOGACAO-2.1.2.md` e o piloto em `docs/PILOTO-CONTROLADO.md`.
+## Conclusão
 
-## STATUS GERAL
+O código está consistente e pronto para revisão independente e implantação em **staging privado**. Não é correto declará-lo publicado ou homologado em produção: faltam decisões, credenciais e infraestrutura da empresa, além do contrato oficial do Selene e do UAT na rede/tablets reais. Esses itens não podem ser fabricados no repositório.
 
-**Implementação concluída e validada localmente; pronta para homologação corporativa.** O software executa com PostgreSQL real e passou a suíte técnica. O ambiente corporativo ainda não está publicado nem homologado porque hostname, TLS, banco gerenciado, OIDC e contrato da integração pertencem à TI e não foram fornecidos. A lista exata está em `PENDENCIAS-TI.md`.
+GitHub continua adequado para código, CI e imagem. GitHub Pages não hospeda esta aplicação operacional, porque ela exige FastAPI, PostgreSQL, cookies seguros, workers e rede privada.
 
-## FUNCIONANDO
+## O que funciona
 
-- Empilhamento 2.0 e Checklist com a identidade visual e o fluxo original preservados.
-- Login, sessão revogável, três perfis, seleção exclusiva de dispositivo e produção.
-- Solicitação, aceite, transferência, autorização, BAIXAR, SUBIR, cancelamento, override, EXP-PIC, corredores e endereços bloqueados.
-- Timer de movimento de 10 segundos e liberação de 90 minutos no servidor.
-- Histórico, dashboards, filtros paginados, auditoria, CSV e PDF com dados reais.
-- Código de Checklist entre clientes/dispositivos, validade de 2 minutos e uso único.
-- Templates versionados, equipamentos, Checklist por turno, pendências e troca de bateria.
-- Restart sem perda e sincronização por invalidação SSE.
+- Login local seguro, sessões revogáveis, CSRF, rate limit, RBAC e três perfis.
+- OIDC Authorization Code + PKCE e exigência configurável de MFA, aguardando parâmetros corporativos.
+- Dispositivos exclusivos, produção, requisições, autorizações, BAIXAR/SUBIR, EXP-PIC, bloqueios, timer no servidor e recuperação após restart.
+- Concorrência com locks reais, idempotência, fechamento de aba e repetição segura após falha de rede.
+- Checklist entre aparelhos, código de uso único, templates versionados, equipamentos, pendências e troca de bateria.
+- Histórico/auditoria imutáveis, relatórios CSV/PDF, métricas, correlation ID e diagnóstico operacional.
+- Adaptador HTTP Selene com TLS, allowlist, credencial apenas no servidor, timeout/retry e outbox transacional. Ele permanece desativado até a homologação do contrato real.
+- Backup cifrado, cópia externa exclusiva e restauração em banco vazio já exercitados.
+- Docker/Compose, migrations Alembic, CI, imagem imutável GHCR, SBOM, preflight, smoke test e runbooks.
 
-## IMPLEMENTADO
+## Melhorias desta revisão
 
-Arquitetura FastAPI + PostgreSQL 17; migration Alembic; transações e locks; máquina de estados; autorização explícita; idempotência; rate limit; RBAC; PWA segura; relatórios; observabilidade; backup cifrado/restore; Docker/Compose; CI; comandos administrativos; documentação de operação, instalação, segurança, integração e rollback.
+- O healthcheck do contêiner deixou de validar apenas a porta TCP e agora consulta `/health/ready`, incluindo aplicação, banco e migration.
+- Foi criado `scripts/plan_supabase_migration.py`: inventaria o export legado, não escreve em banco, não inclui dados pessoais no relatório, recusa sobrescrita e bloqueia a migração quando houver informação de negócio ausente.
+- Foram adicionados testes para o planejador, proteção contra vazamento de nomes e healthcheck real do Compose.
+- Documentação de arquitetura, banco, implementação, migração e pendências foi reconciliada com a versão 2.2.0 e o head `0002_integration_outbox`.
 
-As partes de demonstração foram removidas: usuários/senhas fictícios, dados pré-carregados, persistência operacional em navegador, GitHub Pages e o ZIP duplicado dentro do repositório. Preferências estritamente visuais permanecem na sessão do navegador.
+## Supabase legado verificado
 
-## ARQUITETURA IMPLEMENTADA
+O projeto conectado está saudável em PostgreSQL 17, porém é compartilhado com outras aplicações. Foram inspecionados apenas metadados e contagens dos objetos `emp_`, sem copiar nomes, matrículas ou conteúdo operacional para o Git.
 
-As duas interfaces chamam a mesma API e compartilham usuários, perfis, banco e auditoria. O backend é a autoridade sobre identidade, dispositivo, estado, autorização e tempo. PostgreSQL guarda todo dado corporativo. Worker servidor conclui timers. Service workers armazenam somente estáticos e falham fechados para operação. Consulte `docs/ARQUITETURA.md`.
+- 2 perfis, 32 eventos de auditoria, 1 snapshot e 1 backup legado.
+- 3 paletes em estado `ready`, 1 produção fechada, 10 itens de histórico, 6 tablets e 2 atribuições.
+- Tabelas de códigos, sessões/registros de Checklist e locks estão vazias.
+- RLS está habilitado; as duas funções privilegiadas do módulo já aceitam execução somente pela `service_role`.
+- Três funções Edge antigas de bootstrap/teste são tombstones inertes (HTTP 410), mas devem ser removidas depois do corte.
+- O snapshot não contém quantidade, referência, observação ou área exigidas pelo modelo novo. A migração fica corretamente bloqueada até Negócio e TI preencherem e aprovarem o mapeamento dos três paletes.
 
-## TESTES
+## Evidências executadas
 
-- 35/35 testes pytest aprovados em PostgreSQL 17 real.
-- Concorrência com clientes/sessões simultâneos e locks reais: aprovada.
-- Timer real de 10 segundos e restart: aprovados.
-- Código Checklist entre clientes, expiração, replay e brute force: aprovados.
-- RBAC, CSRF, IDOR, role bypass, SQL injection, XSS textual, session fixation, transição inválida e double submit: aprovados.
-- Migration do zero: 34 tabelas físicas incluindo `alembic_version`, zero usuários, versão `0001_operational`.
-- Backup cifrado e restore num segundo banco: aprovados; restore em banco não vazio recusado.
-- Cadeia de auditoria: íntegra em 2.654 eventos no banco final de validação da versão 2.1.2.
-- Diagnóstico: zero locks órfãos, movimentos pendentes em produção fechada ou confirmações vencidas.
-- Ruff, sintaxe JS, fronteira pública, CSP estática e scanner de segredos: aprovados.
-- `pip-audit`: nenhuma vulnerabilidade conhecida nas versões travadas.
-- Fluxo visual das nove áreas, Empilhamento + Checklist e viewport de tablet: verificados sem erro de console.
+- **53/53 testes aprovados** em PostgreSQL 17 real.
+- Ruff, contratos públicos/JavaScript, acessibilidade/PWA e scanner de segredos aprovados.
+- `alembic check`: nenhuma operação pendente; migration atual `0002_integration_outbox`.
+- Cadeia de auditoria válida em 5.332 eventos do banco descartável acumulado.
+- Diagnóstico: zero lock em item finalizado, produção fechada com movimento pendente, confirmação vencida ou entrega externa parada.
+- Auditoria atual de dependências: nenhuma vulnerabilidade conhecida nas versões runtime fixadas.
+- Evidência anterior preservada: backup cifrado/restauração real e interface verificada de 320 a 1920 px sem overflow ou erro de console.
 
-Evidências: `TEST-RESULTS.xml`, `EVIDENCIA-BACKUP.json`, `dependency-audit.json` e `docs/TESTES.md`.
+## O que ainda impede produção
 
-## SEGURANÇA
+Prioridade P0 — indispensável:
 
-Argon2id; cookie `__Host-` Secure/HttpOnly/SameSite Strict; token opaco com hash no banco; timeouts; revogação; reautenticação; OIDC/PKCE preparado; MFA configurável; CSRF; CSP estrita; Trusted Host; HSTS; validação Pydantic; SQL parametrizado; rate limit persistente; idempotência; autorização backend; erros com correlation ID; audit log HMAC append-only; runtime PostgreSQL de mínimo privilégio; backup AES-256-GCM/RSA-OAEP. Detalhes e fronteiras estão em `docs/SEGURANCA.md`.
+1. Contrato, URL, autenticação, schemas e credencial de homologação do Selene.
+2. Staging corporativo, domínio interno, TLS, proxy/firewall, PostgreSQL gerenciado e cofre.
+3. Mapeamento dos três paletes legados, importação ensaiada e reconciliação assinada.
+4. OIDC/MFA corporativo, se exigido pela TI, com claims e ACR homologados.
+5. Coletor de logs/métricas, alertas, plantão e agendamento real do backup externo.
+6. UAT assinado por TI, operação e segurança nos tablets, turnos e rede da empresa.
+7. Revisor independente da PR; hoje o repositório possui somente o próprio administrador.
 
-## BANCO
+Prioridade P1 — antes da expansão:
 
-Migration `0001_operational`, schema congelado na migration e 33 tabelas da aplicação: identidade/RBAC/sessões, dispositivos, produção, locais, paletes, autorizações, movimentos/locks, códigos, equipamentos, templates/registros/respostas de Checklist, baterias, pendências/eventos, notificações, histórico, auditoria, configurações, rate limits, idempotência, OIDC e eventos técnicos. Índices, constraints e triggers protegem concorrência e imutabilidade. Lista em `docs/BANCO-E-API.md`.
+- Tornar o repositório privado antes de incluir qualquer informação interna.
+- Remover as Edge Functions tombstone e revogar chaves do legado após o prazo de retenção.
+- Planejar a migração futura dos usos depreciados `httpx`/`authlib.jose`; hoje são avisos, não falhas dos testes.
+- Definir retenção, dupla aprovação e capacidade/alta disponibilidade conforme a política corporativa.
 
-## ENDPOINTS
+## Decisão de promoção
 
-Saúde/status; login/me/logout/reauth/activity/OIDC; usuários/perfis; estado; dispositivos; produção; paletes/comandos; locais; códigos; Checklist/templates/registros; equipamentos; pendências; baterias; notificações; histórico; auditoria; settings; SSE; segurança; métricas; relatórios CSV/PDF; integração; backup; OpenAPI autenticado. O agrupamento está em `docs/BANCO-E-API.md`; o contrato completo é `GET /api/site-selene/openapi.json` com permissão TI.
-
-## PERMISSÕES
-
-- `empilhador`: operação própria, paletes, produção, dispositivo, histórico próprio, Checklist e códigos.
-- `encarregado`: acrescenta autorizações, transferência/cancelamento, localização, histórico geral, relatórios, dispositivos, administração não TI, auditoria, templates/equipamentos e resolução de pendências.
-- `ti`: todas as permissões, integração, backup, segurança, perfis e configurações.
-
-O backend aplica permissões granulares por ação; ocultar botão é apenas apresentação.
-
-## INTEGRAÇÕES
-
-O contrato interno do adaptador Selene está definido, com allowlist HTTPS e falha segura. Como a API oficial não foi fornecida, o recurso retorna 503 e mostra “INTEGRAÇÃO NÃO CONFIGURADA”; não existe mock. OIDC usa discovery, Authorization Code, PKCE, state e nonce, mas precisa dos valores corporativos e homologação de claims/ACR. Veja `docs/INTEGRACAO.md`.
-
-## PROBLEMAS ENCONTRADOS E RESOLVIDOS
-
-- O Site 2.0 guardava identidade, códigos e dados no navegador: substituído por API/PostgreSQL.
-- Havia credenciais e dados de demonstração no frontend: removidos.
-- BAIXAR/SUBIR e timers dependiam do cliente: movidos para transações e worker servidor.
-- Autorização era visual: transformada em RBAC e autorizações persistentes no backend.
-- Código Checklist funcionava na mesma origem/navegador: movido para banco, hash, validade e uso único.
-- Arquivos originais duplicados e workflow de importação poderiam republicar a versão insegura: removidos; checkpoint Git preserva o original.
-- O estado não sobrevivia a restart e não havia restore validado: PostgreSQL, backup cifrado e ensaio de restore implementados.
-- A inspeção final encontrou uma variável de aba não inicializada no carregamento autenticado do Checklist: o estado inicial foi declarado, e o fluxo PC → código → Checklist → seleção de dispositivo → relatório foi repetido sem erro de console.
-- A última execução inicialmente encontrou o PostgreSQL portátil de teste parado; a instância isolada foi reiniciada e toda a suíte passou.
-- A suíte emite avisos de depreciação futura do adaptador `httpx` do Starlette/Authlib e de `authlib.jose`; eles não causam falha nem vulnerabilidade conhecida, mas devem ser migrados para `httpx2`/`joserfc` antes de uma futura atualização principal dessas bibliotecas.
-- A revisão 2.1.2 corrigiu mensagens administrativas que podiam sugerir backup ou diagnóstico simulado, fortaleceu downloads e erros de rede, calculou o resultado do Checklist pelas respostas, impediu duplo envio no navegador e eliminou o overflow de 320 px.
-
-## PENDÊNCIAS DA TI
-
-Hostname/origem, certificado e proxy; PostgreSQL gerenciado e contas; cofre/segredos/chaves; política e armazenamento externo de backup; contrato/credencial da integração Selene; OIDC/MFA; aprovação de permissões/retenção/dupla aprovação; monitoramento; UAT em rede e tablets corporativos; repositório privado. Veja `PENDENCIAS-TI.md`.
-
-## ARQUIVOS CRIADOS E ALTERADOS
-
-- Backend: `app/*.py`, incluindo `main`, operações, Checklist, segurança, OIDC, queries, integração, backup, manutenção e monitoramento.
-- Banco: `migrations/`, `alembic.ini`, `deploy/grant-runtime.sql`.
-- Interfaces: `public/empilhadores`, `public/checklist`, `public/shared`.
-- Entrega: `Dockerfile`, `compose.yaml`, `.env.example`, locks de dependência e CI.
-- Qualidade: `tests/`, `scripts/check_public.py`, `scripts/scan_secrets.py` e evidências.
-- Documentação: `README.md`, `docs/`, `PENDENCIAS-TI.md`, este relatório e `INVENTARIO-ORIGINAL.md`.
-
-Os antigos arquivos estáticos da raiz, o ZIP duplicado e o workflow de importação foram removidos da versão ativa. O estado original está preservado na tag `checkpoint-original-20260925`.
-
-## COMMITS
-
-- `fb37126` — PostgreSQL, migrations, configuração segura e inventário original.
-- `8ed2cb8` — Argon2id, sessões revogáveis, RBAC e auditoria encadeada.
-- `8ddf76d` — movimentos, autorizações, dispositivos, Checklist e testes PostgreSQL.
-- `82f442d` — frontend integrado, backup, observabilidade, implantação e validações.
-- `c12fe09` — relatório, runbooks e pendências externas da TI.
-- Commit final de inspeção visual — inicialização autenticada do Checklist e evidência JUnit atualizada.
-
-## COMO INSTALAR
-
-Siga `docs/INSTALACAO.md`: configure o arquivo privado a partir de `.env.example`, suba PostgreSQL, aplique Alembic com a conta proprietária, conceda o mínimo à conta runtime, configure proxy TLS e backup, suba a aplicação, valide health/readiness e execute `python -m app.admin create-initial-admin`. Não coloque o arquivo de ambiente no Git.
-
-## COMO CRIAR O PRIMEIRO TI
-
-Com migration aplicada, banco sem usuários e `DATABASE_URL` runtime configurada, execute `python -m app.admin create-initial-admin`. Informe matrícula, nome e senha forte duas vezes. O comando trava o bootstrap, recusa segunda execução e não cria dados operacionais.
-
-## COMO CONFIGURAR POSTGRESQL E HTTPS
-
-Use PostgreSQL 17 em rede privada. Separe conta proprietária de migration e conta runtime; aplique `deploy/grant-runtime.sql`. No proxy, force HTTPS, mantenha a aplicação inacessível externamente, encaminhe Host/X-Forwarded-Proto somente de IPs confiáveis e faça `PUBLIC_ORIGIN` coincidir com a URL oficial. Veja `docs/INSTALACAO.md`.
-
-## COMO TESTAR
-
-Em banco descartável: migration, `python -m pytest --junitxml=TEST-RESULTS.xml`, `python -m ruff check app tests migrations scripts`, `python scripts/check_public.py`, `python scripts/scan_secrets.py`, `python -m app.admin verify-audit`, `python -m app.admin diagnose` e `pip-audit -r requirements-runtime.lock`. Instruções em `docs/TESTES.md`.
-
-## COMO FAZER BACKUP E ROLLBACK
-
-Agende `python -m app.maintenance backup`, copie o artefato cifrado para armazenamento externo e teste restore periodicamente. Restore exige banco vazio, chave privada e confirmação do nome. Para rollback de aplicação, reative a imagem anterior; para banco, restaure em banco novo e faça a troca controlada. Veja `docs/BACKUP-RESTORE.md` e `docs/ROLLBACK.md`.
-
-## COMO ATUALIZAR
-
-Crie backup, fixe a nova imagem pelo digest/commit, revise e aplique migrations em janela controlada, suba a aplicação, valide readiness e fluxos, verifique auditoria e monitore. Nunca aplique downgrade destrutivo diretamente no banco operacional.
+Não habilitar `INTEGRATION_ADAPTER`, não marcar `BACKUP_SCHEDULE_MANAGED=true`, não importar dados reais e não publicar em produção antes de todos os P0 terem evidência. A sequência oficial está em `docs/IMPLEMENTACAO-EMPRESA.md`, `docs/HOMOLOGACAO-2.2.0.md` e `docs/PILOTO-CONTROLADO.md`.

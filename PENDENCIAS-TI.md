@@ -10,6 +10,8 @@
 - [ ] Aprovar matriz final de permissões, política de retenção e eventual regra de aprovação por duas pessoas.
 - [ ] Configurar coleta central de logs, métricas, alertas e responsáveis de plantão.
 - [ ] Executar homologação de negócio/UAT com operadores, encarregados e TI em tablets e rede corporativa.
+- [ ] Aprovar o mapeamento dos 3 paletes legados do Supabase, ensaiar a importação em staging vazio e assinar a reconciliação; os campos novos obrigatórios não existem no snapshot antigo.
+- [ ] Após o corte e a retenção aprovados, remover as três Edge Functions tombstone do legado e revogar as chaves antigas, sem tocar nas outras aplicações do projeto Supabase compartilhado.
 - [ ] Tornar privado o repositório corporativo antes de adicionar qualquer dado ou configuração interna.
 
 Estas dependências impedem declarar o ambiente corporativo publicado e homologado. Elas não foram substituídas por valores falsos.

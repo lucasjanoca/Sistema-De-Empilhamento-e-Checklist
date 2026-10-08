@@ -1,4 +1,4 @@
-# Homologação técnica 2.2.0 RC2
+# Homologação técnica 2.2.0 RC3
 
 Data: 08/10/2026. Branch candidata: `integracao-producao-main`, reconciliada com a `main` sem publicar em produção e sem mesclar a PR.
 
@@ -24,7 +24,8 @@ A candidata está pronta para revisão e implantação em staging privado. Produ
 - [ ] Revisão independente; hoje o repositório possui somente o próprio administrador.
 - [ ] Staging HTTPS acessível apenas à equipe autorizada.
 - [ ] Segredos fornecidos por cofre; nenhum valor real no repositório ou no frontend.
-- [ ] Migração Supabase reconciliada conforme `MIGRACAO-SUPABASE.md`.
+- [x] Inventário estrutural e de segurança do Supabase executado sem copiar dados pessoais; planejador de migração somente leitura implementado.
+- [ ] Mapeamento dos 3 paletes legados, ensaio em staging e reconciliação assinada conforme `MIGRACAO-SUPABASE.md`.
 - [x] Integração, falha de rede, reenvio idempotente e bloqueio sem configuração validados com servidor HTTP simulado.
 - [ ] Contrato e escrita validados no ambiente oficial de homologação.
 - [x] Backup criado, copiado externamente e restaurado em segundo banco vazio descartável; evidência em `EVIDENCIA-BACKUP.json`.
@@ -33,7 +34,7 @@ A candidata está pronta para revisão e implantação em staging privado. Produ
 
 ## Evidência automática desta candidata
 
-- 49 cenários aprovados em PostgreSQL 17, incluindo dois operadores concorrentes em endereços distintos, fechamento de aba, restart, retry idempotente após resposta incerta e outbox da integração HTTP.
+- 53 cenários aprovados em PostgreSQL 17, incluindo dois operadores concorrentes em endereços distintos, fechamento de aba, restart, retry idempotente após resposta incerta, outbox da integração HTTP, readiness real do Compose e planejamento seguro da migração Supabase.
 - Ruff, fronteira pública, sintaxe JavaScript, contratos de interface/PWA, scanner de segredos e `git diff --check` aprovados.
 - Restore real automatizado: backup cifrado de 2.301.348 bytes, réplica externa idêntica, 10 entidades comparadas (incluindo 12 entregas da outbox), migration `0002_integration_outbox`, cadeia de auditoria válida após restauração e segunda restauração recusada por destino não vazio.
 - UAT visual local: Operação, Meus Paletes, Histórico e Checklist; nove larguras de 320 a 1920 px sem overflow e sem erro de console. Repetição no staging corporativo continua obrigatória.

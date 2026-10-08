@@ -24,6 +24,6 @@ flowchart LR
 - Códigos do Checklist são aleatórios, têm 6 dígitos, validade de 2 minutos, hash no banco, uso único e rate limit persistente.
 - Service workers guardam somente arquivos estáticos. Sem API, as operações fecham com erro; não há fallback local.
 
-As 33 tabelas abrangem identidade, dispositivos, produção, paletes, autorizações, movimentos e locks, códigos, equipamentos, Checklist, pendências, notificações, históricos, auditoria, configuração, rate limit, idempotência, OIDC e eventos técnicos. A lista está em [BANCO-E-API.md](BANCO-E-API.md).
+As 34 tabelas abrangem identidade, dispositivos, produção, paletes, autorizações, movimentos e locks, códigos, equipamentos, Checklist, pendências, notificações, históricos, auditoria, configuração, outbox de integração, rate limit, idempotência, OIDC e eventos técnicos. A lista está em [BANCO-E-API.md](BANCO-E-API.md).
 
 Autorizações são registros próprios e carregam ação, origem, aprovador, validade, estado, motivo e metadados. Isso permite introduzir aprovação por duas pessoas numa migration futura. O recurso não foi habilitado porque a política corporativa ainda não foi fornecida.

@@ -2,14 +2,14 @@
 
 ## Automatizada
 
-- `pytest`: **46 aprovados** em PostgreSQL 17 real; `TEST-RESULTS.xml` guarda o JUnit.
+- `pytest`: **53 aprovados** em PostgreSQL 17 real; `TEST-RESULTS.xml` guarda o JUnit.
 - Ruff em `app`, `tests`, `migrations` e `scripts`: aprovado.
 - `scripts/check_public.py`: tipos públicos, sintaxe JavaScript, ausência de credenciais/dados operacionais e fronteira estática aprovados.
 - `scripts/check_ui_contract.py`: IDs, labels, dialogs, contratos JavaScript/HTML, manifestos, escopos e caches PWA aprovados.
 - `pip-audit` contra `requirements-runtime.lock`: nenhuma vulnerabilidade conhecida; veja `dependency-audit.json`.
 - `app.admin verify-audit` e `app.admin diagnose`: aprovados no banco de validação.
 
-Os testes cobrem login genérico, Argon2id, cookie/sessão/CSRF, RBAC, revogação, última conta TI, rate limit, idempotência/replay, SQL injection, XSS tratado como texto, IDOR/role bypass, transições inválidas, dispositivos e leases, dois operadores em endereços distintos sob concorrência real, autorização BAIXAR/SUBIR, movimento único, timer real de 10 segundos independente do cliente, fechamento da aba, restart, liberação de 90 minutos, EXP-PIC, histórico append-only e filtros, código Checklist entre clientes, validade/uso único, versões de templates, Checklist imutável e visível por outro usuário autorizado, pendências, troca de bateria, CSV/PDF, limites de exportação, rotas públicas, readiness, falha verdadeira de backup sem infraestrutura, cópia externa sem sobrescrita, perda de resposta com repetição idempotente e adaptador HTTP com autenticação, retry, timeout e validação de rotas.
+Os testes cobrem login genérico, Argon2id, cookie/sessão/CSRF, RBAC, revogação, última conta TI, rate limit, idempotência/replay, SQL injection, XSS tratado como texto, IDOR/role bypass, transições inválidas, dispositivos e leases, dois operadores em endereços distintos sob concorrência real, autorização BAIXAR/SUBIR, movimento único, timer real de 10 segundos independente do cliente, fechamento da aba, restart, liberação de 90 minutos, EXP-PIC, histórico append-only e filtros, código Checklist entre clientes, validade/uso único, versões de templates, Checklist imutável e visível por outro usuário autorizado, pendências, troca de bateria, CSV/PDF, limites de exportação, rotas públicas, readiness HTTP no Compose, falha verdadeira de backup sem infraestrutura, cópia externa sem sobrescrita, perda de resposta com repetição idempotente, adaptador HTTP com autenticação/retry/timeout/rotas e análise agregada do snapshot Supabase sem vazamento de dados pessoais ou sobrescrita de arquivos.
 
 ## Backup e restart
 

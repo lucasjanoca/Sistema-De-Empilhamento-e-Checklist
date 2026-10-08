@@ -1,4 +1,4 @@
-# Site Selene 2.2.0-rc.2
+# Site Selene 2.2.0-rc.3
 
 Aplicação operacional do Empilhamento e Checklist, preparada para homologação com uma única fonte de verdade em PostgreSQL. O backend FastAPI decide autenticação, permissões, transições, autorizações, locks, timers, códigos temporários e auditoria. O navegador não armazena dados corporativos nem possui fallback operacional local.
 
@@ -26,3 +26,4 @@ Comece por [docs/IMPLEMENTACAO-EMPRESA.md](docs/IMPLEMENTACAO-EMPRESA.md) e [doc
 - GitHub Pages não é um ambiente suportado para esta versão: autenticação, concorrência, Checklist e dados operacionais dependem do FastAPI e do PostgreSQL.
 - O adaptador e a entrega transacional Selene/EXP-PIC estão implementados, mas permanecem desabilitados até a TI fornecer e homologar o contrato real.
 - Dados do snapshot Supabase não são importados automaticamente; consulte [docs/MIGRACAO-SUPABASE.md](docs/MIGRACAO-SUPABASE.md).
+- O inventário seguro do legado pode ser repetido com `scripts/plan_supabase_migration.py`; ele não escreve no banco e bloqueia suposições sobre campos ausentes.

@@ -1,22 +1,26 @@
-# Rollback
+# Rollback da candidata 2.2.0
 
-## Referência da versão 2.1.2
+## Referências
 
-- Base anterior da `main`: `183ee22`.
-- Tag preservada: `checkpoint-main-pre-backend-20260926`.
-- Esta atualização introduz a migration inicial `0001_operational` para instalações que ainda usavam a versão estática. O rollback da aplicação não deve apagar o banco criado.
-- Versão anterior integrada: tag `site-selene-2.1.1-main`, commit `cd5a62369dc92164313520bee5548b2bb0f69077`.
-- Arquivos materiais desta atualização: interface do Checklist, feedback de conexão e operações, painel técnico do Empilhadores, service workers, contratos de UI e documentação.
+- Candidata: branch `integracao-producao-main`, migrations `0001_operational` e `0002_integration_outbox`.
+- Versão estática anterior da `main`: tag `checkpoint-main-pre-backend-20260926`.
+- Versão integrada anterior: tag `site-selene-2.1.1-main`.
+- Sempre registre o digest exato da imagem aprovada; não use `latest` como referência de rollback.
 
 ## Aplicação
 
-1. Interrompa novas operações no proxy/orquestrador.
-2. Reative a imagem anterior pelo digest ou commit aprovado.
-3. Confirme readiness, login e fluxo não destrutivo.
-4. Registre incidente e intervalo afetado.
+1. Bloqueie novas operações no proxy/orquestrador e registre o horário.
+2. Verifique a outbox; movimentos `PENDING`, `SENDING` ou `FAILED` precisam de decisão operacional antes da troca.
+3. Reative a imagem anterior pelo digest aprovado sem executar downgrade de banco.
+4. Confirme `/health/ready`, login e um fluxo não destrutivo.
+5. Registre incidente, intervalo afetado, IDs de correlação e responsável pela decisão.
 
-Para preparar a versão anterior sem destruir a árvore atual, use um checkout/worktree separado da tag `checkpoint-main-pre-backend-20260926`. Essa referência é a versão estática anterior e não oferece persistência central ou código entre aparelhos; use-a somente como rollback emergencial de interface. Não use `git reset --hard` na cópia operacional. Depois do rollback, confirme que os service workers antigos foram ativados e faça o smoke test de Empilhadores e Checklist.
+A versão estática antiga não oferece persistência central nem código entre aparelhos. Ela serve somente como contingência de interface e não deve receber novos movimentos que precisem ser reconciliados com o banco novo.
 
 ## Banco
 
-Não faça downgrade destrutivo. Crie banco vazio, restaure o backup anterior conforme `BACKUP-RESTORE.md`, valide integridade e contagens, aponte a aplicação anterior para ele durante janela aprovada e preserve o banco substituído para perícia. Dados aceitos depois do backup exigem reconciliação operacional; não os descarte silenciosamente.
+Não execute downgrade destrutivo. Crie banco vazio, restaure o backup anterior, valide migration, contagens, auditoria e integridade, e então troque a conexão numa janela aprovada. Preserve o banco substituído para perícia. Dados aceitos após o backup e confirmações Selene já entregues precisam de reconciliação; nunca os descarte nem reenvie sem verificar a chave de idempotência.
+
+## Migração Supabase
+
+Durante o corte, mantenha o legado somente leitura. Se o novo ambiente for abortado antes de aceitar operações, reabra o legado com autorização de TI. Se o novo ambiente já aceitou qualquer operação, não faça retorno automático: compare movimentos dos dois lados e obtenha decisão conjunta de Negócio/TI. O projeto Supabase é compartilhado; qualquer limpeza deve atingir somente objetos `emp_` explicitamente revisados.

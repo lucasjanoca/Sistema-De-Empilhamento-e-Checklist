@@ -16,7 +16,7 @@ Alembic possui uma cadeia incremental cujo head é `0002_integration_outbox`. A 
 - Operação: estado, produção, paletes/comandos, locais, histórico, auditoria e SSE.
 - Checklist: código criar/revogar/resgatar, estado, templates, registros, equipamentos, pendências e trocas de bateria.
 - Relatórios: CSV/PDF para histórico, produção, auditoria e Checklist.
-- Integração: consultar/configurar/testar; permanece bloqueada sem adaptador homologado.
+- Integração: consultar/configurar/testar/reprocessar; adaptador e outbox estão implementados, mas a ativação permanece bloqueada sem contrato e ambiente oficial homologados.
 - Backup: criar, listar e baixar com permissão e reautenticação; restore somente por CLI.
 
 O contrato exato pode ser lido por TI autenticado em `GET /api/site-selene/openapi.json` com `security:view`.

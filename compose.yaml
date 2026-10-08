@@ -57,10 +57,11 @@ services:
     security_opt: [no-new-privileges:true]
     restart: unless-stopped
     healthcheck:
-      test: [CMD, python, -c, "import socket; s=socket.create_connection(('127.0.0.1',8000),3); s.close()"]
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3).read()"]
       interval: 20s
       timeout: 5s
       retries: 3
+      start_period: 10s
   migrate:
     image: ${SELENE_IMAGE:-site-selene:local}
     build: .
