@@ -175,7 +175,7 @@ def create_pallet(conn, actor, body, request):
                 location_id=loc["id"],
                 address=address,
                 corridor=corridor_for(address, setting(conn, "corridors", [])),
-                operator=body.operator,
+                operator=actor.user["nome"],
                 quantity=body.quantity,
                 reference=body.reference,
                 volumes=body.volumes,

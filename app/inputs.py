@@ -158,7 +158,11 @@ class IntegrationConfig(Input):
     serverBase: str = Field(default="", max_length=300)
     routePending: str = Field(default="", max_length=240)
     routeAttendance: str = Field(default="", max_length=240)
+    routeMovement: str = Field(default="", max_length=240)
+    routeHealth: str = Field(default="", max_length=240)
     codGrupo: str = Field(default="", max_length=60)
     codEmp: str = Field(default="", max_length=60)
     enabled: bool = False
     interval: int = Field(default=10000, ge=5000, le=300000)
+    timeoutSeconds: float = Field(default=8, ge=1, le=30, allow_inf_nan=False)
+    retries: int = Field(default=2, ge=0, le=3)

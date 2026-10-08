@@ -2,6 +2,9 @@
 
 import argparse
 import json
+import hashlib
+import os
+import shutil
 from datetime import timedelta, datetime, timezone
 from pathlib import Path
 from .config import settings
@@ -12,13 +15,35 @@ from .operations import setting
 from .backup import create
 
 
+def replicate_immutable(source, directory):
+    source = Path(source)
+    target_dir = Path(directory).resolve()
+    if not target_dir.is_dir():
+        raise RuntimeError("Destino externo de backup ausente.")
+    copied = []
+    for item in (source, source.with_suffix(source.suffix + ".json")):
+        destination = target_dir / item.name
+        with item.open("rb") as origin, destination.open("xb") as target:
+            os.chmod(destination, 0o600)
+            shutil.copyfileobj(origin, target, 1024 * 1024)
+            target.flush()
+            os.fsync(target.fileno())
+        copied.append(destination)
+    if hashlib.file_digest(copied[0].open("rb"), "sha256").hexdigest() != hashlib.file_digest(source.open("rb"), "sha256").hexdigest():
+        raise RuntimeError("Cópia externa de backup não passou na verificação de integridade.")
+    return str(copied[0])
+
+
 def backup_job(job_id=None):
     cfg = settings()
     if not cfg.backup_directory or not cfg.backup_public_key:
         raise RuntimeError("Backup não configurado pela TI.")
     name = "selene-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f") + ".selene"
     try:
-        result = create(cfg.database_url.get_secret_value(), cfg.backup_public_key, Path(cfg.backup_directory) / name)
+        local_file = Path(cfg.backup_directory) / name
+        result = create(cfg.database_url.get_secret_value(), cfg.backup_public_key, local_file)
+        if cfg.backup_external_directory:
+            result["externalCopy"] = replicate_immutable(local_file, cfg.backup_external_directory)
         with engine().begin() as c:
             at = now(c)
             if job_id:
@@ -39,6 +64,12 @@ def backup_job(job_id=None):
 
 def cleanup():
     # Long-lived evidence remains immutable. Cleanup handles transient artifacts only.
+    cfg = settings()
+    if cfg.backup_directory:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=cfg.backup_retention_days)
+        for item in Path(cfg.backup_directory).glob("selene-*"):
+            if item.is_file() and datetime.fromtimestamp(item.stat().st_mtime, timezone.utc) < cutoff:
+                item.unlink()
     with engine().begin() as c:
         at = now(c)
         policy = setting(c, "retention", {})

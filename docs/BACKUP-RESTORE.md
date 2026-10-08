@@ -4,10 +4,11 @@
 
 ## Rotina
 
-1. Configure `BACKUP_DIRECTORY` em volume privado e `BACKUP_PUBLIC_KEY` com RSA pública de no mínimo 3072 bits.
+1. Configure `BACKUP_DIRECTORY` em volume privado, `BACKUP_EXTERNAL_DIRECTORY` em armazenamento externo/imutável e `BACKUP_PUBLIC_KEY` com RSA pública de no mínimo 3072 bits.
 2. Use uma conta dedicada de leitura quando a política corporativa exigir.
-3. Agende `python -m app.maintenance backup`; copie arquivo e manifesto para armazenamento externo imutável.
-4. Monitore ausência, falha, tamanho anormal e idade. Teste restore periodicamente.
+3. Agende `python -m app.maintenance backup`; o job grava o backup local e replica arquivo e manifesto usando criação exclusiva, sem sobrescrever o destino externo.
+4. Agende `python -m app.maintenance cleanup`; `BACKUP_RETENTION_DAYS` vale apenas para cópias locais. O destino externo não é apagado pela aplicação.
+5. Defina `BACKUP_SCHEDULE_MANAGED=true` somente depois de instalar o agendamento e alerte quando `backupOverdue=true` ou a idade superar `BACKUP_MAX_AGE_HOURS`. Teste restore periodicamente.
 
 ## Restore controlado
 

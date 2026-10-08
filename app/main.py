@@ -77,11 +77,14 @@ async def lifespan(app):
         from cryptography.hazmat.primitives.asymmetric import rsa
 
         backup_dir = Path(cfg.backup_directory)
+        external_backup_dir = Path(cfg.backup_external_directory) if cfg.backup_external_directory else None
         public_key = Path(cfg.backup_public_key)
         if not cfg.backup_directory or not backup_dir.is_dir() or not os.access(backup_dir, os.W_OK):
             raise RuntimeError("Diretório privado de backup ausente ou sem escrita.")
         if not cfg.backup_public_key or not public_key.is_file():
             raise RuntimeError("Chave pública de backup ausente.")
+        if external_backup_dir and (not external_backup_dir.is_dir() or not os.access(external_backup_dir, os.W_OK)):
+            raise RuntimeError("Destino externo de backup ausente ou sem escrita.")
         key = serialization.load_pem_public_key(public_key.read_bytes())
         if not isinstance(key, rsa.RSAPublicKey) or key.key_size < 3072:
             raise RuntimeError("Chave pública RSA de backup inválida.")
@@ -704,8 +707,8 @@ def notifications(action: str, request: Request):
 
 
 @app.get(API + "/history")
-def history(request: Request, q: str = "", page: int = 1):
-    if page < 1 or len(q) > 100:
+def history(request: Request, q: str = "", page: int = 1, request_number: str = "", event: str = ""):
+    if page < 1 or max(map(len, [q, request_number, event])) > 100:
         fail(422, "Filtro inválido.")
 
     def read(c, a):
@@ -721,6 +724,20 @@ def history(request: Request, q: str = "", page: int = 1):
                     t.production_requests.c.number.icontains(q, autoescape=True),
                 )
             )
+        if request_number:
+            query = query.where(t.production_requests.c.number == request_number)
+        event_actions = {
+            "down": ["LOWER_CONFIRMED"],
+            "up": ["RAISE_CONFIRMED"],
+            "release": ["PALLET_AUTHORIZE_LOWER", "PALLET_AUTHORIZE_RAISE", "AUTO_RELEASE"],
+            "cancel": ["PALLET_CANCEL"],
+            "request": ["PALLET_REQUESTED"],
+        }
+        if event:
+            actions = event_actions.get(event)
+            if not actions:
+                fail(422, "Evento inválido.")
+            query = query.where(t.operational_history.c.action.in_(actions))
         result = rows(c, query.order_by(t.operational_history.c.id.desc()).offset((page - 1) * 100).limit(101))
         return {"rows": [views.history_row(r) for r in result[:100]], "hasMore": len(result) > 100, "page": page}
 
@@ -844,30 +861,44 @@ def events(request: Request):
 
 @app.get(API + "/security/status")
 def security_status(request: Request):
-    return run(
-        request,
-        "security:view",
-        {},
-        lambda c, a: {
+    def read(c, a):
+        cfg = settings()
+        last = one(
+            c,
+            sa.select(t.technical_events.c.created_at, t.technical_events.c.details)
+            .where(t.technical_events.c.kind == "BACKUP")
+            .order_by(t.technical_events.c.id.desc())
+            .limit(1),
+        )
+        overdue = not last or last["details"].get("status") != "COMPLETED" or (now(c) - last["created_at"]).total_seconds() > cfg.backup_max_age_hours * 3600
+        return {
             "ok": True,
             "version": __version__,
             "database": "PostgreSQL",
             "passwordStorage": "Argon2id",
-            "sessionCookie": "Secure / HttpOnly / SameSite=Strict" if settings().secure_cookies else "DEVELOPMENT ONLY",
+            "sessionCookie": "Secure / HttpOnly / SameSite=Strict" if cfg.secure_cookies else "DEVELOPMENT ONLY",
             "csrf": True,
             "secureAudit": True,
             "securityHeaders": True,
             "staticIsolation": True,
             "rateLimit": True,
-            "automaticBackups": False,
-            "backupConfigured": bool(settings().backup_directory),
-            "sessionIdleMinutes": settings().idle_seconds // 60,
-            "integrationConfigured": bool(settings().integration_adapter),
+            "automaticBackups": cfg.backup_schedule_managed,
+            "backupConfigured": bool(cfg.backup_directory and cfg.backup_public_key),
+            "externalBackupConfigured": bool(cfg.backup_external_directory),
+            "backupOverdue": overdue,
+            "sessionIdleMinutes": cfg.idle_seconds // 60,
+            "integrationConfigured": bool(cfg.integration_adapter),
             "counts": {
                 "users": c.scalar(sa.select(sa.func.count()).select_from(t.users)),
                 "pallets": c.scalar(sa.select(sa.func.count()).select_from(t.pallet_requests)),
             },
-        },
+        }
+
+    return run(
+        request,
+        "security:view",
+        {},
+        read,
     )
 
 

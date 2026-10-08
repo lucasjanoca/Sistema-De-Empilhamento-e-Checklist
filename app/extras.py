@@ -7,7 +7,8 @@ from sqlalchemy.dialects.postgresql import insert
 from . import schema as t, inputs as inp, views
 from .db import rows
 from .security import audit, fail, rate_limit
-from .integration import validate_base, require_adapter
+from .config import settings
+from .integration import validate_config, require_adapter
 from .queries import production_query, production_row, checklist_query, checklist_row, audit_query
 from .monitoring import snapshot
 
@@ -24,7 +25,8 @@ def register(app, run):
     def config(request: Request):
         def read(c, a):
             value = c.scalar(sa.select(t.integration_settings.c.value).where(t.integration_settings.c.key == "config")) or {}
-            return {"config": value, "configured": bool(value.get("enabled") and value.get("serverBase"))}
+            configured = bool(value.get("enabled") and value.get("serverBase") and settings().integration_adapter == "http-json-v1")
+            return {"config": value, "configured": configured}
 
         return run(
             request,
@@ -36,10 +38,10 @@ def register(app, run):
     @app.put(base + "/integration/config")
     def configure(request: Request, body: inp.IntegrationConfig):
         def action(c, a):
-            validate_base(body.serverBase)
-            if body.enabled:
-                require_adapter()
             value = body.model_dump()
+            validate_config(value)
+            if body.enabled:
+                require_adapter(value)
             c.execute(
                 insert(t.integration_settings)
                 .values(key="config", value=value)
@@ -52,7 +54,13 @@ def register(app, run):
 
     @app.post(base + "/integration/test")
     def test_integration(request: Request):
-        return run(request, "integration:view", {}, lambda c, a: require_adapter())
+        def test(c, a):
+            value = c.scalar(sa.select(t.integration_settings.c.value).where(t.integration_settings.c.key == "config")) or {}
+            result = require_adapter(value).health()
+            audit(c, "INTEGRATION_TESTED", {"ok": True}, a, request)
+            return {"ok": True, "responseType": type(result).__name__}
+
+        return run(request, "integration:view", {}, test)
 
     @app.get(base + "/reports/{kind}.{format}")
     def report(
@@ -195,7 +203,7 @@ def register(app, run):
                     .select_from(t.sessions)
                     .where(t.sessions.c.revoked_at.is_(None), t.sessions.c.expires_at > sa.func.now())
                 ),
-                "integration_configured": False,
+                "integration_configured": bool(settings().integration_adapter),
             },
         )
 

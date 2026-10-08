@@ -29,11 +29,23 @@ services:
       OIDC_MFA_ACR: ${OIDC_MFA_ACR:-}
       REQUIRE_ADMIN_MFA: ${REQUIRE_ADMIN_MFA:-false}
       INTEGRATION_ALLOWED_HOSTS: ${INTEGRATION_ALLOWED_HOSTS:-}
+      INTEGRATION_ADAPTER: ${INTEGRATION_ADAPTER:-}
+      INTEGRATION_AUTH_MODE: ${INTEGRATION_AUTH_MODE:-none}
+      INTEGRATION_BEARER_TOKEN: ${INTEGRATION_BEARER_TOKEN:-}
+      INTEGRATION_API_KEY_NAME: ${INTEGRATION_API_KEY_NAME:-X-API-Key}
+      INTEGRATION_API_KEY_SECRET: ${INTEGRATION_API_KEY_SECRET:-}
+      INTEGRATION_BASIC_USERNAME: ${INTEGRATION_BASIC_USERNAME:-}
+      INTEGRATION_BASIC_PASSWORD: ${INTEGRATION_BASIC_PASSWORD:-}
       BACKUP_DIRECTORY: /backups
+      BACKUP_EXTERNAL_DIRECTORY: /backups-external
       BACKUP_PUBLIC_KEY: /keys/backup-public.pem
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_MAX_AGE_HOURS: ${BACKUP_MAX_AGE_HOURS:-26}
+      BACKUP_SCHEDULE_MANAGED: ${BACKUP_SCHEDULE_MANAGED:-false}
     ports: ["127.0.0.1:8000:8000"]
     volumes:
       - ${BACKUP_DIRECTORY:?Defina diretório privado de backup}:/backups
+      - ${BACKUP_EXTERNAL_DIRECTORY:?Defina diretório externo/imutável de backup}:/backups-external
       - ${BACKUP_PUBLIC_KEY:?Defina caminho da chave pública}:/keys/backup-public.pem:ro
     networks: [private]
     depends_on:

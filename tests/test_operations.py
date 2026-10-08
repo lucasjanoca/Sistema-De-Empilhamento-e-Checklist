@@ -156,3 +156,18 @@ def test_real_timer_and_lifespan_restart(clients):
 def test_operational_day_shift_overnight():
     assert tuple(map(str, operational_day(datetime(2026, 9, 25, 6, 0, tzinfo=timezone.utc)))) == ("2026-09-24", "T3")
     assert tuple(map(str, operational_day(datetime(2026, 9, 25, 8, 0, tzinfo=timezone.utc)))) == ("2026-09-25", "T1")
+
+
+def test_history_filters_by_request_and_event(clients):
+    a = clients()
+    pid = prepare(a)
+    assert a.command(pid, "lower").status_code == 200
+    due(pid)
+    state = a.get("/state").json()["data"]
+    number = next(item["number"] for item in state["productionRequests"] if item["status"] == "open")
+
+    result = a.get(f"/history?request_number={number}&event=down")
+
+    assert result.status_code == 200
+    assert result.json()["rows"]
+    assert all(row["requestNumber"] == number and row["action"] == "LOWER_CONFIRMED" for row in result.json()["rows"])

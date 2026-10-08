@@ -2,12 +2,12 @@
 
 ## Pré-requisitos
 
-Docker Engine com Compose, reverse proxy corporativo com TLS, hostname aprovado, PostgreSQL 17 e armazenamento privado para backup. A TI deve gerar todos os segredos; `.env.example` não contém padrões utilizáveis.
+Docker Engine com Compose, reverse proxy corporativo com TLS, hostname aprovado, PostgreSQL 17, armazenamento privado local e destino externo/imutável para backup. A TI deve gerar todos os segredos; `.env.example` não contém padrões utilizáveis.
 
 ## Primeira instalação
 
 1. Mantenha este repositório em área privada e faça checkout do commit aprovado.
-2. Copie `.env.example` para um arquivo fora do Git. Preencha banco, origem HTTPS, URLs das contas proprietária e runtime, `SESSION_SECRET` aleatório com no mínimo 32 caracteres, caminhos de backup e IPs exatos do proxy.
+2. Copie `.env.example` para um arquivo fora do Git. Preencha banco, origem HTTPS, URLs das contas proprietária e runtime, `SESSION_SECRET` aleatório com no mínimo 32 caracteres, caminhos local/externo de backup e IPs exatos do proxy.
 3. Gere uma chave RSA de backup de no mínimo 3072 bits. Monte somente a chave pública na aplicação; guarde a privada cifrada no cofre de recuperação.
 4. Suba o banco: `docker compose up -d db`.
 5. Num job administrativo efêmero com `MIGRATION_DATABASE_URL`, execute `python -m alembic upgrade head`.
@@ -28,7 +28,7 @@ O proxy termina TLS, redireciona HTTP para HTTPS e preserva `Host` e `X-Forwarde
 4. Verifique readiness, login, dispositivo, produção, Empilhamento, Checklist, métricas e cadeia de auditoria.
 5. Para falha, siga [ROLLBACK.md](ROLLBACK.md); não execute downgrade destrutivo no banco operacional.
 
-Antes de promover a versão 2.1.2, execute `python scripts/homologate.py`, percorra `PILOTO-CONTROLADO.md` e registre o commit/digest aprovado. Os service workers usam caches separados `selene-checklist-2.1.2` e `selene-empilhadores-2.1.2`, ativam a nova versão e removem somente caches antigos do próprio módulo.
+Antes de promover a versão 2.2.0, execute `python scripts/homologate.py`, percorra `PILOTO-CONTROLADO.md` e registre o commit/digest aprovado. Os service workers usam caches separados `selene-checklist-2.2.0-rc.1` e `selene-empilhadores-2.2.0-rc.1`, ativam a nova versão e removem somente caches antigos do próprio módulo.
 
 ## Teste local
 

@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Site Selene 2.0 — Gestão de Paletes</title>
   <link rel="stylesheet" href="assets/app.bundle.css">
   <link rel="stylesheet" href="assets/operation-focus.css">
@@ -25,13 +28,13 @@
         </a>
       </h1>
 
-      <p class="login-subtitle">Entre com seu acesso de Emp, Encarregado ou TI.</p>
+      <p class="login-subtitle">Entre com o número do crachá e sua senha.</p>
 
       <form id="loginForm" class="login-form">
         <label class="field">
-          <span class="field-label">▣ Matrícula</span>
-          <input id="loginMatricula" type="text" autocomplete="username"
-                 placeholder="Digite sua matrícula" required>
+          <span class="field-label">▣ Número do crachá</span>
+          <input id="loginMatricula" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="username"
+                 placeholder="Ex.: 0174340" required>
         </label>
 
         <label class="field">
@@ -103,6 +106,7 @@
       <nav class="sidebar-nav">
         <button class="nav-button active" data-view="painel" data-permission="dashboard">⌂ Painel geral</button>
         <button class="nav-button" data-view="operacao" data-permission="operate">▦ Operação</button>
+        <button class="nav-button" data-view="meus-paletes" data-permission="operate">▣ Meus Paletes</button>
         <button class="nav-button" data-view="requisicoes" data-permission="manageRequests">▤ Requisições</button>
         <button class="nav-button" data-view="usuarios" data-permission="manageUsers">♙ Usuários</button>
         <button class="nav-button" data-view="historico" data-permission="history">◷ Histórico</button>
@@ -127,8 +131,7 @@
         <div class="topbar-actions">
           <span id="centralSyncBadge" class="central-sync-badge local">Conectando ao servidor…</span>
           <button id="currentTabletBadge" class="tablet-topbar-badge" type="button" title="Trocar tablet">Tablet: selecionar</button>
-          <span id="currentUserLabel" class="current-user"></span>
-          <span id="currentProductionRequest" class="production-request-badge hidden"></span>
+          <span id="currentUserLabel" class="current-user"></span>          <span id="currentProductionRequest" class="production-request-badge hidden"></span>
           <div class="notification-center">
             <button id="notificationButton" class="notification-button" type="button" aria-label="Notificações" aria-expanded="false">♧<span id="notificationCount" class="notification-count hidden">0</span></button>
             <section id="notificationPanel" class="notification-panel" aria-label="Central de notificações">
@@ -298,6 +301,25 @@
       </section>
 
 
+      <!-- MEUS PALETES -->
+      <section id="view-meus-paletes" class="view">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Meus Paletes</h3>
+              <p>Paletes solicitados ou movimentados pelo usuário logado.</p>
+            </div>
+            <button id="refreshMyPallets" class="btn btn-soft" type="button">↻ Atualizar</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Palet</th><th>Status</th><th>Corredor</th><th>Requisição</th><th>Origem</th><th>Última ação</th></tr></thead>
+              <tbody id="myPalletsBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
       <!-- REQUISIÇÕES DE PRODUÇÃO — ENCARREGADO / TI -->
       <section id="view-requisicoes" class="view">
         <div class="production-page">
@@ -430,7 +452,7 @@
             <div>
               <span class="production-eyebrow">GESTÃO DE ACESSOS</span>
               <h3>Gerenciar usuários</h3>
-              <p>Crie acessos para empilhadores sem precisar alterar os arquivos do site.</p>
+              <p>Cadastre Nome, Crachá e Senha. O crachá é usado no login; o nome identifica as ações no sistema.</p>
             </div>
             <div class="production-hero-icon">♙</div>
           </section>
@@ -440,7 +462,7 @@
               <div class="panel-header">
                 <div>
                   <h3>Criar novo usuário</h3>
-                  <p>O empilhador inicia uma requisição para registrar sua produção.</p>
+                  <p>O nome cadastrado será exibido em requisições, movimentações, histórico e registros do operador.</p>
                 </div>
               </div>
               <form id="createUserForm" class="panel-body user-form">
@@ -449,8 +471,8 @@
                   <input id="newUserName" autocomplete="off" placeholder="" required>
                 </label>
                 <label class="field">
-                  <span class="field-label">Matrícula</span>
-                  <input id="newUserMatricula" autocomplete="off" placeholder="" required>
+                  <span class="field-label">Número do crachá</span>
+                  <input id="newUserMatricula" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Ex.: 0174340" required>
                 </label>
                 <label class="field">
                   <span class="field-label">Senha inicial</span>
@@ -465,7 +487,7 @@
                   </select>
                 </label>
                 <button class="btn btn-primary btn-full" type="submit">Criar usuário</button>
-                <p class="user-storage-note">No modo servidor, os acessos podem ser centralizados. Em produção, o TI poderá manter essa autenticação ou integrar ao padrão corporativo.</p>
+                <p class="user-storage-note">A conta é salva no PostgreSQL do servidor. O crachá é usado para entrar; o nome identifica o operador nas ações.</p>
               </form>
             </section>
 
@@ -490,10 +512,22 @@
               <h3>Histórico completo</h3>
               <p>Registro das movimentações realizadas.</p>
             </div>
-            <div class="panel-actions"><button id="exportHistoryCsv" class="btn btn-soft" type="button">Exportar CSV</button><label class="history-search" aria-label="Pesquisar histórico">
-              <span>⌕</span>
-              <input id="historySearchInput" type="search" placeholder="Pesquisar requisição, palet, data ou operador...">
-            </label></div>
+            <div class="panel-actions">
+              <select id="historyRequestFilter" aria-label="Filtrar por requisição"><option value="">Todas as requisições</option></select>
+              <select id="historyEventFilter" aria-label="Filtrar por evento">
+                <option value="">Todos os eventos</option>
+                <option value="down">Descidas</option>
+                <option value="up">Subidas</option>
+                <option value="release">Liberações</option>
+                <option value="cancel">Cancelamentos</option>
+                <option value="request">Requisições</option>
+              </select>
+              <button id="exportHistoryCsv" class="btn btn-soft" type="button">Exportar CSV</button>
+              <label class="history-search" aria-label="Pesquisar histórico">
+                <span>⌕</span>
+                <input id="historySearchInput" type="search" placeholder="Pesquisar requisição, palet, operador ou equipamento...">
+              </label>
+            </div>
           </div>
 
           <div class="table-wrapper">
@@ -503,8 +537,9 @@
                   <th>Data/Hora</th>
                   <th>Requisição</th>
                   <th>Palet</th>
-                  <th>Ação</th>
-                  <th>Operador</th>
+                  <th>Evento</th>
+                  <th>Responsável</th>
+                  <th>Equipamento</th>
                 </tr>
               </thead>
               <tbody id="historyTable"></tbody>
@@ -549,7 +584,7 @@
                 <div><span>Armazenamento</span><b id="storageMode">Neste navegador</b></div>
                 <div><span>Integração Selene</span><b id="integrationMode">Verificando...</b></div>
               </div>
-              <p class="settings-help">A movimentação oficial permanece bloqueada até o TI validar os parâmetros completos da API.</p>
+              <p class="settings-help">A integração de escrita com o sistema oficial permanece bloqueada até o TI validar as rotas, autenticação e parâmetros da API interna. A operação do Site Selene funciona de forma independente.</p>
             </section>
             <section class="settings-block">
               <h4>Dados operacionais compartilhados</h4>
@@ -615,8 +650,12 @@
             <label><span>Código da empresa</span><input id="techCodEmp" type="text" placeholder="Definir"></label>
             <label><span>Rota de leitura · pendentes</span><input id="techRoutePending" type="text" placeholder="Definir pelo TI"></label>
             <label><span>Rota de leitura · em atendimento</span><input id="techRouteAttendance" type="text" placeholder="Definir pelo TI"></label>
+            <label><span>Rota de escrita · movimentação</span><input id="techRouteMovement" type="text" placeholder="Definir após homologação"></label>
+            <label><span>Rota de verificação</span><input id="techRouteHealth" type="text" placeholder="Opcional"></label>
             <label><span>Atualização (segundos)</span><input id="techInterval" type="number" min="5" max="300" step="1" value="10"></label>
-            <label class="tech-switch"><input id="techIntegrationEnabled" type="checkbox" checked><span>Ativar leitura automática da Selene</span></label>
+            <label><span>Tempo limite (segundos)</span><input id="techTimeout" type="number" min="1" max="30" step="1" value="8"></label>
+            <label><span>Novas tentativas</span><input id="techRetries" type="number" min="0" max="3" step="1" value="2"></label>
+            <label class="tech-switch"><input id="techIntegrationEnabled" type="checkbox"><span>Ativar integração homologada</span></label>
           </div>
           <div class="tech-wizard-actions"><button id="techSaveIntegration" class="btn btn-primary" type="button">Salvar configuração</button><button id="techTestConnection" class="btn btn-secondary" type="button">Testar conexão e leitura</button><button id="techRefreshSelene" class="btn btn-soft" type="button">Atualizar paletes agora</button></div>
           <div id="techConnectionResult" class="tech-test-result neutral"><b>Aguardando validação.</b><small>Use “Testar conexão e leitura” após o TI informar os parâmetros do ambiente.</small></div>
@@ -630,7 +669,7 @@
           <section class="panel">
             <div class="panel-header"><div><h3>3. Ferramentas do TI</h3><p>Ações para suporte, análise e implantação.</p></div><span class="ti-only-pill">SOMENTE TI</span></div>
             <div class="panel-body technical-actions">
-              <button id="techForceSync" class="btn btn-primary" type="button">Sincronizar dados do servidor local</button>
+              <button id="techForceSync" class="btn btn-primary" type="button">Sincronizar dados do servidor</button>
               <button id="techCopyGuide" class="btn btn-secondary" type="button">Copiar roteiro de integração</button>
               <button id="techDownloadMap" class="btn btn-soft" type="button">Baixar mapa de integração</button>
               <button id="techDownloadSnapshot" class="btn btn-light" type="button">Exportar snapshot técnico</button>
@@ -639,7 +678,7 @@
         </div>
 
         <section class="panel tech-guide-panel">
-          <div class="panel-header"><div><h3>4. O que falta para integrar de verdade</h3><p>Checklist de trabalho para o TI. A escrita permanece bloqueada até todos os itens críticos serem confirmados.</p></div><span class="tech-safe-pill">ESCRITA PROTEGIDA</span></div>
+          <div class="panel-header"><div><h3>4. Integração com o sistema oficial</h3><p>A operação do Site Selene já é centralizada. Esta etapa serve apenas para conectar leitura/escrita à API corporativa quando o TI fornecer os dados oficiais.</p></div><span class="tech-safe-pill">ESCRITA PROTEGIDA</span></div>
           <div class="tech-guide-layout">
             <ol class="tech-checklist">
               <li><b>Validar acesso à API</b><span>Confirmar servidor, grupo e empresa e executar a validação de leitura acima.</span></li>
@@ -705,7 +744,8 @@
 
       <label class="field">
         <span class="field-label">Solicitante</span>
-        <input id="requestOperator" required>
+        <input id="requestOperator" readonly required>
+        <small>Preenchido automaticamente com o nome da conta logada.</small>
       </label>
 
       <div class="request-extra-fields"><label class="field">Quantidade<input id="requestQuantity" type="number" min="1" max="1000" value="1" required></label><label class="field">Referência<input id="requestReference" maxlength="100"></label><label class="field">Volumes<input id="requestVolumes" type="number" min="0" max="1000000"></label><label class="field">Observação<textarea id="requestNote" maxlength="1000"></textarea></label><label><input id="requestIdentified" type="checkbox"> Identificação conferida</label><label><input id="requestStretch" type="checkbox"> Stretch conferido</label></div><label class="pic-option">

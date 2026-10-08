@@ -117,6 +117,7 @@ const UI = (() => {
     const meta = {
       painel:['Painel geral','Visão rápida da operação e das prioridades.'],
       operacao:['Operação','Controle de movimentação dos paletes.'],
+      'meus-paletes':['Meus Paletes','Solicitações e movimentações vinculadas ao seu usuário.'],
       requisicoes:['Requisições','Produção registrada por empilhador.'],
       usuarios:['Usuários','Criação, perfis e gerenciamento de acessos.'],
       historico:['Histórico','Registro completo das movimentações.'],
@@ -776,7 +777,7 @@ const Operation = (() => {
 
 const History = (() => {
   let page=1,remoteRows=null,hasMore=false,queryTimer;
-  async function load(){if(!Permissions.can('history'))return;try{const r=await SeleneApi.request('/history?page='+page+'&q='+encodeURIComponent(UI.$('historySearchInput').value));remoteRows=r.rows;hasMore=r.hasMore;render();}catch(e){UI.toast(e.message);}}
+  async function load(){if(!Permissions.can('history'))return;try{const params=new URLSearchParams({page:String(page),q:UI.$('historySearchInput').value,request_number:UI.$('historyRequestFilter')?.value||'',event:UI.$('historyEventFilter')?.value||''});const r=await SeleneApi.request('/history?'+params);remoteRows=r.rows;hasMore=r.hasMore;render();}catch(e){UI.toast(e.message);}}
   function escapeHtml(value=''){
     return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[char]);
   }
@@ -816,21 +817,32 @@ const History = (() => {
         <td>${escapeHtml(item.address)}</td>
         <td>${escapeHtml(item.action)}</td>
         <td>${escapeHtml(item.operator)}</td>
+        <td>${escapeHtml(item.tabletName||'—')}</td>
       </tr>`).join('') : `
-      <tr><td colspan="5"><div class="empty">Nenhum registro encontrado na pesquisa.</div></td></tr>`;
+      <tr><td colspan="6"><div class="empty">Nenhum registro encontrado na pesquisa.</div></td></tr>`;
     UI.$('liveDown').textContent = history.filter(h => h.direction === 'down').length;
     UI.$('liveUp').textContent = AppState.getData().metrics.up||0;
     UI.$('historyPage').textContent='Página '+page;UI.$('historyPrev').disabled=page<=1;UI.$('historyNext').disabled=!hasMore;
   }
   function init(){
     UI.$('historySearchInput')?.addEventListener('input',()=>{clearTimeout(queryTimer);queryTimer=setTimeout(()=>{page=1;load();},300);});
+    for(const id of ['historyRequestFilter','historyEventFilter'])UI.$(id)?.addEventListener('change',()=>{page=1;load();});
     UI.$('historyPrev').onclick=()=>{page--;load();};UI.$('historyNext').onclick=()=>{page++;load();};document.addEventListener('view:changed',e=>{if(e.detail.name==='historico')load();});
     document.addEventListener('app:data-changed',()=>{
+      const select=UI.$('historyRequestFilter');if(select){const selected=select.value;select.innerHTML='<option value="">Todas as requisições</option>'+AppState.getData().productionRequests.map(r=>`<option value="${escapeHtml(r.number)}">${escapeHtml(r.number)}</option>`).join('');select.value=selected;}
       if(UI.$('view-historico')?.classList.contains('active')) render();
     });
   }
   return { init, render };
 })();;
+
+const MyPallets = (() => {
+  const labels={waiting:'Aguardando',lowering:'Descendo',floor:'No chão',ready:'Liberado',returning:'Subindo'};
+  function rows(){const user=AppState.getUser();if(!user)return[];return AppState.getData().requests.filter(r=>r.createdBy===user.id||r.assignedTo===user.id||r.lastHandledByMatricula===user.matricula);}
+  function render(){const body=UI.$('myPalletsBody');if(!body)return;const items=rows();body.innerHTML=items.length?items.map(r=>`<tr><td>${escapeHtml(r.address)}</td><td>${escapeHtml(labels[r.status]||r.status)}</td><td>${escapeHtml(r.corridor||'—')}</td><td>${escapeHtml(r.requestNumber||'—')}</td><td>${r.external?'Integração externa':'Site Selene'}</td><td>${escapeHtml(r.lastHandledByName||r.operator||'—')}</td></tr>`).join(''):'<tr><td colspan="6"><div class="empty">Nenhum palete vinculado ao seu usuário.</div></td></tr>';}
+  function init(){UI.$('refreshMyPallets')?.addEventListener('click',()=>DataSync.refresh().catch(e=>UI.toast(e.message)));document.addEventListener('view:changed',e=>{if(e.detail.name==='meus-paletes')render();});document.addEventListener('app:data-changed',()=>{if(UI.$('view-meus-paletes')?.classList.contains('active'))render();});}
+  return {init,render};
+})();
 
 const Indicators = (() => {
   function render(){
@@ -1311,10 +1323,10 @@ const Notifications = (() => {
 
 const SeleneIntegration=(()=>{
   let config={enabled:false};
-  const guide='Integração externa aguardando contrato oficial. TI deve informar ambiente de homologação, autenticação, endpoints, parâmetros, estados, EXP-PIC, idempotência e regras de conflito. Nenhuma movimentação externa é aceita sem homologação.';
+  const guide='O adaptador HTTP JSON existe, mas nasce desativado. TI deve homologar host HTTPS, autenticação, endpoints, parâmetros, estados, EXP-PIC, idempotência e conflitos. Segredos são variáveis exclusivas do servidor; nenhuma credencial é salva neste painel.';
   async function loadServerConfig(){if(Permissions.can('integration'))config=(await SeleneApi.request('/integration/config')).config;return config;}
   function init(){const el=document.createElement('span');el.id='seleneConnectionBadge';el.className='selene-badge selene-off';el.textContent='Selene externa: não configurada';document.querySelector('.topbar')?.append(el);}
-  return {init,loadServerConfig,getSettings:()=>config,saveSettings:async input=>{config=(await SeleneApi.mutate('/integration/config',input,'PUT')).config;return config;},refresh:()=>SeleneApi.mutate('/integration/test'),testConnection:()=>SeleneApi.mutate('/integration/test'),integrationGuide:()=>guide,integrationMap:()=>({architecture:'Navegador → Site Selene → PostgreSQL',external:'Contrato pendente de TI',writeEnabled:false})};
+  return {init,loadServerConfig,getSettings:()=>config,saveSettings:async input=>{config=(await SeleneApi.mutate('/integration/config',input,'PUT')).config;return config;},refresh:()=>SeleneApi.mutate('/integration/test'),testConnection:()=>SeleneApi.mutate('/integration/test'),integrationGuide:()=>guide,integrationMap:()=>({architecture:'Navegador → API do Site Selene → PostgreSQL / adaptador externo',external:config.enabled?'Ativada no servidor':'Desativada',writeEnabled:Boolean(config.enabled&&config.routeMovement)})};
 })();
 const Reports=(()=>{
   function download(kind,format){const filters=kind==='production'?{q:UI.$('productionNumberFilter').value,user:UI.$('productionUserFilter').value,status:UI.$('productionStatusFilter').value,date_from:UI.$('productionDateFrom').value,date_to:UI.$('productionDateTo').value}:kind==='history'?{q:UI.$('historySearchInput').value}:{q:UI.$('auditSearchInput').value,date_from:UI.$('auditDateFrom').value,date_to:UI.$('auditDateTo').value};return SeleneApi.download(`/reports/${kind}.${format}?`+new URLSearchParams(filters),`selene-${kind}.${format}`).catch(e=>UI.toast(e.message));}
@@ -1337,20 +1349,20 @@ const TechnicalPanel=(()=>{
     const rows=[['Banco',s.database],['Usuários',s.counts.users],['Paletes registrados',s.counts.pallets],['Backup automático',s.automaticBackups?'Ativo':'Não configurado'],['Integração externa',s.integrationConfigured?'Configurada':'Não configurada']];
     UI.$('techDiagnostics').innerHTML=rows.map(([a,b])=>`<div><span>${escapeHtml(a)}</span><b>${escapeHtml(b)}</b></div>`).join('');
     UI.$('techSecurityDetails').innerHTML=[['Senhas',s.passwordStorage],['Sessão',s.sessionCookie],['CSRF',s.csrf?'Ativo':'Inativo'],['Auditoria','Append-only / verificação por CLI'],['Cabeçalhos',s.securityHeaders?'Ativos':'Inativos'],['Inatividade',s.sessionIdleMinutes+' minutos']].map(([a,b])=>`<article><span>${escapeHtml(a)}</span><b>${escapeHtml(b)}</b></article>`).join('');
-    for(const [id,key] of Object.entries({techApiBase:'serverBase',techCodGrupo:'codGrupo',techCodEmp:'codEmp',techRoutePending:'routePending',techRouteAttendance:'routeAttendance'}))UI.$(id).value=c[key]||'';
-    UI.$('techInterval').value=(c.interval||10000)/1000;UI.$('techIntegrationEnabled').checked=!!c.enabled;UI.$('techIntegrationNotes').value=AppState.getData().settings.tiIntegrationNotes||'';
+    for(const [id,key] of Object.entries({techApiBase:'serverBase',techCodGrupo:'codGrupo',techCodEmp:'codEmp',techRoutePending:'routePending',techRouteAttendance:'routeAttendance',techRouteMovement:'routeMovement',techRouteHealth:'routeHealth'}))UI.$(id).value=c[key]||'';
+    UI.$('techInterval').value=(c.interval||10000)/1000;UI.$('techTimeout').value=c.timeoutSeconds||8;UI.$('techRetries').value=c.retries??2;UI.$('techIntegrationEnabled').checked=!!c.enabled;UI.$('techIntegrationNotes').value=AppState.getData().settings.tiIntegrationNotes||'';
   }catch(e){UI.toast(e.message);}}
   function init(){
     document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});UI.$('techRefresh').onclick=render;UI.$('techForceSync').onclick=()=>DataSync.refresh().catch(e=>UI.toast(e.message));
     for(const id of ['techTestConnection','techRefreshSelene'])UI.$(id).onclick=async()=>{const result=UI.$('techConnectionResult');result.textContent='Verificando integração…';result.className='tech-test-result neutral';try{await SeleneIntegration.testConnection();result.textContent='Conexão validada pelo servidor.';result.className='tech-test-result ok';}catch(e){result.textContent=e.message;result.className='tech-test-result error';}};
-    UI.$('techSaveIntegration').onclick=async()=>{try{await SeleneIntegration.saveSettings({serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,interval:Number(UI.$('techInterval').value)*1000,enabled:UI.$('techIntegrationEnabled').checked});UI.toast('Configuração registrada.');}catch(e){UI.toast(e.message);}};
+    UI.$('techSaveIntegration').onclick=async()=>{try{await SeleneIntegration.saveSettings({serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,routeMovement:UI.$('techRouteMovement').value,routeHealth:UI.$('techRouteHealth').value,interval:Number(UI.$('techInterval').value)*1000,timeoutSeconds:Number(UI.$('techTimeout').value),retries:Number(UI.$('techRetries').value),enabled:UI.$('techIntegrationEnabled').checked});UI.toast('Configuração registrada.');}catch(e){UI.toast(e.message);}};
     UI.$('techSaveNotes').onclick=()=>DataSync.command('/settings/ti-notes',{value:UI.$('techIntegrationNotes').value},'PUT');UI.$('techCopyGuide').onclick=()=>navigator.clipboard.writeText(SeleneIntegration.integrationGuide()).then(()=>UI.toast('Roteiro copiado.')).catch(()=>UI.toast('Selecione o roteiro para copiar.'));
     UI.$('techDownloadMap').onclick=()=>downloadJson('selene-mapa-integracao.json',SeleneIntegration.integrationMap());UI.$('techDownloadSnapshot').onclick=async()=>{if(!lastSnapshot)await render();if(lastSnapshot)downloadJson('selene-snapshot-tecnico.json',lastSnapshot);else UI.toast('Não foi possível montar o snapshot técnico.');};
   }
   return {init,render};
 })();
 document.addEventListener('DOMContentLoaded',async()=>{
-  TabletManager.init();Auth.init();Operation.init();History.init();ProductionRequests.init();UsersAdmin.init();Reports.init();Audit.init();Dashboard.init();Notifications.init();DataSync.init();DataTools.init();TechnicalPanel.init();SeleneIntegration.init();
+  TabletManager.init();Auth.init();Operation.init();History.init();MyPallets.init();ProductionRequests.init();UsersAdmin.init();Reports.init();Audit.init();Dashboard.init();Notifications.init();DataSync.init();DataTools.init();TechnicalPanel.init();SeleneIntegration.init();
   UI.$('menuButton').onclick=UI.openMenu;UI.$('closeMenu').onclick=UI.closeMenu;UI.$('overlay').onclick=UI.closeMenu;
   document.querySelectorAll('.nav-button').forEach(b=>b.onclick=()=>UI.openView(b.dataset.view));
   document.addEventListener('security:expired',()=>{AppState.clear();SeleneApi.clear();location.replace('/empilhadores/');},{once:true});

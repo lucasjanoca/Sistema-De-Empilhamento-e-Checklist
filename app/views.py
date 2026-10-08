@@ -121,7 +121,7 @@ def metrics(conn, actor):
 def state(conn, actor):
     at = now(conn)
     data = dict(
-        version="2.1.2",
+        version="2.2.0-rc.1",
         requests=[],
         history=[],
         productionRequests=[],
@@ -143,8 +143,8 @@ def state(conn, actor):
         ):
             m = one(
                 conn,
-                sa.select(t.pallet_movements, t.users.c.nome, t.users.c.matricula, t.devices.c.name)
-                .select_from(t.pallet_movements.join(t.users).join(t.devices))
+                sa.select(t.pallet_movements, t.users.c.nome, t.users.c.matricula, t.devices.c.name, t.production_requests.c.number)
+                .select_from(t.pallet_movements.join(t.users).join(t.devices).join(t.production_requests))
                 .where(t.pallet_movements.c.pallet_request_id == r["id"])
                 .order_by(t.pallet_movements.c.id.desc())
                 .limit(1),
@@ -174,7 +174,9 @@ def state(conn, actor):
                     unlockedAt=ms(r["ready_at"]),
                     dueAt=ms(r["due_at"]),
                     external=bool(r["external_ref"]),
+                    createdBy=r["created_by"],
                     assignedTo=r["assigned_to"],
+                    requestNumber=m["number"] if m else "",
                     lastHandledByName=m["nome"] if m else "",
                     lastHandledByMatricula=m["matricula"] if m else "",
                     lastHandledTablet=m["name"] if m else "",
