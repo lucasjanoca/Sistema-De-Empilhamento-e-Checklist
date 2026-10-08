@@ -19,7 +19,7 @@ A candidata está pronta para revisão e implantação em staging privado. Produ
 
 ## Checklist de promoção
 
-- [x] CI verde no commit anterior da PR e validação local completa; repetir no commit final antes da aprovação.
+- [x] CI 2/2 verde no commit candidato e validação local completa; exigir o mesmo no commit final antes da aprovação.
 - [ ] Revisão independente e proteção da `main` contra push direto/merge sem checks.
 - [ ] Staging HTTPS acessível apenas à equipe autorizada.
 - [ ] Segredos fornecidos por cofre; nenhum valor real no repositório ou no frontend.
