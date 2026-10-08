@@ -36,6 +36,18 @@ jobs:
       - run: python scripts/check_ui_contract.py
       - run: python scripts/scan_secrets.py
       - run: python -m pip_audit -r requirements-runtime.lock --no-deps --disable-pip
+      - name: Validate deployment manifest
+        env:
+          POSTGRES_DB: selene_staging
+          POSTGRES_OWNER: selene_owner
+          POSTGRES_OWNER_PASSWORD: compose-validation-only
+          TRUSTED_PROXY_IPS: 127.0.0.1
+          BACKUP_DIRECTORY: /tmp/selene-backups
+          BACKUP_EXTERNAL_DIRECTORY: /tmp/selene-backups-external
+          BACKUP_PUBLIC_KEY: /tmp/selene-backup-public.pem
+        run: docker compose config --quiet
+      - name: Build production image
+        run: docker build --tag "site-selene:${{ github.sha }}" .
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: test-results, path: test-results.xml}
