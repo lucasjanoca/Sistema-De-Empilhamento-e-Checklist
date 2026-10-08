@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-08",
+  "environment": "local PostgreSQL test database; not corporate staging",
+  "browser": "Codex in-app browser",
+  "viewports": [320, 375, 430, 768, 1024, 1280, 1366, 1440, 1920],
+  "screens": {
+    "operation": {
+      "loaded": true,
+      "serverBackedCounters": true,
+      "pageHorizontalOverflow": false
+    },
+    "myPallets": {
+      "loaded": true,
+      "columns": ["Palet", "Status", "Corredor", "Requisição", "Origem", "Última ação"]
+    },
+    "history": {
+      "loaded": true,
+      "filters": ["requisição", "evento", "pesquisa"],
+      "columns": ["Data/Hora", "Requisição", "Palet", "Evento", "Responsável", "Equipamento"],
+      "pageHorizontalOverflow": false
+    },
+    "checklist": {
+      "codeAccessLoaded": true,
+      "pageHorizontalOverflow": false
+    }
+  },
+  "consoleErrors": 0,
+  "result": "passed",
+  "productionCaveat": "Repeat business UAT on the corporate staging network and devices before production."
+}

@@ -1,23 +1,27 @@
 {
   "backup": {
-    "file": "cce1dd6a1ff96b1f.selene",
-    "createdAt": "2026-09-25T21:33:40.876689+00:00",
-    "bytes": 179032,
-    "sha256": "737c52a75ebd1dc04d92ba81ab8dcde2bce052bb91d232d9ac3c55dec10ec544",
+    "file": "selene-exercise.selene",
+    "createdAt": "2026-10-08T21:41:30.445207+00:00",
+    "bytes": 1740041,
+    "sha256": "2e3df9a856e3dd9676db305985c4f892959ac615628515bb9223adfd1c420432",
     "format": "PostgreSQL custom / AES-256-GCM / RSA-OAEP-SHA256"
   },
-  "restore": "verified",
+  "restore": "verified_in_disposable_database",
+  "restoreDatabase": "selene_restore_test",
   "tableCounts": {
-    "users": 59,
-    "audit_log": 284,
-    "operational_history": 84,
-    "pallet_requests": 16,
-    "pallet_movements": 18,
-    "checklist_records": 3,
-    "checklist_answers": 3,
-    "equipment": 7,
-    "battery_swaps": 2,
-    "refuses_nonempty_target": true
+    "users": 755,
+    "audit_log": 3729,
+    "operational_history": 1055,
+    "pallet_requests": 179,
+    "pallet_movements": 201,
+    "checklist_records": 61,
+    "checklist_answers": 61,
+    "equipment": 140,
+    "battery_swaps": 40,
+    "alembic_version": "0001_operational"
   },
-  "auditHeadMatches": true
+  "auditHeadMatches": true,
+  "auditChainValidAfterRestore": true,
+  "externalCopyMatches": true,
+  "refusesNonEmptyTarget": true
 }

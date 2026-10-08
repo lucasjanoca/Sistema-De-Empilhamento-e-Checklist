@@ -19,3 +19,7 @@
 5. Verifique contagens, constraints, usuários, movimentos, Checklist e cabeça da auditoria; registre o ensaio.
 
 Esta entrega restaurou o backup num segundo banco e comparou entidades e cabeça da auditoria. `EVIDENCIA-BACKUP.json` contém a evidência; chaves e dumps de teste não entram no pacote.
+
+## Ensaio automatizado de recovery
+
+Com `ENVIRONMENT=test`, `DATABASE_URL`, `SESSION_SECRET`, `TEST_ADMIN_URL` e `TEST_RESTORE_URL` configurados, execute `python scripts/verify_backup_restore.py`. O nome do destino deve terminar em `_restore_test`; o script recria e remove somente esse banco descartável, gera uma chave RSA temporária, cifra o dump, confirma a cópia externa, restaura, compara contagens/migration/cabeça e cadeia da auditoria e comprova que um destino não vazio é recusado. A chave e o dump vivem apenas em diretório temporário.

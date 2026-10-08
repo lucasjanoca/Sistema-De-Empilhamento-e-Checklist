@@ -171,3 +171,37 @@ def test_history_filters_by_request_and_event(clients):
     assert result.status_code == 200
     assert result.json()["rows"]
     assert all(row["requestNumber"] == number and row["action"] == "LOWER_CONFIRMED" for row in result.json()["rows"])
+
+
+def test_two_operators_can_move_different_addresses_concurrently(clients):
+    a = clients()
+    b = clients()
+    first = prepare(a)
+    second = prepare(b)
+    with ThreadPoolExecutor(2) as pool:
+        results = list(pool.map(lambda pair: pair[0].command(pair[1], "lower").status_code, [(a, first), (b, second)]))
+    assert results == [200, 200]
+    assert record(first)["state"] == "LOWERING"
+    assert record(second)["state"] == "LOWERING"
+
+
+def test_client_closure_does_not_cancel_server_timer(clients):
+    a = clients()
+    pid = prepare(a)
+    assert a.command(pid, "lower").status_code == 200
+    a.client.close()
+    due(pid)
+    assert record(pid)["state"] == "FLOOR"
+
+
+def test_network_retry_is_idempotent_after_uncertain_response(clients):
+    a = clients()
+    pid = prepare(a)
+    version = record(pid)["version"]
+    key = "network-retry-fixed-key"
+    first = a.send(f"/pallets/{pid}/lower", {"version": version}, key=key)
+    retried = a.send(f"/pallets/{pid}/lower", {"version": version}, key=key)
+    assert first.status_code == retried.status_code == 200
+    assert first.json() == retried.json()
+    with engine().connect() as c:
+        assert c.scalar(sa.select(sa.func.count()).select_from(t.pallet_movements).where(t.pallet_movements.c.pallet_request_id == pid)) == 1

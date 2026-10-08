@@ -20,6 +20,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Homologacao automatizada do Site Selene")
     parser.add_argument("--skip-dependency-audit", action="store_true", help="Nao consulta a base de vulnerabilidades")
     parser.add_argument("--skip-runtime", action="store_true", help="Nao executa verificacoes que exigem PostgreSQL configurado")
+    parser.add_argument(
+        "--verify-backup-restore",
+        action="store_true",
+        help="Cria, replica e restaura backup em banco descartavel *_restore_test",
+    )
     args = parser.parse_args()
     python = sys.executable
 
@@ -61,6 +66,8 @@ def main() -> None:
         run("Estado das migrations", [python, "-m", "alembic", "check"])
         run("Integridade da auditoria", [python, "-m", "app.admin", "verify-audit"])
         run("Diagnostico operacional", [python, "-m", "app.admin", "diagnose"])
+        if args.verify_backup_restore:
+            run("Exercicio de backup e restore", [python, "scripts/verify_backup_restore.py"])
 
     print("\nHOMOLOGACAO AUTOMATIZADA: PASSOU", flush=True)
 
