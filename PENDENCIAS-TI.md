@@ -5,7 +5,7 @@
 - [ ] Criar PostgreSQL 17 gerenciado, conta proprietária de migrations, conta runtime de privilégio mínimo e conta de backup conforme a política.
 - [ ] Gerar e guardar `SESSION_SECRET`, senhas do banco e chaves RSA em cofre; montar somente a chave pública de backup na aplicação.
 - [ ] Definir diretório, retenção, cópia externa imutável, agenda e alerta dos backups.
-- [ ] Fornecer contrato oficial, endpoint, autenticação, allowlist e homologação da integração Selene.
+- [ ] Fornecer contrato oficial Selene: URL de staging, rotas health/pendentes/em atendimento/movimentação, método de autenticação, `codGrupo`, `codEmp`, schemas JSON, estados/EXP-PIC, timeouts, semântica de `Idempotency-Key` e respostas 2xx/204.
 - [ ] Fornecer issuer, client ID/secret, claims e ACR do OIDC/MFA; vincular subjects aprovados.
 - [ ] Aprovar matriz final de permissões, política de retenção e eventual regra de aprovação por duas pessoas.
 - [ ] Configurar coleta central de logs, métricas, alertas e responsáveis de plantão.

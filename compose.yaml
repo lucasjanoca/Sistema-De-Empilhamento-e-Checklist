@@ -15,6 +15,7 @@ services:
       timeout: 3s
       retries: 10
   app:
+    image: ${SELENE_IMAGE:-site-selene:local}
     build: .
     environment:
       ENVIRONMENT: ${ENVIRONMENT:?Defina production ou staging}
@@ -60,6 +61,21 @@ services:
       interval: 20s
       timeout: 5s
       retries: 3
+  migrate:
+    image: ${SELENE_IMAGE:-site-selene:local}
+    build: .
+    profiles: [maintenance]
+    command: [python, -m, alembic, upgrade, head]
+    environment:
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?Defina a conexão da conta proprietária de migrations}
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
 volumes:
   pgdata:
 networks:

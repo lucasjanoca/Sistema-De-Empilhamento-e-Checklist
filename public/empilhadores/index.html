@@ -657,8 +657,9 @@
             <label><span>Novas tentativas</span><input id="techRetries" type="number" min="0" max="3" step="1" value="2"></label>
             <label class="tech-switch"><input id="techIntegrationEnabled" type="checkbox"><span>Ativar integração homologada</span></label>
           </div>
-          <div class="tech-wizard-actions"><button id="techSaveIntegration" class="btn btn-primary" type="button">Salvar configuração</button><button id="techTestConnection" class="btn btn-secondary" type="button">Testar conexão e leitura</button><button id="techRefreshSelene" class="btn btn-soft" type="button">Atualizar paletes agora</button></div>
+          <div class="tech-wizard-actions"><button id="techSaveIntegration" class="btn btn-primary" type="button">Salvar configuração</button><button id="techTestConnection" class="btn btn-secondary" type="button">Testar conexão e leitura</button><button id="techRefreshSelene" class="btn btn-soft" type="button">Repetir leitura agora</button></div>
           <div id="techConnectionResult" class="tech-test-result neutral"><b>Aguardando validação.</b><small>Use “Testar conexão e leitura” após o TI informar os parâmetros do ambiente.</small></div>
+          <div id="techOutboxStatus" class="tech-test-result neutral"><b>Fila de entrega externa</b><small>Nenhuma entrega registrada.</small><button id="techRetryIntegration" class="btn btn-soft" type="button">Reenviar falhas</button></div>
         </section>
 
         <div class="two-columns technical-columns">

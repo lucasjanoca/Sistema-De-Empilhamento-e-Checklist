@@ -1,4 +1,4 @@
-# Site Selene 2.2.0-rc.1
+# Site Selene 2.2.0-rc.2
 
 Aplicação operacional do Empilhamento e Checklist, preparada para homologação com uma única fonte de verdade em PostgreSQL. O backend FastAPI decide autenticação, permissões, transições, autorizações, locks, timers, códigos temporários e auditoria. O navegador não armazena dados corporativos nem possui fallback operacional local.
 
@@ -19,10 +19,10 @@ Esta branch reconciliou a arquitetura transacional da PR #2 com a evolução pos
 
 A entrada em produção corporativa depende dos valores e da homologação listados em [PENDENCIAS-TI.md](PENDENCIAS-TI.md). Nenhum hostname, certificado, segredo, endpoint interno ou credencial foi inventado.
 
-Comece por [docs/INSTALACAO.md](docs/INSTALACAO.md) e execute `python scripts/homologate.py` no ambiente configurado. O roteiro operacional está em [docs/PILOTO-CONTROLADO.md](docs/PILOTO-CONTROLADO.md), e os gates desta candidata estão em [docs/HOMOLOGACAO-2.2.0.md](docs/HOMOLOGACAO-2.2.0.md).
+Comece por [docs/IMPLEMENTACAO-EMPRESA.md](docs/IMPLEMENTACAO-EMPRESA.md) e [docs/INSTALACAO.md](docs/INSTALACAO.md), depois execute `python scripts/homologate.py` no ambiente configurado. O roteiro operacional está em [docs/PILOTO-CONTROLADO.md](docs/PILOTO-CONTROLADO.md), e os gates desta candidata estão em [docs/HOMOLOGACAO-2.2.0.md](docs/HOMOLOGACAO-2.2.0.md).
 
 ## Limites deliberados
 
 - GitHub Pages não é um ambiente suportado para esta versão: autenticação, concorrência, Checklist e dados operacionais dependem do FastAPI e do PostgreSQL.
-- A integração oficial Selene/EXP-PIC permanece desabilitada até a TI fornecer e homologar o contrato real.
+- O adaptador e a entrega transacional Selene/EXP-PIC estão implementados, mas permanecem desabilitados até a TI fornecer e homologar o contrato real.
 - Dados do snapshot Supabase não são importados automaticamente; consulte [docs/MIGRACAO-SUPABASE.md](docs/MIGRACAO-SUPABASE.md).

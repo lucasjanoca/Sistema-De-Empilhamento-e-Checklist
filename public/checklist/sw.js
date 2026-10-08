@@ -1,5 +1,5 @@
 'use strict';
-const CACHE="selene-checklist-2.2.0-rc.1",ASSETS=["/checklist/icon.svg", "/checklist/assets/checklist.css", "/checklist/assets/checklist.js", "/shared/api.js", "/shared/production.css", "/shared/pwa.js", "/checklist/offline.html"];
+const CACHE="selene-checklist-2.2.0-rc.2",ASSETS=["/checklist/icon.svg", "/checklist/assets/checklist.css", "/checklist/assets/checklist.js", "/shared/api.js", "/shared/production.css", "/shared/pwa.js", "/checklist/offline.html"];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith("selene-checklist-")&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{

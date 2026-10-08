@@ -53,7 +53,10 @@ def select_device(conn, actor, device_id, request):
     pending = conn.scalar(
         sa.select(sa.func.count())
         .select_from(t.pallet_movements)
-        .where(t.pallet_movements.c.user_id == actor.user["id"], t.pallet_movements.c.status == "PENDING")
+        .where(
+            t.pallet_movements.c.user_id == actor.user["id"],
+            t.pallet_movements.c.status.in_(["PENDING", "EXTERNAL_PENDING"]),
+        )
     )
     if pending:
         fail(409, "Conclua a movimentação antes de trocar de equipamento.")
@@ -222,7 +225,10 @@ def production(conn, actor, action, request):
         rid = current["id"]
         if conn.scalar(
             sa.select(t.pallet_movements.c.id)
-            .where(t.pallet_movements.c.production_id == rid, t.pallet_movements.c.status == "PENDING")
+            .where(
+                t.pallet_movements.c.production_id == rid,
+                t.pallet_movements.c.status.in_(["PENDING", "EXTERNAL_PENDING"]),
+            )
             .limit(1)
         ):
             fail(409, "Aguarde a confirmação das movimentações.")
@@ -253,8 +259,11 @@ def pallet_command(conn, actor, pid, action, body, request):
         fail(404, "Palete não encontrado.")
     if p["version"] != body.version:
         fail(409, "O estado deste palete foi alterado. Atualize a tela.")
-    if p["external_ref"]:
-        fail(409, "Movimentação externa exige integração homologada.")
+    if p["external_ref"] and action in ("lower", "raise"):
+        from .integration import external_movement_ready
+
+        if not external_movement_ready(conn):
+            fail(503, "Movimentação externa bloqueada até a TI homologar a rota oficial de escrita.")
     at = now(conn)
     if action in ("lower", "raise"):
         assignment = lease(conn, actor)
@@ -405,6 +414,32 @@ def pallet_command(conn, actor, pid, action, body, request):
     return {"ok": True, "id": pid, "state": state, "version": p["version"] + 1}
 
 
+def finalize_movement(conn, p, move, confirmed):
+    lower = move["direction"] == "LOWER"
+    state = ("READY" if p["area"] == "EXP-PIC" else "FLOOR") if lower else "COMPLETED"
+    values = {"assigned_to": None}
+    if lower:
+        values.update(lowered_at=confirmed, due_at=confirmed + timedelta(minutes=10 if p["area"] == "EXP-PIC" else 90))
+        if p["area"] == "EXP-PIC":
+            authorize(conn, p, "RAISE", source="EXP_PIC")
+            values["ready_at"] = confirmed
+    update_state(conn, p, state, **values)
+    conn.execute(
+        t.pallet_movements.update().where(t.pallet_movements.c.id == move["id"]).values(status="CONFIRMED", finished_at=confirmed)
+    )
+    conn.execute(t.pallet_authorizations.update().where(t.pallet_authorizations.c.id == move["authorization_id"]).values(used_at=confirmed))
+    conn.execute(t.pallet_locks.delete().where(t.pallet_locks.c.pallet_request_id == p["id"]))
+    counter = t.production_requests.c.down_count if lower else t.production_requests.c.up_count
+    conn.execute(
+        t.production_requests.update()
+        .where(t.production_requests.c.id == move["production_id"])
+        .values({counter.name: counter + 1})
+    )
+    history(conn, "LOWER_CONFIRMED" if lower else "RAISE_CONFIRMED", p, movement=move, previous=p["state"], new=state)
+    audit(conn, "MOVEMENT_CONFIRMED", {"pallet_id": p["id"], "movement_id": move["id"], "state": state})
+    notify(conn, "Movimentação concluída", p["address"])
+
+
 def settle(conn, pid=None):
     at = now(conn)
     query = sa.select(t.pallet_requests).where(t.pallet_requests.c.state.not_in(["COMPLETED", "CANCELLED"]))
@@ -420,32 +455,13 @@ def settle(conn, pid=None):
             ),
         )
         if move:
-            lower = move["direction"] == "LOWER"
             confirmed = move["confirm_at"]
-            state = ("READY" if p["area"] == "EXP-PIC" else "FLOOR") if lower else "COMPLETED"
-            values = {"assigned_to": None}
-            if lower:
-                values.update(lowered_at=confirmed, due_at=confirmed + timedelta(minutes=10 if p["area"] == "EXP-PIC" else 90))
-                if p["area"] == "EXP-PIC":
-                    authorize(conn, p, "RAISE", source="EXP_PIC")
-                    values["ready_at"] = confirmed
-            update_state(conn, p, state, **values)
-            conn.execute(
-                t.pallet_movements.update().where(t.pallet_movements.c.id == move["id"]).values(status="CONFIRMED", finished_at=confirmed)
-            )
-            conn.execute(
-                t.pallet_authorizations.update().where(t.pallet_authorizations.c.id == move["authorization_id"]).values(used_at=confirmed)
-            )
-            conn.execute(t.pallet_locks.delete().where(t.pallet_locks.c.pallet_request_id == p["id"]))
-            counter = t.production_requests.c.down_count if lower else t.production_requests.c.up_count
-            conn.execute(
-                t.production_requests.update()
-                .where(t.production_requests.c.id == move["production_id"])
-                .values({counter.name: counter + 1})
-            )
-            history(conn, "LOWER_CONFIRMED" if lower else "RAISE_CONFIRMED", p, movement=move, previous=p["state"], new=state)
-            audit(conn, "MOVEMENT_CONFIRMED", {"pallet_id": p["id"], "movement_id": move["id"], "state": state})
-            notify(conn, "Movimentação concluída", p["address"])
+            if p["external_ref"]:
+                from .integration import queue_external_movement
+
+                queue_external_movement(conn, p, move, confirmed)
+                continue
+            finalize_movement(conn, p, move, confirmed)
         elif p["state"] == "FLOOR" and p["lowered_at"] and (p["area"] == "EXP-PIC" or p["lowered_at"] + timedelta(minutes=90) <= at):
             authorize(conn, p, "RAISE", source="EXP_PIC" if p["area"] == "EXP-PIC" else "TIMER")
             update_state(conn, p, "READY", ready_at=at)

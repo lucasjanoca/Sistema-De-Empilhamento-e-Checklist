@@ -28,6 +28,7 @@ TABLES = [
     "operational_history",
     "pallet_requests",
     "pallet_movements",
+    "integration_outbox",
     "checklist_records",
     "checklist_answers",
     "equipment",

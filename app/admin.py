@@ -58,12 +58,21 @@ def main():
                 .where(t.pallet_requests.c.state.in_(["COMPLETED", "CANCELLED"])),
                 "closed_with_pending_movement": sa.select(sa.func.count())
                 .select_from(t.pallet_movements.join(t.production_requests))
-                .where(t.pallet_movements.c.status == "PENDING", t.production_requests.c.status == "CLOSED"),
+                .where(
+                    t.pallet_movements.c.status.in_(["PENDING", "EXTERNAL_PENDING"]),
+                    t.production_requests.c.status == "CLOSED",
+                ),
                 "overdue_confirmation": sa.select(sa.func.count())
                 .select_from(t.pallet_movements)
                 .where(
                     t.pallet_movements.c.status == "PENDING",
                     t.pallet_movements.c.confirm_at < now(conn) - __import__("datetime").timedelta(seconds=30),
+                ),
+                "stale_external_delivery": sa.select(sa.func.count())
+                .select_from(t.integration_outbox)
+                .where(
+                    t.integration_outbox.c.status.in_(["PENDING", "SENDING", "FAILED"]),
+                    t.integration_outbox.c.created_at < now(conn) - __import__("datetime").timedelta(minutes=15),
                 ),
             }
             result = {k: conn.scalar(q) for k, q in checks.items()}

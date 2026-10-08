@@ -1,12 +1,18 @@
 """Adaptador HTTP JSON fechado por padrão para a integração corporativa homologada."""
 
+from datetime import timedelta
 import time
 from typing import Protocol
 from urllib.parse import urlsplit
 
 import httpx
+import sqlalchemy as sa
+from fastapi import HTTPException
+from sqlalchemy.dialects.postgresql import insert
 
+from . import schema as t
 from .config import settings
+from .db import engine, now, one
 from .security import fail
 
 
@@ -98,6 +104,8 @@ class HttpJsonAdapter:
                     continue
                 if response.status_code >= 400:
                     fail(502, f"Integração externa recusou a operação (HTTP {response.status_code}).")
+                if response.status_code == 204 or not response.content:
+                    return {}
                 try:
                     return response.json()
                 except ValueError:
@@ -157,3 +165,170 @@ def require_adapter(config=None, client=None):
         fail(503, "INTEGRAÇÃO NÃO CONFIGURADA: contrato oficial e adaptador homologado necessários.")
     validate_config(config)
     return HttpJsonAdapter(config, client=client, runtime=runtime)
+
+
+def stored_config(conn):
+    return conn.scalar(sa.select(t.integration_settings.c.value).where(t.integration_settings.c.key == "config")) or {}
+
+
+def external_movement_ready(conn):
+    config = stored_config(conn)
+    runtime = settings()
+    ready = bool(
+        runtime.integration_adapter == "http-json-v1"
+        and config.get("enabled")
+        and config.get("serverBase")
+        and config.get("routeMovement")
+    )
+    if ready:
+        validate_config(config)
+    return ready
+
+
+def queue_external_movement(conn, pallet, movement, at):
+    action = "lower" if movement["direction"] == "LOWER" else "raise"
+    key = f"movement-{movement['id']}-{action}"
+    payload = {
+        "externalId": str(pallet["external_ref"]),
+        "action": action,
+        "movementId": movement["id"],
+        "palletId": pallet["id"],
+    }
+    conn.execute(
+        insert(t.integration_outbox)
+        .values(
+            movement_id=movement["id"],
+            external_ref=str(pallet["external_ref"]),
+            action=action,
+            idempotency_key=key,
+            payload=payload,
+            status="PENDING",
+            attempts=0,
+            next_attempt_at=at,
+            created_at=at,
+        )
+        .on_conflict_do_nothing(index_elements=["movement_id"])
+    )
+    conn.execute(
+        t.pallet_movements.update()
+        .where(t.pallet_movements.c.id == movement["id"], t.pallet_movements.c.status == "PENDING")
+        .values(status="EXTERNAL_PENDING")
+    )
+    conn.execute(
+        t.technical_events.insert().values(
+            created_at=at,
+            kind="INTEGRATION",
+            details={"status": "QUEUED", "movement_id": movement["id"], "outbox_key": key},
+        )
+    )
+
+
+def _claim_outbox():
+    with engine().begin() as conn:
+        at = now(conn)
+        stale = at - timedelta(minutes=5)
+        item = one(
+            conn,
+            sa.select(t.integration_outbox)
+            .where(
+                sa.or_(
+                    sa.and_(
+                        t.integration_outbox.c.status.in_(["PENDING", "FAILED"]),
+                        t.integration_outbox.c.next_attempt_at <= at,
+                    ),
+                    sa.and_(
+                        t.integration_outbox.c.status == "SENDING",
+                        t.integration_outbox.c.locked_at < stale,
+                    ),
+                )
+            )
+            .order_by(t.integration_outbox.c.id)
+            .with_for_update(skip_locked=True)
+            .limit(1),
+        )
+        if not item:
+            return None
+        config = stored_config(conn)
+        conn.execute(
+            t.integration_outbox.update()
+            .where(t.integration_outbox.c.id == item["id"])
+            .values(status="SENDING", attempts=t.integration_outbox.c.attempts + 1, locked_at=at, last_error_code=None)
+        )
+        return dict(item), config
+
+
+def _fail_outbox(item, code):
+    with engine().begin() as conn:
+        current = one(
+            conn,
+            sa.select(t.integration_outbox).where(t.integration_outbox.c.id == item["id"]).with_for_update(),
+        )
+        if not current or current["status"] == "CONFIRMED":
+            return
+        delay = min(2 ** min(int(current["attempts"]), 8), 300)
+        conn.execute(
+            t.integration_outbox.update()
+            .where(t.integration_outbox.c.id == item["id"])
+            .values(status="FAILED", next_attempt_at=now(conn) + timedelta(seconds=delay), locked_at=None, last_error_code=code)
+        )
+        conn.execute(
+            t.technical_events.insert().values(
+                created_at=now(conn),
+                kind="INTEGRATION",
+                details={"status": "FAILED", "movement_id": current["movement_id"], "error_code": code},
+            )
+        )
+
+
+def _confirm_outbox(item):
+    from .operations import finalize_movement
+
+    with engine().begin() as conn:
+        current = one(
+            conn,
+            sa.select(t.integration_outbox).where(t.integration_outbox.c.id == item["id"]).with_for_update(),
+        )
+        if not current or current["status"] == "CONFIRMED":
+            return
+        movement = one(
+            conn,
+            sa.select(t.pallet_movements).where(t.pallet_movements.c.id == current["movement_id"]).with_for_update(),
+        )
+        pallet = one(
+            conn,
+            sa.select(t.pallet_requests).where(t.pallet_requests.c.id == movement["pallet_request_id"]).with_for_update(),
+        )
+        if movement["status"] != "EXTERNAL_PENDING":
+            raise RuntimeError("Movimento externo fora do estado esperado.")
+        confirmed = now(conn)
+        finalize_movement(conn, pallet, movement, confirmed)
+        conn.execute(
+            t.integration_outbox.update()
+            .where(t.integration_outbox.c.id == current["id"])
+            .values(status="CONFIRMED", confirmed_at=confirmed, locked_at=None, last_error_code=None)
+        )
+        conn.execute(
+            t.technical_events.insert().values(
+                created_at=confirmed,
+                kind="INTEGRATION",
+                details={"status": "CONFIRMED", "movement_id": movement["id"]},
+            )
+        )
+
+
+def drain_outbox_once(client=None):
+    claimed = _claim_outbox()
+    if not claimed:
+        return None
+    item, config = claimed
+    try:
+        adapter = require_adapter(config, client=client)
+        adapter.confirm_movement(item["external_ref"], item["action"], item["idempotency_key"])
+    except HTTPException as exc:
+        _fail_outbox(item, f"HTTP_{exc.status_code}")
+        return "failed"
+    except Exception:
+        _fail_outbox(item, "UNEXPECTED")
+        return "failed"
+    _confirm_outbox(item)
+    return "confirmed"

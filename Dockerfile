@@ -7,6 +7,7 @@ COPY requirements-runtime.lock ./
 RUN pip install --no-cache-dir -r requirements-runtime.lock
 COPY app ./app
 COPY migrations ./migrations
+COPY scripts ./scripts
 COPY alembic.ini ./
 COPY public ./public
 USER 10001:10001

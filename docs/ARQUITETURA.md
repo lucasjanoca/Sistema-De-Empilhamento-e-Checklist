@@ -15,7 +15,7 @@ flowchart LR
 
 ## Regras centrais
 
-- A migration `0001_operational` cria schema, índices, constraints, perfis e permissões. Não cria usuários, dispositivos, equipamentos ou dados operacionais.
+- As migrations `0001_operational` e `0002_integration_outbox` criam schema, índices, constraints, perfis, permissões e a entrega transacional da integração. Não criam usuários, dispositivos, equipamentos ou dados operacionais.
 - Operações de palete usam transação, `SELECT FOR UPDATE`, advisory locks e versão otimista.
 - O estado segue uma máquina explícita: `WAITING`, `ASSIGNED`, `LOWER_AUTHORIZED`, `LOWERING`, `FLOOR`, `READY`/`RAISE_AUTHORIZED`, `RETURNING`, `COMPLETED` ou `CANCELLED`.
 - BAIXAR e SUBIR exigem autorização de servidor, sessão, permissão, produção aberta, dispositivo arrendado e lock do palete.

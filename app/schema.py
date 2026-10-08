@@ -99,7 +99,7 @@ pallet_requests = table(
     col("area", sa.String(20), nullable=False),
     col("state", sa.String(30), nullable=False),
     col("version", sa.Integer, nullable=False, server_default="1"),
-    fk("created_by", "users.id"),
+    fk("created_by", "users.id", nullable=True),
     fk("assigned_to", "users.id", nullable=True),
     col("created_at", T, nullable=False),
     col("lowered_at", T),
@@ -147,9 +147,14 @@ pallet_movements = table(
     col("finished_at", T),
     col("status", sa.String(20), nullable=False),
     sa.CheckConstraint("direction IN ('LOWER','RAISE')"),
-    sa.CheckConstraint("status IN ('PENDING','CONFIRMED','CANCELLED')"),
+    sa.CheckConstraint("status IN ('PENDING','EXTERNAL_PENDING','CONFIRMED','CANCELLED')"),
 )
-sa.Index("uq_pallet_moving", pallet_movements.c.pallet_request_id, unique=True, postgresql_where=pallet_movements.c.status == "PENDING")
+sa.Index(
+    "uq_pallet_moving",
+    pallet_movements.c.pallet_request_id,
+    unique=True,
+    postgresql_where=pallet_movements.c.status.in_(["PENDING", "EXTERNAL_PENDING"]),
+)
 pallet_locks = sa.Table(
     "pallet_locks",
     metadata,
@@ -306,6 +311,24 @@ system_settings = sa.Table("system_settings", metadata, col("key", sa.String(80)
 integration_settings = sa.Table(
     "integration_settings", metadata, col("key", sa.String(80), primary_key=True), col("value", JSONB, nullable=False)
 )
+integration_outbox = table(
+    "integration_outbox",
+    fk("movement_id", "pallet_movements.id", unique=True),
+    col("external_ref", sa.String(200), nullable=False),
+    col("action", sa.String(10), nullable=False),
+    col("idempotency_key", sa.String(100), nullable=False, unique=True),
+    col("payload", JSONB, nullable=False),
+    col("status", sa.String(20), nullable=False),
+    col("attempts", sa.Integer, nullable=False, server_default="0"),
+    col("next_attempt_at", T, nullable=False),
+    col("locked_at", T),
+    col("last_error_code", sa.String(40)),
+    col("created_at", T, nullable=False),
+    col("confirmed_at", T),
+    sa.CheckConstraint("action IN ('lower','raise')"),
+    sa.CheckConstraint("status IN ('PENDING','SENDING','FAILED','CONFIRMED')"),
+)
+sa.Index("ix_integration_outbox_delivery", integration_outbox.c.status, integration_outbox.c.next_attempt_at)
 rate_limits = sa.Table(
     "rate_limits",
     metadata,

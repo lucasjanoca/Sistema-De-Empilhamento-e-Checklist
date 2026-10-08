@@ -121,7 +121,7 @@ def metrics(conn, actor):
 def state(conn, actor):
     at = now(conn)
     data = dict(
-        version="2.2.0-rc.1",
+        version="2.2.0-rc.2",
         requests=[],
         history=[],
         productionRequests=[],
@@ -143,8 +143,20 @@ def state(conn, actor):
         ):
             m = one(
                 conn,
-                sa.select(t.pallet_movements, t.users.c.nome, t.users.c.matricula, t.devices.c.name, t.production_requests.c.number)
-                .select_from(t.pallet_movements.join(t.users).join(t.devices).join(t.production_requests))
+                sa.select(
+                    t.pallet_movements,
+                    t.users.c.nome,
+                    t.users.c.matricula,
+                    t.devices.c.name,
+                    t.production_requests.c.number,
+                    t.integration_outbox.c.status.label("integration_delivery_status"),
+                )
+                .select_from(
+                    t.pallet_movements.join(t.users)
+                    .join(t.devices)
+                    .join(t.production_requests)
+                    .outerjoin(t.integration_outbox, t.integration_outbox.c.movement_id == t.pallet_movements.c.id)
+                )
                 .where(t.pallet_movements.c.pallet_request_id == r["id"])
                 .order_by(t.pallet_movements.c.id.desc())
                 .limit(1),
@@ -181,6 +193,9 @@ def state(conn, actor):
                     lastHandledByMatricula=m["matricula"] if m else "",
                     lastHandledTablet=m["name"] if m else "",
                     confirmAt=ms(m["confirm_at"]) if m and m["status"] == "PENDING" else None,
+                    integrationDeliveryStatus=m["integration_delivery_status"].lower()
+                    if m and m["integration_delivery_status"]
+                    else None,
                 )
             )
     if {"history:view_own", "history:view_all"} & actor.permissions:

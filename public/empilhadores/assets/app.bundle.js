@@ -497,6 +497,13 @@ const Operation = (() => {
   }
   function movingCard(request){
     const lowering = request.status === 'lowering';
+    const externalPending = Boolean(request.integrationDeliveryStatus);
+    const movementLabel = externalPending
+      ? (request.integrationDeliveryStatus === 'failed' ? 'Falha de conexão · reenvio automático' : 'Aguardando confirmação do Selene')
+      : (lowering ? 'Descendo...' : 'Subindo...');
+    const movementControl = externalPending
+      ? '<b class="countdown">Sincronizando</b>'
+      : `<b class="countdown" id="countdown-${request.id}">${Math.max(0,Math.ceil((request.confirmAt-SeleneApi.now())/1000))}s</b>`;
     return `
       <article class="pallet-card ${request.status} ${request.isPic ? 'pic hazard-blink' : ''}" data-id="${request.id}" data-external="${request.external ? 'true' : 'false'}">
         <div>
@@ -506,12 +513,12 @@ const Operation = (() => {
         </div>
         <div>
           <div class="card-footer">
-            <span>${lowering ? 'Descendo...' : 'Subindo...'}</span>
-            <b class="countdown" id="countdown-${request.id}">${Math.max(0,Math.ceil((request.confirmAt-SeleneApi.now())/1000))}s</b>
+            <span>${movementLabel}</span>
+            ${movementControl}
           </div>
-          <button class="undo-button" data-undo="${request.id}">
+          ${externalPending ? '' : `<button class="undo-button" data-undo="${request.id}">
             ↩ ${lowering ? 'Cancelar descida' : 'Voltar palet'}
-          </button>
+          </button>`}
         </div>
       </article>
     `;
@@ -1322,11 +1329,11 @@ const Notifications = (() => {
 })();;
 
 const SeleneIntegration=(()=>{
-  let config={enabled:false};
+  let config={enabled:false},outbox={};
   const guide='O adaptador HTTP JSON existe, mas nasce desativado. TI deve homologar host HTTPS, autenticação, endpoints, parâmetros, estados, EXP-PIC, idempotência e conflitos. Segredos são variáveis exclusivas do servidor; nenhuma credencial é salva neste painel.';
-  async function loadServerConfig(){if(Permissions.can('integration'))config=(await SeleneApi.request('/integration/config')).config;return config;}
+  async function loadServerConfig(){if(Permissions.can('integration')){const result=await SeleneApi.request('/integration/config');config=result.config;outbox=result.outbox||{};}return config;}
   function init(){const el=document.createElement('span');el.id='seleneConnectionBadge';el.className='selene-badge selene-off';el.textContent='Selene externa: não configurada';document.querySelector('.topbar')?.append(el);}
-  return {init,loadServerConfig,getSettings:()=>config,saveSettings:async input=>{config=(await SeleneApi.mutate('/integration/config',input,'PUT')).config;return config;},refresh:()=>SeleneApi.mutate('/integration/test'),testConnection:()=>SeleneApi.mutate('/integration/test'),integrationGuide:()=>guide,integrationMap:()=>({architecture:'Navegador → API do Site Selene → PostgreSQL / adaptador externo',external:config.enabled?'Ativada no servidor':'Desativada',writeEnabled:Boolean(config.enabled&&config.routeMovement)})};
+  return {init,loadServerConfig,getSettings:()=>config,getOutbox:()=>outbox,saveSettings:async input=>{config=(await SeleneApi.mutate('/integration/config',input,'PUT')).config;return config;},retryFailed:()=>SeleneApi.mutate('/integration/retry'),refresh:()=>SeleneApi.mutate('/integration/test'),testConnection:()=>SeleneApi.mutate('/integration/test'),integrationGuide:()=>guide,integrationMap:()=>({architecture:'Navegador → API do Site Selene → PostgreSQL / adaptador externo',external:config.enabled?'Ativada no servidor':'Desativada',writeEnabled:Boolean(config.enabled&&config.routeMovement),deliveryQueue:outbox})};
 })();
 const Reports=(()=>{
   function download(kind,format){const filters=kind==='production'?{q:UI.$('productionNumberFilter').value,user:UI.$('productionUserFilter').value,status:UI.$('productionStatusFilter').value,date_from:UI.$('productionDateFrom').value,date_to:UI.$('productionDateTo').value}:kind==='history'?{q:UI.$('historySearchInput').value}:{q:UI.$('auditSearchInput').value,date_from:UI.$('auditDateFrom').value,date_to:UI.$('auditDateTo').value};return SeleneApi.download(`/reports/${kind}.${format}?`+new URLSearchParams(filters),`selene-${kind}.${format}`).catch(e=>UI.toast(e.message));}
@@ -1343,7 +1350,7 @@ const TechnicalPanel=(()=>{
   let lastSnapshot=null;
   function downloadJson(filename,value){const blob=new Blob([JSON.stringify(value,null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.hidden=true;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   async function render(){if(!Permissions.can('technical'))return;try{
-    const s=await SecurityApi.getSecurityStatus();await SeleneIntegration.loadServerConfig();const c=SeleneIntegration.getSettings();
+    const s=await SecurityApi.getSecurityStatus();await SeleneIntegration.loadServerConfig();const c=SeleneIntegration.getSettings(),outbox=SeleneIntegration.getOutbox();
     lastSnapshot={generatedAt:new Date().toISOString(),application:{version:s.version,database:s.database,passwordStorage:s.passwordStorage,csrf:s.csrf,securityHeaders:s.securityHeaders,rateLimit:s.rateLimit,sessionIdleMinutes:s.sessionIdleMinutes,counts:s.counts},operations:{automaticBackups:s.automaticBackups,backupConfigured:s.backupConfigured,integrationConfigured:s.integrationConfigured},integration:{map:SeleneIntegration.integrationMap(),config:c}};
     for(const [id,value] of Object.entries({techVersion:s.version,techProtocol:location.protocol,techHost:location.host,techStorage:'PostgreSQL',techSecurityMode:'Servidor',techIntegrationGuide:SeleneIntegration.integrationGuide(),techIntegrationMap:JSON.stringify(SeleneIntegration.integrationMap(),null,2)})){if(UI.$(id))UI.$(id).textContent=value;}
     const rows=[['Banco',s.database],['Usuários',s.counts.users],['Paletes registrados',s.counts.pallets],['Backup automático',s.automaticBackups?'Ativo':'Não configurado'],['Integração externa',s.integrationConfigured?'Configurada':'Não configurada']];
@@ -1351,11 +1358,13 @@ const TechnicalPanel=(()=>{
     UI.$('techSecurityDetails').innerHTML=[['Senhas',s.passwordStorage],['Sessão',s.sessionCookie],['CSRF',s.csrf?'Ativo':'Inativo'],['Auditoria','Append-only / verificação por CLI'],['Cabeçalhos',s.securityHeaders?'Ativos':'Inativos'],['Inatividade',s.sessionIdleMinutes+' minutos']].map(([a,b])=>`<article><span>${escapeHtml(a)}</span><b>${escapeHtml(b)}</b></article>`).join('');
     for(const [id,key] of Object.entries({techApiBase:'serverBase',techCodGrupo:'codGrupo',techCodEmp:'codEmp',techRoutePending:'routePending',techRouteAttendance:'routeAttendance',techRouteMovement:'routeMovement',techRouteHealth:'routeHealth'}))UI.$(id).value=c[key]||'';
     UI.$('techInterval').value=(c.interval||10000)/1000;UI.$('techTimeout').value=c.timeoutSeconds||8;UI.$('techRetries').value=c.retries??2;UI.$('techIntegrationEnabled').checked=!!c.enabled;UI.$('techIntegrationNotes').value=AppState.getData().settings.tiIntegrationNotes||'';
+    const pending=(outbox.PENDING||0)+(outbox.SENDING||0),failed=outbox.FAILED||0,confirmed=outbox.CONFIRMED||0,status=UI.$('techOutboxStatus');status.className=`tech-test-result ${failed?'error':pending?'neutral':'ok'}`;status.querySelector('b').textContent=failed?'Fila de integração exige atenção':'Fila de entrega externa';status.querySelector('small').textContent=`Confirmadas: ${confirmed} · Em envio: ${pending} · Com falha: ${failed}`;UI.$('techRetryIntegration').disabled=!failed;
   }catch(e){UI.toast(e.message);}}
   function init(){
     document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});UI.$('techRefresh').onclick=render;UI.$('techForceSync').onclick=()=>DataSync.refresh().catch(e=>UI.toast(e.message));
     for(const id of ['techTestConnection','techRefreshSelene'])UI.$(id).onclick=async()=>{const result=UI.$('techConnectionResult');result.textContent='Verificando integração…';result.className='tech-test-result neutral';try{await SeleneIntegration.testConnection();result.textContent='Conexão validada pelo servidor.';result.className='tech-test-result ok';}catch(e){result.textContent=e.message;result.className='tech-test-result error';}};
     UI.$('techSaveIntegration').onclick=async()=>{try{await SeleneIntegration.saveSettings({serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,routeMovement:UI.$('techRouteMovement').value,routeHealth:UI.$('techRouteHealth').value,interval:Number(UI.$('techInterval').value)*1000,timeoutSeconds:Number(UI.$('techTimeout').value),retries:Number(UI.$('techRetries').value),enabled:UI.$('techIntegrationEnabled').checked});UI.toast('Configuração registrada.');}catch(e){UI.toast(e.message);}};
+    UI.$('techRetryIntegration').onclick=async()=>{try{const result=await SeleneIntegration.retryFailed();UI.toast(`${result.queued} entrega(s) reenfileirada(s).`);await render();}catch(e){UI.toast(e.message);}};
     UI.$('techSaveNotes').onclick=()=>DataSync.command('/settings/ti-notes',{value:UI.$('techIntegrationNotes').value},'PUT');UI.$('techCopyGuide').onclick=()=>navigator.clipboard.writeText(SeleneIntegration.integrationGuide()).then(()=>UI.toast('Roteiro copiado.')).catch(()=>UI.toast('Selecione o roteiro para copiar.'));
     UI.$('techDownloadMap').onclick=()=>downloadJson('selene-mapa-integracao.json',SeleneIntegration.integrationMap());UI.$('techDownloadSnapshot').onclick=async()=>{if(!lastSnapshot)await render();if(lastSnapshot)downloadJson('selene-snapshot-tecnico.json',lastSnapshot);else UI.toast('Não foi possível montar o snapshot técnico.');};
   }

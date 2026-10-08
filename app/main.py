@@ -19,7 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import insert
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from . import __version__, schema as t, inputs as inp, operations as ops, checklists, views
+from . import SCHEMA_REVISION, __version__, schema as t, inputs as inp, operations as ops, checklists, views
 from .config import settings
 from .db import engine, lock, now, one, rows
 from .security import (
@@ -67,6 +67,11 @@ def tick():
             .where(t.access_codes.c.expires_at <= at, t.access_codes.c.revoked_at.is_(None), t.access_codes.c.used_at.is_(None))
             .values(revoked_at=at)
         )
+    from .integration import drain_outbox_once
+
+    for _ in range(5):
+        if drain_outbox_once() is None:
+            break
 
 
 @asynccontextmanager
@@ -89,7 +94,7 @@ async def lifespan(app):
         if not isinstance(key, rsa.RSAPublicKey) or key.key_size < 3072:
             raise RuntimeError("Chave pública RSA de backup inválida.")
     with engine().connect() as conn:
-        if conn.scalar(sa.text("SELECT version_num FROM alembic_version")) != "0001_operational":
+        if conn.scalar(sa.text("SELECT version_num FROM alembic_version")) != SCHEMA_REVISION:
             raise RuntimeError("Aplique as migrations antes de iniciar.")
         if cfg.environment in ("staging", "production"):
             bad = conn.scalar(
@@ -222,7 +227,7 @@ def live():
 def ready():
     try:
         with engine().connect() as conn:
-            valid = conn.scalar(sa.text("SELECT version_num FROM alembic_version")) == "0001_operational"
+            valid = conn.scalar(sa.text("SELECT version_num FROM alembic_version")) == SCHEMA_REVISION
             return JSONResponse({"ok": valid}, 200 if valid else 503)
     except Exception:
         return JSONResponse({"ok": False}, 503)

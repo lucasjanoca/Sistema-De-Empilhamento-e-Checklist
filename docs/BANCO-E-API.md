@@ -2,9 +2,9 @@
 
 ## Migration e tabelas
 
-Alembic possui a migration congelada `0001_operational`. Ela cria 33 tabelas:
+Alembic possui uma cadeia incremental cujo head é `0002_integration_outbox`. A base cria 34 tabelas:
 
-`users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `sessions`, `devices`, `device_assignments`, `production_requests`, `locations`, `pallet_requests`, `pallet_authorizations`, `pallet_movements`, `pallet_locks`, `access_codes`, `equipment`, `checklist_templates`, `checklist_template_versions`, `checklist_records`, `checklist_answers`, `battery_links`, `battery_swaps`, `issues`, `issue_events`, `notifications`, `operational_history`, `audit_log`, `system_settings`, `integration_settings`, `rate_limits`, `idempotency_keys`, `oidc_flows` e `technical_events`.
+`users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `sessions`, `devices`, `device_assignments`, `production_requests`, `locations`, `pallet_requests`, `pallet_authorizations`, `pallet_movements`, `pallet_locks`, `access_codes`, `equipment`, `checklist_templates`, `checklist_template_versions`, `checklist_records`, `checklist_answers`, `battery_links`, `battery_swaps`, `issues`, `issue_events`, `notifications`, `operational_history`, `audit_log`, `system_settings`, `integration_settings`, `integration_outbox`, `rate_limits`, `idempotency_keys`, `oidc_flows` e `technical_events`.
 
 Índices únicos impedem dois paletes ativos no mesmo endereço, dois movimentos simultâneos, produção aberta duplicada e lease duplicado. Constraints validam estados, tipos e números. Triggers impedem alteração/exclusão dos registros imutáveis.
 

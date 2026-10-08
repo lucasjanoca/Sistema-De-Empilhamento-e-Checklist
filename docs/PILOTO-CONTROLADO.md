@@ -7,6 +7,7 @@ Execute em banco, URL HTTPS e rede de homologação, com dados descartáveis e r
 - [ ] Fixar a imagem/commit aprovado e registrar o digest.
 - [ ] Confirmar backup válido, responsável pelo rollback e janela do piloto.
 - [ ] Validar `/health/live`, `/health/ready`, logs, horário e conectividade PostgreSQL.
+- [ ] Executar preflight e smoke test; anexar os resultados ao digest aprovado.
 - [ ] Cadastrar 1 computador, 1 tablet, 1 usuário Emp, 1 Encarregado e 1 TI.
 - [ ] Cadastrar ao menos 1 bateria, 1 empilhadeira e 1 tablet operacional.
 - [ ] Publicar e conferir os três modelos de checklist.
@@ -27,6 +28,7 @@ Execute em banco, URL HTTPS e rede de homologação, com dados descartáveis e r
 - [ ] Pesquisar, filtrar e abrir Histórico; exportar CSV e PDF.
 - [ ] Atualizar a página, abrir nova aba e confirmar restauração esperada da sessão.
 - [ ] Simular perda e retorno de rede; conferir bloqueio, banner e recuperação sem duplicidade.
+- [ ] Com palete externo descartável, interromper o Selene após iniciar a movimentação; confirmar estado “Sincronizando”, fechamento bloqueado, alerta após 15 minutos e uma única confirmação após o retorno.
 - [ ] Fazer logout; confirmar retorno ao login e revogação da sessão/códigos.
 - [ ] Entrar como Encarregado e TI; validar matriz administrativa e proteção da última conta TI.
 - [ ] Conferir instalação/atualização PWA e ausência de cache antigo.

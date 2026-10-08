@@ -26,7 +26,15 @@ def register(app, run):
         def read(c, a):
             value = c.scalar(sa.select(t.integration_settings.c.value).where(t.integration_settings.c.key == "config")) or {}
             configured = bool(value.get("enabled") and value.get("serverBase") and settings().integration_adapter == "http-json-v1")
-            return {"config": value, "configured": configured}
+            outbox = {
+                status: count
+                for status, count in c.execute(
+                    sa.select(t.integration_outbox.c.status, sa.func.count())
+                    .group_by(t.integration_outbox.c.status)
+                    .order_by(t.integration_outbox.c.status)
+                )
+            }
+            return {"config": value, "configured": configured, "outbox": outbox}
 
         return run(
             request,
@@ -56,11 +64,32 @@ def register(app, run):
     def test_integration(request: Request):
         def test(c, a):
             value = c.scalar(sa.select(t.integration_settings.c.value).where(t.integration_settings.c.key == "config")) or {}
-            result = require_adapter(value).health()
+            adapter = require_adapter(value)
+            health = adapter.health()
+            reads = adapter.fetch_pallets() if value.get("routeHealth") else health
             audit(c, "INTEGRATION_TESTED", {"ok": True}, a, request)
-            return {"ok": True, "responseType": type(result).__name__}
+            return {
+                "ok": True,
+                "healthResponseType": type(health).__name__,
+                "pendingResponseType": type(reads["pending"]).__name__,
+                "attendanceResponseType": type(reads["attendance"]).__name__,
+            }
 
         return run(request, "integration:view", {}, test)
+
+    @app.post(base + "/integration/retry")
+    def retry_integration(request: Request):
+        def retry(c, a):
+            at = c.scalar(sa.text("SELECT clock_timestamp()"))
+            result = c.execute(
+                t.integration_outbox.update()
+                .where(t.integration_outbox.c.status == "FAILED")
+                .values(status="PENDING", next_attempt_at=at, locked_at=None, last_error_code=None)
+            )
+            audit(c, "INTEGRATION_RETRY_REQUESTED", {"queued": result.rowcount}, a, request)
+            return {"ok": True, "queued": result.rowcount}
+
+        return run(request, "integration:configure", {}, retry, True)
 
     @app.get(base + "/reports/{kind}.{format}")
     def report(
@@ -196,7 +225,9 @@ def register(app, run):
                     .limit(1)
                 ),
                 "open_movements": c.scalar(
-                    sa.select(sa.func.count()).select_from(t.pallet_movements).where(t.pallet_movements.c.status == "PENDING")
+                    sa.select(sa.func.count())
+                    .select_from(t.pallet_movements)
+                    .where(t.pallet_movements.c.status.in_(["PENDING", "EXTERNAL_PENDING"]))
                 ),
                 "active_sessions": c.scalar(
                     sa.select(sa.func.count())
