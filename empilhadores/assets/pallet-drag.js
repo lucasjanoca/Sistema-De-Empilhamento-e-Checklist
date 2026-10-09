@@ -132,7 +132,7 @@
     const card = event.target.closest(selector);
     if (!card || !grid.contains(card)) return;
     if(card.dataset.external === 'true' &&
-       !(typeof SeleneIntegration!=='undefined' && SeleneIntegration.canTestMove?.())) return;
+       !(typeof SeleneIntegration!=='undefined' && SeleneIntegration.canOfficialMove?.())) return;
     const rect = card.getBoundingClientRect();
 
     gesture = {
