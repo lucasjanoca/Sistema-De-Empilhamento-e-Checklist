@@ -1,0 +1,35 @@
+/* Janela de detalhes: sem mudanças no layout principal da operação. */
+.pallet-details-dialog {
+  width: min(960px, calc(100% - 28px));
+  max-height: min(88vh, 900px);
+  color: #163e2e;
+}
+.pallet-details-content { display:grid; gap:16px; padding:22px; }
+.pallet-details-head h3 { margin:6px 0 0; font-size:20px; color:#163e2e; }
+.pallet-details-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.pallet-details-fields>div {
+  display:grid; gap:5px; padding:11px; border:1px solid #d7e8df;
+  border-radius:10px; background:#f4faf7; min-width:0;
+}
+.pallet-details-fields small { color:#526c60; font-size:11px; }
+.pallet-details-fields b { color:#164938; font-size:13px; overflow-wrap:anywhere; }
+.pallet-details-content h4 { margin:1px 0 -11px; font-size:15px; }
+.pallet-details-hint { margin:0; color:#546e62; font-size:12px; }
+.pallet-details-history-scroll { max-height:42vh; overflow:auto; border:1px solid #d7e8df; border-radius:9px; }
+.pallet-details-history-table {
+  min-width:610px; width:100%; border-collapse:collapse; font-size:12px;
+  color:#1e3d31; background:white;
+}
+.pallet-details-history-table th,.pallet-details-history-table td {
+  padding:10px; border-bottom:1px solid #e5eee9; text-align:left; vertical-align:top;
+}
+.pallet-details-history-table th {
+  background:#e6f3ed; font-weight:800; position:sticky; top:0; z-index:1;
+}
+.pallet-details-history-table tr:nth-child(even) td { background:#f7faf8; }
+.pallet-details-content .dialog-actions { flex-wrap:wrap; }
+@media(max-width:680px) {
+  .pallet-details-content { padding:14px; }
+  .pallet-details-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .pallet-details-head h3 { font-size:17px; }
+}

@@ -37,28 +37,40 @@
 
   function positionGhost(g) {
     if (!g.ghost) return;
-    // Posição do ponto exato agarrado no cartão, sem delay de transição CSS.
-    g.ghost.style.transform =
-      `translate3d(${g.x - g.offsetX}px, ${g.y - g.offsetY}px, 0)`;
-    targets[g.direction].classList.toggle('pallet-drop-hover', isValidDrop(g.x, g.y, g.direction));
+    // Mantém o ponto exato em que o usuário segurou no cartão.
+    const nextX = g.x - g.offsetX, nextY = g.y - g.offsetY;
+    if(g.lastX !== nextX || g.lastY !== nextY) {
+      g.ghost.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
+      g.lastX = nextX; g.lastY = nextY;
+    }
+    const hover = isValidDrop(g.x, g.y, g.direction);
+    if(g.hover !== hover) {
+      targets[g.direction].classList.toggle('pallet-drop-hover', hover);
+      g.hover = hover;
+    }
   }
 
   function autoScroll(g) {
-    function tick() {
-      if (gesture !== g || !g.dragging) return;
+    // Só solicita novos frames quando o cursor está perto das bordas e há rolagem.
+    if(g.raf !== null) return;
+    const tick = () => {
+      g.raf = null;
+      if(gesture !== g || !g.dragging) return;
       const rect = scroller.getBoundingClientRect();
       let speed = 0;
-      if (g.x >= rect.left && g.x <= rect.right &&
-          g.y >= rect.top && g.y <= rect.bottom) {
-        const topDistance = g.y - rect.top;
-        const bottomDistance = rect.bottom - g.y;
-        if (topDistance < SCROLL_EDGE) speed = -Math.ceil((SCROLL_EDGE - topDistance) / 4);
-        else if (bottomDistance < SCROLL_EDGE) speed = Math.ceil((SCROLL_EDGE - bottomDistance) / 4);
+      if(g.x >= rect.left && g.x <= rect.right &&
+         g.y >= rect.top && g.y <= rect.bottom) {
+        const top = g.y - rect.top, bottom = rect.bottom - g.y;
+        if(top < SCROLL_EDGE) speed = -Math.ceil((SCROLL_EDGE - top) / 4);
+        else if(bottom < SCROLL_EDGE) speed = Math.ceil((SCROLL_EDGE - bottom) / 4);
       }
-      if (speed) scroller.scrollTop += speed;
+      if(!speed) return;
+      const before = scroller.scrollTop;
+      scroller.scrollTop += speed;
+      if(scroller.scrollTop === before) return;
       positionGhost(g);
       g.raf = requestAnimationFrame(tick);
-    }
+    };
     g.raf = requestAnimationFrame(tick);
   }
 
@@ -144,6 +156,7 @@
     if (g.dragging) {
       if (event.cancelable) event.preventDefault();
       positionGhost(g);
+      autoScroll(g);
     }
   });
 
