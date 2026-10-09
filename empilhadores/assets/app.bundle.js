@@ -1320,10 +1320,14 @@ const Operation = (() => {
     const picOverdue = picReturnOverdue(request);
     if(request.status === 'floor'){
       const privileged = ['encarregado','ti'].includes(AppState.getUser()?.role);
-      hint = privileged
-        ? `Clique para liberar · automático em ${floorUnlockClock(request)}`
-        : `Liberação automática em ${floorUnlockClock(request)}`;
-      timing = `<time class="floor-time" data-floor-time-id="${request.id}">Baixado há ${floorElapsedClock(request)}</time>`;
+      hint = request.external
+        ? 'Não liberado pela Selene · subida de teste bloqueada'
+        : privileged
+          ? `Clique para liberar · automático em ${floorUnlockClock(request)}`
+          : `Liberação automática em ${floorUnlockClock(request)}`;
+      timing = request.external
+        ? '<time class="floor-time">Aguardando liberação oficial</time>'
+        : `<time class="floor-time" data-floor-time-id="${request.id}">Baixado há ${floorElapsedClock(request)}</time>`;
     }
     if(request.status === 'ready'){
       if(request.isPic){
@@ -1332,7 +1336,7 @@ const Operation = (() => {
       }else{
         hint = 'Detalhes · arraste ↑';
         const manualLabel=manualUnlockLabel(request);
-        timing = `<time class="floor-time ready-time ${manualLabel ? 'manual-release' : ''}">${manualLabel || 'Liberado automaticamente · 1h30 concluída'}</time>`;
+        timing = request.external ? '<time class="floor-time ready-time">Liberado pela Selene</time>' : `<time class="floor-time ready-time ${manualLabel ? 'manual-release' : ''}">${manualLabel || 'Liberado automaticamente · 1h30 concluída'}</time>`;
       }
     }
     return `
@@ -2913,7 +2917,7 @@ async function refresh(){
     status('offline','Selene: sem consulta à rede · '+String(e?.message||'erro desconhecido').slice(0,150));
     return {ok:false,error:e.message};
   }
-}async function testConnection(){const start=Date.now();await loadServerConfig();const c=settings(),checks=[{name:'Camada de integração',ok:true,detail:SecurityApi.isServerMode()?'Servidor intermediário ativo; navegador não acessa o sistema oficial diretamente.':SecurityApi.isAccountCloud()?'Supabase autenticado; integração oficial depende do endpoint corporativo.':'Acesso direto sem backend corporativo.'},{name:'URL da API',ok:/^https?:\/\//i.test(c.serverBase),detail:c.serverBase}];try{const{pending,attendance}=await lists();checks.push({name:'Pendentes',ok:true,detail:`${pending.length} registro(s)`},{name:'Em atendimento',ok:true,detail:`${attendance.length} registro(s)`});return{ok:true,checks,durationMs:Date.now()-start};}catch(e){checks.push({name:'Leitura da API',ok:false,detail:e.message});return{ok:false,checks,durationMs:Date.now()-start};}}function integrationMap(){const c=settings();return{architecture:localBridgeActive?'Navegador → Servidor local (127.0.0.1) → API interna da Selene · leitura':SecurityApi.isServerMode()?'Navegador → Servidor Site Selene → sistema oficial / coletor':'Navegador autenticado + Supabase',server:c.serverBase,settings:{enabled:c.enabled,codGrupo:c.codGrupo,codEmp:c.codEmp,routePending:c.routePending,routeAttendance:c.routeAttendance,interval:c.interval},writeEnabled:false,secretsInBrowser:false,readProxy:localBridgeActive||SecurityApi.isServerMode(),futureWrite:'Implementar somente no servidor após o TI confirmar a rota oficial de escrita, sessão e parâmetros de movimentação.'};}function integrationGuide(){const c=settings();return['CHECKLIST TI — SITE SELENE 2.0',`1. Definir servidor/API no Painel TI: ${c.serverBase||'[não configurado]'}.`,'2. Informar as duas rotas oficiais de leitura (pendentes e em atendimento).',`3. Validar os parâmetros de grupo/empresa conforme o ambiente oficial.`,'4. Confirmar autenticação/sessão usada pelos sistemas internos.','5. Confirmar a rota oficial de escrita e os parâmetros exigidos para descer/subir.','6. Confirmar a origem do EXP-PIC e o contrato de leitura.','7. Só confirmar a movimentação na interface após resposta positiva do sistema oficial.','8. Validar concorrência com dois operadores.','9. Homologar com palete autorizado.','10. Só então habilitar escrita no servidor.'].join('\n');}async function processRequest(){throw new Error('Escrita real bloqueada: deve ser implementada no servidor junto ao TI.');}function restart(){if(timer)clearInterval(timer);const c=settings();if(c.enabled)timer=setInterval(refresh,Math.max(5000,c.interval));}async function init(){
+}async function testConnection(){const start=Date.now();await loadServerConfig();const c=settings(),checks=[{name:'Camada de integração',ok:true,detail:SecurityApi.isServerMode()?'Servidor intermediário ativo; navegador não acessa o sistema oficial diretamente.':SecurityApi.isAccountCloud()?'Supabase autenticado; integração oficial depende do endpoint corporativo.':'Acesso direto sem backend corporativo.'},{name:'URL da API',ok:/^https?:\/\//i.test(c.serverBase),detail:c.serverBase}];try{const{pending,attendance}=await lists();checks.push({name:'Pendentes',ok:true,detail:`${pending.length} registro(s)`},{name:'Em atendimento',ok:true,detail:`${attendance.length} registro(s)`});return{ok:true,checks,durationMs:Date.now()-start};}catch(e){checks.push({name:'Leitura da API',ok:false,detail:e.message});return{ok:false,checks,durationMs:Date.now()-start};}}function integrationMap(){const c=settings();return{architecture:localBridgeActive?'Navegador → Servidor local (127.0.0.1) → API interna da Selene · leitura':SecurityApi.isServerMode()?'Navegador → Servidor Site Selene → sistema oficial / coletor':'Navegador autenticado + Supabase',server:c.serverBase,settings:{enabled:c.enabled,codGrupo:c.codGrupo,codEmp:c.codEmp,routePending:c.routePending,routeAttendance:c.routeAttendance,interval:c.interval},writeEnabled:false,secretsInBrowser:false,readProxy:localBridgeActive||SecurityApi.isServerMode(),futureWrite:'Implementar somente no servidor após o TI confirmar a rota oficial de escrita, sessão e parâmetros de movimentação.'};}function integrationGuide(){const c=settings();return['CHECKLIST TI — SITE SELENE 2.0',`1. Definir servidor/API no Painel TI: ${c.serverBase||'[não configurado]'}.`,'2. Informar as duas rotas oficiais de leitura (pendentes e em atendimento).',`3. Validar os parâmetros de grupo/empresa conforme o ambiente oficial.`,'4. Confirmar autenticação/sessão usada pelos sistemas internos.','5. Confirmar a rota oficial de escrita e os parâmetros exigidos para descer/subir.','6. Confirmar a origem do EXP-PIC e o contrato de leitura.','7. Só confirmar a movimentação na interface após resposta positiva do sistema oficial.','8. Validar concorrência com dois operadores.','9. Homologar com palete autorizado.','10. Só então habilitar escrita no servidor.'].join('\n');}async function processRequest(){throw new Error('Escrita real bloqueada: deve ser implementada no servidor junto ao TI.');}function restart(){if(timer)clearInterval(timer);const c=settings();if(c.enabled)timer=setInterval(refresh,Math.max(localBridgeActive?3000:5000,c.interval));}async function init(){
   ensureBadge();
   await probeLocalBridge();
   if(!SecurityApi.isServerMode()||AppState.getUser()){
