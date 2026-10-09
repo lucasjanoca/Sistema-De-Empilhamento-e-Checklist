@@ -2008,6 +2008,14 @@ const Operation = (() => {
     if(typeof Notifications !== 'undefined') Notifications.render();
   }
   function init(){
+    // A interação por arraste reutiliza o fluxo de operação, sem alterar as regras existentes.
+    document.addEventListener('selene:pallet-dropped-down', event => {
+      const id = Number(event.detail?.id);
+      if (!Number.isSafeInteger(id)) return;
+      const request = AppState.getData().requests.find(item => item.id === id);
+      if (!request || request.status !== 'waiting' || request.external) return;
+      moveRequest(id);
+    });
     document.addEventListener('click', event => {
       const undo = event.target.closest('[data-undo]');
       if(undo){
