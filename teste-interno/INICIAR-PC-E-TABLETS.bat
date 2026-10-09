@@ -1,34 +1,27 @@
 @echo off
-setlocal
+setlocal DisableDelayedExpansion
 cd /d "%~dp0.."
 where node >nul 2>&1
 if errorlevel 1 (
-  echo Node.js nao encontrado. Instale o Node.js 18+ em um computador permitido.
-  echo Nao foi feita nenhuma alteracao de rede.
+  echo Node.js nao encontrado. Instale Node.js 18+ se permitido.
   pause
   exit /b 1
 )
-set "SELENE_ALLOW_LAN=1"
-if not defined SELENE_COD_EMP (
-  echo.
-  echo Selecione a MESMA empilhadeira mostrada no sistema original.
-  set /p SELENE_COD_EMP=Codigo da empilhadeira [emp1]: 
+where powershell >nul 2>&1
+if errorlevel 1 (
+  echo PowerShell nao encontrado neste computador.
+  pause
+  exit /b 1
 )
-if not defined SELENE_COD_EMP set "SELENE_COD_EMP=emp1"
-echo Consultando %SELENE_COD_EMP% na rede interna.
 echo ============================================================
 echo  InfoTech - teste interno Selene (PC + tablet)
 echo ============================================================
 echo.
-echo Iniciando leitura SOMENTE GET no computador.
+echo A senha de acesso ao teste sera solicitada em sigilo.
+echo Escolha sempre a mesma senha se quiser mante-la em cada teste.
+echo Usuario no navegador: infotech
 echo.
-echo Mantenha esta janela aberta enquanto usar nos tablets.
-echo O endereco de acesso do tablet e o codigo temporario
-echo aparecerao abaixo. No navegador informe:
-echo   Usuario: infotech
-echo   Senha: codigo temporario mostrado aqui
+powershell -NoProfile -File "%~dp0INICIAR-PC-E-TABLETS.ps1"
+if errorlevel 1 echo O teste nao iniciou. Confira a mensagem acima.
 echo.
-node teste-interno\server.js
-echo.
-echo O servidor encerrou. Se houve erro, confira a mensagem acima.
 pause
