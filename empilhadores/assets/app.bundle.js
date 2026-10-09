@@ -2703,7 +2703,14 @@ const SeleneIntegration=(()=>{const DEFAULT='',KEY='empilhamento_integracao_v20_
   return cfg;
 }
 async function probeLocalBridge(){
-  if(!['127.0.0.1','localhost'].includes(location.hostname)){
+  // No tablet, a ponte fica no IPv4 privado do PC; no PC fica em localhost.
+  const hostname=String(location.hostname||'');
+  const parts=hostname.split('.').map(Number);
+  const internal=hostname==='localhost' || hostname==='127.0.0.1' ||
+    (parts.length===4 && parts.every(n=>Number.isInteger(n)&&n>=0&&n<=255) &&
+      (parts[0]===10 || (parts[0]===192&&parts[1]===168) ||
+       (parts[0]===172&&parts[1]>=16&&parts[1]<=31)));
+  if(!internal){
     localBridgeActive=false;
     return false;
   }
