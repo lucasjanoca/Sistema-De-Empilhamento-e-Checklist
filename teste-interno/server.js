@@ -38,7 +38,10 @@ function configFromEnv(env=process.env) {
   if(!Number.isInteger(port) || port<0 || port>65535) throw new Error('Porta inválida.');
   // Acesso LAN precisa ser explicitamente habilitado. Sem ele, somente localhost.
   const lanEnabled=String(env.SELENE_ALLOW_LAN || '')==='1';
-  const bindHost=lanEnabled?'0.0.0.0':'127.0.0.1';
+  // Quando houver escrita oficial, expor a aplicação somente no loopback.
+  // Tablets devem entrar por um reverse proxy HTTPS autenticado na empresa.
+  const officialWritesEnabled=String(env.SELENE_OFFICIAL_WRITES||'')==='1';
+  const bindHost=lanEnabled && !officialWritesEnabled?'0.0.0.0':'127.0.0.1';
   const accessUsername=String(env.SELENE_TEST_USERNAME||'infotech').trim();
   if(env.SELENE_TEST_USERNAME && !/^[0-9]{4,12}$/.test(accessUsername))
     throw new Error('Matrícula de acesso inválida. Digite de 4 a 12 números.');
@@ -48,7 +51,6 @@ function configFromEnv(env=process.env) {
     : '';
   if(lanEnabled && accessCode.length<12)
     throw new Error('A senha de acesso deve conter pelo menos 12 caracteres.');
-  const officialWritesEnabled=String(env.SELENE_OFFICIAL_WRITES||'')==='1';
   const adapterPath=String(env.SELENE_WRITE_ADAPTER_PATH||'').trim();
   return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode,customAccessCode,accessUsername,officialWritesEnabled,adapterPath};
 }
@@ -205,8 +207,12 @@ function createHandler(cfg,options={}){
     }
     if(req.method!=='GET' && req.method!=='HEAD')
       return json(res,405,{ok:false,error:'Rota não aceita escrita.'});
-    if(pathname==='/api/selene-read/status')
-      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pollMs:5000,writeEnabled:operations.enabled(),officialOperations:true,read:lastRead});
+    if(pathname==='/api/selene-read/status'){
+      const isLocal=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress);
+      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,
+        codEmp:cfg.codEmp,pollMs:5000,writeEnabled:operations.enabled()&&isLocal,
+        officialOperations:true,read:lastRead});
+    }
     if(pathname==='/api/selene-read/snapshot'){
       try{
         if(!pendingSnapshot){
@@ -286,7 +292,7 @@ if(require.main===module){
     console.log('');
     console.log('InfoTech / Selene — aplicacao para instalacao no PC');
     console.log('Computador: http://127.0.0.1:'+port+'/empilhadores/');
-    if(cfg.lanEnabled){
+    if(cfg.lanEnabled && !cfg.officialWritesEnabled){
       const addresses=localAddresses();
       for(const address of addresses)console.log('Tablet na mesma rede: http://'+address+':'+port+'/empilhadores/');
       if(!addresses.length)console.log('Nenhum IPv4 privado da rede encontrado. Verifique Wi-Fi/LAN.');
