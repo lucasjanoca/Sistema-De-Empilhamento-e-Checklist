@@ -12,7 +12,7 @@ try {
   $env:SELENE_COD_EMP=$emp
   $env:SELENE_TEST_USERNAME=$matricula
   $env:SELENE_ALLOW_LAN='0'
-  $env:SELENE_OFFICIAL_WRITES='0'
+  if (-not $env:SELENE_OFFICIAL_WRITES) { $env:SELENE_OFFICIAL_WRITES='0' }
   Write-Host 'Abrindo sistema em http://127.0.0.1:8765/empilhadores/'
   Write-Host 'A consulta oficial sera disponibilizada se a rede permitir.'
   Write-Host 'Movimentacoes reais permanecem indisponiveis ate a integracao oficial de escrita.'
