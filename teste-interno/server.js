@@ -38,12 +38,13 @@ function configFromEnv(env=process.env) {
   // Acesso LAN precisa ser explicitamente habilitado. Sem ele, somente localhost.
   const lanEnabled=String(env.SELENE_ALLOW_LAN || '')==='1';
   const bindHost=lanEnabled?'0.0.0.0':'127.0.0.1';
+  const customAccessCode=lanEnabled && typeof env.SELENE_TEST_ACCESS_CODE === 'string' && env.SELENE_TEST_ACCESS_CODE.length > 0;
   const accessCode=lanEnabled
-    ? String(env.SELENE_TEST_ACCESS_CODE || crypto.randomBytes(18).toString('base64url'))
+    ? (customAccessCode ? String(env.SELENE_TEST_ACCESS_CODE) : crypto.randomBytes(18).toString('base64url'))
     : '';
-  if(lanEnabled && accessCode.length<16)
-    throw new Error('O código de acesso precisa ter pelo menos 16 caracteres.');
-  return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode};
+  if(lanEnabled && accessCode.length<12)
+    throw new Error('A senha de acesso deve conter pelo menos 12 caracteres.');
+  return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode,customAccessCode};
 }
 
 function json(res,status,value){
@@ -254,7 +255,8 @@ if(require.main===module){
       for(const address of addresses)console.log('Tablet na mesma rede: http://'+address+':'+port+'/empilhadores/');
       if(!addresses.length)console.log('Nenhum IPv4 privado da rede encontrado. Verifique Wi-Fi/LAN.');
       console.log('Usuario do acesso restrito: infotech');
-      console.log('Codigo temporario: '+cfg.accessCode);
+      if(cfg.customAccessCode) console.log('Senha de acesso: a mesma que voce digitou ao iniciar (nao exibida).');
+      else console.log('Codigo temporario: '+cfg.accessCode);
       console.log('AVISO: HTTP na LAN nao e criptografado. Uso temporario em rede isolada.');
     }
     console.log('Grupo: '+cfg.codGrupo+' | Empilhadeira: '+cfg.codEmp);
