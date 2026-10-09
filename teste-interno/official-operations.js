@@ -25,7 +25,7 @@ function isGreen(item){
   return item?.liberado===true||item?.liberado===1||
     /^(verde|green|#008000|#00ff00)$/i.test(String(item?.icon_cor??item?.cor??'').trim());
 }
-function createOfficialOperations({config,readUpstream,routes,adapter=null}){
+function createOfficialOperations({config,readUpstream,routes,adapter=null,operatorValidator=null}){
   let writer=adapter;
   if(!writer && config.officialWritesEnabled && config.adapterPath){
     const file=path.resolve(config.adapterPath);
@@ -35,7 +35,27 @@ function createOfficialOperations({config,readUpstream,routes,adapter=null}){
     if(!fs.existsSync(file))throw new Error('Adaptador privado de escrita não encontrado.');
     writer=require(file);
   }
-  const enabled=()=>Boolean(config.officialWritesEnabled && writer && typeof writer.move==='function');
+  let validator=operatorValidator;
+  if(!validator && config.officialWritesEnabled && config.operatorAuthPath){
+    const file=path.resolve(config.operatorAuthPath);
+    const repository=path.resolve(__dirname,'..')+path.sep;
+    if(!path.isAbsolute(config.operatorAuthPath)||file.startsWith(repository))
+      throw new Error('O autenticador de operadores deve ficar fora do repositório público.');
+    if(!fs.existsSync(file))throw new Error('Módulo privado de autenticação não encontrado.');
+    validator=require(file);
+  }
+  const enabled=()=>Boolean(config.officialWritesEnabled &&
+    writer && typeof writer.move==='function' &&
+    validator && typeof validator.authenticate==='function');
+  async function authenticate(req){
+    if(!enabled())return null;
+    try{
+      const actor=await validator.authenticate(req);
+      if(!actor || actor.canOperate!==true || !/^[0-9]{4,12}$/.test(String(actor.matricula||'')))
+        return null;
+      return {matricula:String(actor.matricula)};
+    }catch{return null;}
+  }
   const busy=new Set();
   async function read(){
     const [pending,attendance]=await Promise.all([
@@ -98,6 +118,6 @@ function createOfficialOperations({config,readUpstream,routes,adapter=null}){
       busy.delete(numeric);
     }
   }
-  return {enabled,move};
+  return {enabled,authenticate,move};
 }
 module.exports={createOfficialOperations,fields,isGreen,records};

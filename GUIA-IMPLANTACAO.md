@@ -21,7 +21,7 @@ A API conhecida inclui consultas GET de pendentes e atendimento. **Não temos ai
 
 O responsável pela implantação deve disponibilizar, de forma aprovada, um módulo **privado** JavaScript fora do repositório público, implementando:
 
-\`\`\`js
+```js
 module.exports = {
   async move({ direction, officialId, address, codGrupo, codEmp, actor, record }) {
     // Enviar a operação ao endpoint de escrita oficial autorizado, com a
@@ -32,14 +32,30 @@ module.exports = {
     throw new Error('Contrato oficial de escrita ainda não implementado.');
   }
 };
-\`\`\`
+```
+
+A escrita oficial exige também um módulo **privado de autenticação**, que verifique a sessão e as permissões do operador para cada requisição. Informar apenas uma matrícula no navegador ou uma senha compartilhada **não é autenticação suficiente para gravações corporativas**.
+
+Contrato esperado no servidor:
+
+```js
+module.exports = {
+  async authenticate(request) {
+    // Validar a identidade e as permissões usando o provedor autorizado.
+    // Somente usuário autorizado pode retornar:
+    // return { matricula: 'matricula_verificada', canOperate: true };
+    return null;
+  }
+};
+```
 
 Variáveis de ambiente **somente no servidor**, não no GitHub Pages:
 
-- \`SELENE_API_BASE\`: URL privada da API autorizada para consultar os paletes.
-- \`SELENE_COD_GRUPO\` / \`SELENE_COD_EMP\`: parâmetros correspondentes ao operador/empilhadeira.
-- \`SELENE_WRITE_ADAPTER_PATH\`: caminho **absoluto**, fora do repositório, para o módulo privado implementado.
-- \`SELENE_OFFICIAL_WRITES=1\`: habilita a função **somente se** o módulo privado estiver presente e exportar \`move\`.
+- `SELENE_API_BASE`: URL privada da API autorizada para consultar os paletes.
+- `SELENE_COD_GRUPO` / `SELENE_COD_EMP`: parâmetros correspondentes ao operador/empilhadeira.
+- `SELENE_WRITE_ADAPTER_PATH`: caminho **absoluto**, fora do repositório, para o módulo privado implementado.
+- `SELENE_OPERATOR_AUTH_ADAPTER_PATH`: caminho privado absoluto do módulo que valida sessão, matrícula e permissão por operação.
+- `SELENE_OFFICIAL_WRITES=1`: habilita a função **somente se** os módulos privados de escrita e autenticação estiverem presentes e exportarem `move`.
 
 O backend realiza nova consulta GET antes de cada comando para confirmar o palete e seu estado. Para subir, exige liberação verde explícita. Envia apenas o identificador real autorizado ao adaptador. Após a confirmação de escrita, consulta novamente a API oficial para verificar que a requisição saiu da lista original. **Uma resposta HTTP isolada não é considerada confirmação suficiente.**
 
@@ -49,7 +65,7 @@ Se houver erro, os botões permanecem bloqueados ou exibem a falha; nenhum movim
 
 Para uso definitivo em múltiplos aparelhos, instale o backend em ambiente gerenciado e exponha **HTTPS com certificado confiável**, autenticação por operador, controles de acesso e auditoria. O aplicativo publicado em GitHub Pages não alcança automaticamente a rede interna da empresa.
 
-**Importante:** com gravação oficial habilitada, o servidor Node se limita ao loopback \`127.0.0.1\`. A publicação para tablets deve passar por um proxy reverso HTTPS da empresa, não por abrir uma porta HTTP de escrita para toda a rede.
+**Importante:** com gravação oficial habilitada, o servidor Node se limita ao loopback `127.0.0.1`. A publicação para tablets deve passar por um proxy reverso HTTPS da empresa, não por abrir uma porta HTTP de escrita para toda a rede.
 
 Não copie credenciais da API, cookies, tokens ou senhas para o repositório. Não confunda a senha de acesso HTTP da ponte com a senha da conta do nosso aplicativo.
 
