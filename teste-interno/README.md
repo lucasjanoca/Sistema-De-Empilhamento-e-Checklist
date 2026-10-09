@@ -10,9 +10,9 @@ O PC mantém uma pequena ponte de consulta de leitura e disponibiliza **o mesmo 
 2. É necessário ter **Node.js 18 ou superior** instalado nesse computador. Não são necessários pacotes npm.
 3. Abra a pasta `teste-interno` e dê dois cliques em **`INICIAR-PC-E-TABLETS.bat`**.
    - Digite **a mesma empilhadeira selecionada no sistema original** (`emp1`, `emp2` etc.). Se for `emp1`, basta pressionar Enter.
-4. O iniciador agora solicita uma **senha escolhida por você (mínimo 12 caracteres)**. Ela será digitada sem aparecer na tela; para reutilizar a mesma senha em outro teste, digite-a novamente ao iniciar. A senha **não é gravada nos arquivos do GitHub** nem exibida na janela.
-5. A janela preta mostrará os endereços do PC e tablets. No PC, abra `http://127.0.0.1:8765/empilhadores/`. O navegador solicitará **usuário `infotech` e a senha que você escolheu**.
-6. No tablet, usando a mesma rede interna e com conexão permitida ao PC, abra o **endereço IP exibido na janela**: `http://IP-DO-PC:8765/empilhadores/`. O tablet pedirá o mesmo usuário **`infotech` e a mesma senha escolhida no PC**.
+4. O iniciador solicita sua **matrícula (somente números)** e, em seguida, uma **senha escolhida por você (mínimo 12 caracteres)**. Ela será digitada sem aparecer na tela; para reutilizar a mesma senha em outro teste, digite-a novamente ao iniciar. A senha **não é gravada nos arquivos do GitHub** nem exibida na janela.
+5. A janela preta mostrará os endereços do PC e tablets. No PC, abra `http://127.0.0.1:8765/empilhadores/`. O navegador solicitará **usuário igual à **matrícula digitada ao iniciar** e a senha que você escolheu**.
+6. No tablet, usando a mesma rede interna e com conexão permitida ao PC, abra o **endereço IP exibido na janela**: `http://IP-DO-PC:8765/empilhadores/`. O tablet pedirá o mesmo usuário **igual à matrícula digitada ao iniciar** e a mesma senha escolhida no PC.
 7. Depois do controle de acesso, faça o login normal no Sistema de Empilhadores. A aplicação deverá mostrar o aviso **Selene ao vivo** quando conseguir ler a API original.
 
 **Mantenha o PC ligado, a janela do servidor aberta e o acesso à rede ativo.** O PC funciona como ponte; se desligar ou perder conexão, os tablets ficarão sem a leitura. Se o tablet não conseguir abrir o endereço do PC, a rede pode isolar tablets de computadores ou impedir a porta. Não tente contornar essas restrições; é necessário um caminho de rede permitido.
@@ -50,7 +50,7 @@ No site, a barra superior agora informa a empilhadeira, o grupo, a quantidade de
 ### Diagnóstico rápido
 
 - **Tablet não abre a página:** verificar se o IP mostrado pertence à rede alcançável pelo tablet e se a porta local está permitida.
-- **Login da ponte não funciona:** usuário `infotech`, senha = senha escolhida no momento da inicialização, não é a senha do sistema original.
+- **Login da ponte não funciona:** usuário igual à **matrícula digitada ao iniciar**, senha = senha escolhida no momento da inicialização, não é a senha do sistema original.
 - **A página abre, mas não aparecem paletes reais:** conferir status na barra superior; a API pode estar indisponível, exigir autenticação ou retornar estrutura que precise mapeamento.
 - **Paletes em atendimento aparecem vermelhos, mas deveriam verdes:** a cor só é confirmada quando a fonte de dados informa liberação; não inferimos a autorização pela idade do palete.
 - **Arrastar não altera o sistema da Selene:** é intencional; somente leitura. O fluxo oficial de escrita não foi integrado.
