@@ -19,9 +19,9 @@ dialog.open = false;
 dialog.showModal = () => {dialog.open = true;};
 dialog.close = () => {dialog.open = false;};
 const requests = [
-  {id:1,address:'01-001-1',status:'ready',originRequestNumber:'REQ-1',
+  {id:1,address:'01-001-1',status:'ready',external:true,originRequestNumber:'REQ-1',
     requestedByName:'Operador A',lastHandledByName:'Empilhador B',createdAt:1000},
-  {id:2,address:'02-001-1',status:'waiting',originRequestNumber:'REQ-2',
+  {id:2,address:'02-001-1',status:'waiting',external:true,originRequestNumber:'REQ-2',
     requestedByName:'Operador C',createdAt:2000}
 ];
 const history = [
@@ -40,6 +40,7 @@ const ctx={
     dispatchEvent(event){actions.push(event);}
   },
   AppState:{getData:()=>({requests,history}),getUser:()=>({role:'empilhador'})},
+  SeleneIntegration:{currentRequests:()=>requests},
   Permissions:{can:()=>canOperate},
   CustomEvent:class {constructor(type,opts){this.type=type;this.detail=opts.detail;}},
   Date,Number,String,Set,Math
@@ -49,17 +50,12 @@ listeners['selene:pallet-details']({detail:{id:1}});
 assert.equal(dialog.open,true);
 assert.equal(fields.palletDetailsStatus.textContent,'Liberado para subir');
 assert.equal(fields.palletDetailsRequester.textContent,'Operador A');
-assert.equal(fields.palletDetailsAction.hidden,false);
-assert.match(fields.palletDetailsAction.textContent,/Iniciar subida/);
-assert.match(fields.palletDetailsHistory.innerHTML,/00:00:06/);
-assert.doesNotMatch(fields.palletDetailsHistory.innerHTML,/Outro palete/);
-fields.palletDetailsAction.events.click();
-assert.equal(dialog.open,false);
-assert.equal(actions.at(-1).type,'selene:pallet-action');
-assert.equal(actions.at(-1).detail.id,1);
+assert.equal(fields.palletDetailsAction.hidden,true,'Palete oficial é somente leitura');
+assert.match(fields.palletDetailsHistory.innerHTML,/histórico oficial.*não está conectado/i);
+assert.doesNotMatch(fields.palletDetailsHistory.innerHTML,/Outro palete|Desceu palete|Solicitado/);
 canOperate=false;
 listeners['selene:pallet-details']({detail:{id:2}});
 assert.equal(fields.palletDetailsAction.hidden,true);
-assert.match(fields.palletDetailsHistory.innerHTML,/&lt;img/);
 assert.doesNotMatch(fields.palletDetailsHistory.innerHTML,/<img/);
-console.log('7 casos de histórico e permissões passaram.');
+assert.equal(actions.length,0,'Nenhuma ação de escrita deve disparar para palete oficial');
+console.log('7 verificações de leitura oficial e ausência de ações de escrita passaram.');

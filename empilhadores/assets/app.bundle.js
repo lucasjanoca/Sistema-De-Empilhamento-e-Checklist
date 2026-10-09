@@ -1241,6 +1241,8 @@ const Operation = (() => {
     return formatDurationSeconds(Math.floor(floorElapsedMs(request) / 1000));
   }
   function unlockDueFloorRequests(){
+    // A aplicação não altera a liberação de requisições oficiais em modo leitura.
+    return false;
     const data = AppState.getData();
     let changed = false;
     data.requests.forEach(request => {
@@ -1265,12 +1267,13 @@ const Operation = (() => {
     return changed;
   }
   function visibleRequests(){
-    const data = AppState.getData();
-    const query = UI.$('searchInput').value.toLowerCase().trim();
-    const status = UI.$('statusFilter').value;
-    return data.requests.filter(request =>
+    const data=AppState.getData();
+    const query=UI.$('searchInput').value.toLowerCase().trim();
+    const status=UI.$('statusFilter').value;
+    // Nunca misturar itens manuais/localStorage/Supabase com paletes oficiais.
+    return SeleneIntegration.currentRequests().filter(request =>
       data.selectedCorridors.includes(request.corridor) &&
-      (!query || `${request.address} ${request.operator}`.toLowerCase().includes(query)) &&
+      (!query || (String(request.address)+' '+String(request.operator)).toLowerCase().includes(query)) &&
       (status === 'all' || request.status === status || pendingMovements.has(request.id) || ['lowering','returning'].includes(request.status))
     ).sort(compareAddresses);
   }
@@ -1399,7 +1402,7 @@ const Operation = (() => {
   }
 
   function renderRequests(){
-    unlockDueFloorRequests();
+    // Não transformar status oficial com relógios locais.
     const list = visibleRequests();
     const boardFor = request => {
       const pending = pendingMovements.get(request.id);
@@ -1416,14 +1419,17 @@ const Operation = (() => {
       const pending = pendingMovements.get(request.id);
       return pending ? pendingMovementCard(request,pending) : cardTemplate(request);
     };
+    const empty = SeleneIntegration.hasLiveData()
+      ? 'Nenhum palete oficial nesta seleção.'
+      : 'Sem consulta à Selene. Paletes de teste e registros locais estão ocultos.';
     UI.$('topGrid').innerHTML = top.length
       ? top.map(display).join('')
-      : '<div class="empty">Nenhum palet nesta seleção.</div>';
+      : '<div class="empty">'+empty+'</div>';
     UI.$('bottomGrid').innerHTML = bottom.length
       ? bottom.map(display).join('')
       : (UI.$('availableOnly').checked
-          ? '<div class="empty">Nenhum palet disponível para subir.</div>'
-          : '<div class="empty">Nenhum palet baixado.</div>');
+          ? '<div class="empty">'+empty+'</div>'
+          : '<div class="empty">'+empty+'</div>');
   }
   function updateElapsedClocks(){
     const unlocked = unlockDueFloorRequests();
@@ -1431,7 +1437,7 @@ const Operation = (() => {
       renderAll();
       return;
     }
-    const data = AppState.getData();
+    const data = {requests:SeleneIntegration.currentRequests()};
     document.querySelectorAll('[data-elapsed-id]').forEach(element => {
       const request = data.requests.find(r => r.id === Number(element.dataset.elapsedId));
       if(!request) return;
@@ -1844,6 +1850,8 @@ const Operation = (() => {
   }
 
   function requestPallet(address,operator,options={}){
+    UI.toast('Solicitações manuais desativadas: somente paletes reais da Selene.');
+    return false;
     if(!Permissions.can('requestPallet')){
       UI.toast('Seu perfil não possui permissão para pedir paletes.');
       return false;
@@ -2112,6 +2120,9 @@ const Operation = (() => {
     UI.$('searchInput').addEventListener('input', renderRequests);
     UI.$('statusFilter').addEventListener('change', renderRequests);
     UI.$('availableOnly').addEventListener('change', renderRequests);
+    UI.$('requestButton').disabled = true;
+    UI.$('requestButton').title = 'Paletes reais são carregados pela integração oficial';
+    UI.$('requestButton').textContent = 'Somente paletes oficiais';
     UI.$('requestButton').addEventListener('click', () => {
       if(!Permissions.can('requestPallet')){
         UI.toast('Seu perfil não possui permissão para pedir paletes.');
@@ -2222,13 +2233,13 @@ const History = (() => {
     if(!select)return;
     const current=select.value;
     const requests=[...new Set(
-      AppState.getData().history.map(item=>String(item.requestNumber||'').trim()).filter(Boolean)
+      [].map(item=>String(item.requestNumber||'').trim()).filter(Boolean)
     )].sort((a,b)=>b.localeCompare(a,'pt-BR',{numeric:true}));
     select.innerHTML='<option value="">Todas as requisições</option>'+requests.map(number=>`<option value="${escapeHtml(number)}">${escapeHtml(number)}</option>`).join('');
     if(requests.includes(current))select.value=current;
   }
   function filteredHistory(){
-    const history=AppState.getData().history;
+    const history=[]; // Histórico oficial de feedback ainda não conectado.
     const query=(UI.$('historySearchInput')?.value||'').trim().toLowerCase();
     const requestFilter=UI.$('historyRequestFilter')?.value||'';
     const eventFilter=UI.$('historyEventFilter')?.value||'';
@@ -2244,7 +2255,7 @@ const History = (() => {
     });
   }
   function render(){
-    const history=AppState.getData().history;
+    const history=[]; // Não exibir histórico manual como dado oficial.
     populateRequestFilter();
     const filtered=filteredHistory();
     UI.$('liveHistory').innerHTML = history.length
@@ -2288,7 +2299,7 @@ const MyPallets=(()=>{
   function rows(){
     const user=AppState.getUser();
     if(!user) return [];
-    return (AppState.getData().requests||[]).filter(item=>
+    return SeleneIntegration.currentRequests().filter(item=>
       item.requestedByMatricula===user.matricula ||
       item.lastHandledByMatricula===user.matricula ||
       (!item.requestedByMatricula && String(item.operator||'')===String(user.nome||''))
@@ -2314,14 +2325,15 @@ const MyPallets=(()=>{
 const Indicators = (() => {
   function render(){
     const data = AppState.getData();
-    const history = data.history;
+    // Eventos locais anteriores não são movimentos confirmados pela Selene.
+    const history = [];
     const down = history.filter(h => h.direction === 'down').length;
     const up = history.filter(h => h.direction === 'up').length;
     const canceled = history.filter(h => h.action.toLowerCase().includes('cancelada')).length;
     UI.$('metricDown').textContent = down;
     UI.$('metricUp').textContent = up;
     UI.$('metricCanceled').textContent = canceled;
-    UI.$('metricOpen').textContent = data.requests.length;
+    UI.$('metricOpen').textContent = SeleneIntegration.currentRequests().length;
     const productionRequest = Operation.getOpenProductionRequest();
     const productionTotal = productionRequest
       ? productionRequest.downCount + productionRequest.upCount
@@ -2345,7 +2357,7 @@ const Indicators = (() => {
         `).join('')
       : '<div class="empty">Sem movimentações registradas.</div>';
     const alerts = [];
-    data.requests.forEach(request => {
+    SeleneIntegration.currentRequests().forEach(request => {
       const ageMinutes = Math.floor((Date.now() - request.createdAt) / 60000);
       const floorAgeMinutes = Math.floor((Date.now() - Number(request.loweredAt || request.createdAt)) / 60000);
       if(request.isPic && request.status === 'ready' && floorAgeMinutes >= 10){
@@ -2671,7 +2683,7 @@ const UsersAdmin=(()=>{
   }
   return{init,render};
 })();
-const SeleneIntegration=(()=>{const DEFAULT='',KEY='empilhamento_integracao_v20_entrega';let timer=null,badge=null,serverCfg=null;function defaults(){return{enabled:false,serverBase:DEFAULT,codGrupo:'',codEmp:'',routePending:'',routeAttendance:'',interval:10000,writeEnabled:false};}function local(){
+const SeleneIntegration=(()=>{const DEFAULT='',KEY='empilhamento_integracao_v20_entrega';let timer=null,badge=null,serverCfg=null;let liveRequests=[];let lastReadAt=0;function defaults(){return{enabled:false,serverBase:DEFAULT,codGrupo:'',codEmp:'',routePending:'',routeAttendance:'',interval:10000,writeEnabled:false};}function local(){
   try{
     if(SecurityApi.isAccountCloud()){
       return Object.assign(defaults(),AppState.getData().settings?.integration||{},{writeEnabled:false});
@@ -2684,7 +2696,95 @@ else if(SecurityApi.isAccountCloud()){
   d.settings=d.settings||{};
   d.settings.integration={...n,writeEnabled:false};
   AppState.save({source:'integration-config'});
-}else localStorage.setItem(KEY,JSON.stringify(n));restart();return settings();}function ensureBadge(){if(badge)return badge;badge=document.createElement('div');badge.id='seleneConnectionBadge';badge.className='selene-badge selene-checking';badge.textContent='Selene: verificando...';(document.querySelector('.topbar')||document.querySelector('header'))?.appendChild(badge);return badge;}function status(t,x){const e=ensureBadge();e.className=`selene-badge selene-${t}`;e.textContent=x;e.title=x;}function unwrap(j){if(Array.isArray(j))return j;if(Array.isArray(j?.Response))return j.Response;if(Array.isArray(j?.response))return j.response;return [];}function date(v){const d=new Date(v);return Number.isNaN(d.getTime())?Date.now():d.getTime();}function corridor(a){const f=String(a||'').split('-')[0].trim().toUpperCase();if(f==='RECEB'||f.startsWith('RECEB'))return'RECEB';if(/^[A-Z]$/.test(f)){const i=f.charCodeAt(0)-65,s=65+Math.floor(i/2)*2;return`${String.fromCharCode(s)}-${String.fromCharCode(Math.min(s+1,90))}`;}const n=Number(f.replace(/\D/g,''));if(n>=1&&n<=30){const s=n%2===0?n-1:n;return`${s}-${s+1}`;}return'OUTROS';}function pic(i){try{return /\bPIC\b/i.test([i?.type,i?.origin,i?.source,i?.collector,i?.system,i?.tipo,i?.origem,JSON.stringify(i)].join(' '));}catch{return false;}}async function get(route){if(!route)throw new Error('Rota de leitura ainda não configurada pelo TI.');if(SecurityApi.isServerMode())return unwrap(await SecurityApi.integrationRead(route));const c=settings(),q=`codGrupo=${encodeURIComponent(c.codGrupo)}&codEmp=${encodeURIComponent(c.codEmp)}`,r=await fetch(`${c.serverBase.replace(/\/+$/,'')}/${String(route).replace(/^\/+/, '')}?${q}`,{cache:'no-store',headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return unwrap(await r.json());}function map(i,type){const req=Number(i.id??i.requestId??i.requisicao),address=String(i.address??i.endereco??'').trim(),isPic=pic(i),at=date(i.createdAt??i.dataHora??i.timestamp),att=type!=='pending';return{id:Number.isFinite(req)?900000000+req:Date.now()+Math.random(),externalId:req,address,operator:String(i.operator??i.operador??i.usuario??'Sistema'),status:type==='pending'?'waiting':(isPic?'ready':'floor'),corridor:corridor(address),createdAt:at,loweredAt:att?at:undefined,unlockedAt:att&&isPic?at:undefined,external:true,isPic,sourceType:isPic?'PIC':'OFICIAL'};}function merge(p,a){const d=AppState.getData(),loc=d.requests.filter(x=>!x.external),ext=[...p.map(x=>map(x,'pending')),...a.map(x=>map(x,'attendance'))],u=new Map();ext.forEach(x=>u.set(`${x.externalId}-${x.status}`,x));d.requests=[...loc,...u.values()];AppState.save({source:'selene-read'});Operation?.renderAll();}async function lists(){const c=settings();return{pending:await get(c.routePending),attendance:await get(c.routeAttendance)};}async function refresh(){if(SecurityApi.isServerMode()&&!AppState.getUser()){status('off','Selene: aguardando login');return{ok:false};}await loadServerConfig();const c=settings();if(!c.enabled){status('off','Selene: integração desligada');return{ok:false};}try{status('checking','Integração: atualizando...');const{pending,attendance}=await lists();merge(pending,attendance);status('online',`Integração conectada • ${pending.length} pendente(s) • ${attendance.length} em atendimento`);return{ok:true,pending:pending.length,attendance:attendance.length};}catch(e){status('offline','Integração oficial indisponível — operação do Site Selene continua ativa');return{ok:false,error:e.message};}}async function testConnection(){const start=Date.now();await loadServerConfig();const c=settings(),checks=[{name:'Camada de integração',ok:true,detail:SecurityApi.isServerMode()?'Servidor intermediário ativo; navegador não acessa o sistema oficial diretamente.':SecurityApi.isAccountCloud()?'Supabase autenticado; integração oficial depende do endpoint corporativo.':'Acesso direto sem backend corporativo.'},{name:'URL da API',ok:/^https?:\/\//i.test(c.serverBase),detail:c.serverBase}];try{const{pending,attendance}=await lists();checks.push({name:'Pendentes',ok:true,detail:`${pending.length} registro(s)`},{name:'Em atendimento',ok:true,detail:`${attendance.length} registro(s)`});return{ok:true,checks,durationMs:Date.now()-start};}catch(e){checks.push({name:'Leitura da API',ok:false,detail:e.message});return{ok:false,checks,durationMs:Date.now()-start};}}function integrationMap(){const c=settings();return{architecture:SecurityApi.isServerMode()?'Navegador → Servidor Site Selene → sistema oficial / coletor':'Navegador autenticado + Supabase',server:c.serverBase,settings:{enabled:c.enabled,codGrupo:c.codGrupo,codEmp:c.codEmp,routePending:c.routePending,routeAttendance:c.routeAttendance,interval:c.interval},writeEnabled:false,secretsInBrowser:false,readProxy:SecurityApi.isServerMode(),futureWrite:'Implementar somente no servidor após o TI confirmar a rota oficial de escrita, sessão e parâmetros de movimentação.'};}function integrationGuide(){const c=settings();return['CHECKLIST TI — SITE SELENE 2.0',`1. Definir servidor/API no Painel TI: ${c.serverBase||'[não configurado]'}.`,'2. Informar as duas rotas oficiais de leitura (pendentes e em atendimento).',`3. Validar os parâmetros de grupo/empresa conforme o ambiente oficial.`,'4. Confirmar autenticação/sessão usada pelos sistemas internos.','5. Confirmar a rota oficial de escrita e os parâmetros exigidos para descer/subir.','6. Confirmar a origem do EXP-PIC e o contrato de leitura.','7. Só confirmar a movimentação na interface após resposta positiva do sistema oficial.','8. Validar concorrência com dois operadores.','9. Homologar com palete autorizado.','10. Só então habilitar escrita no servidor.'].join('\n');}async function processRequest(){throw new Error('Escrita real bloqueada: deve ser implementada no servidor junto ao TI.');}function restart(){if(timer)clearInterval(timer);const c=settings();if(c.enabled)timer=setInterval(refresh,Math.max(5000,c.interval));}async function init(){ensureBadge();if(!SecurityApi.isServerMode()||AppState.getUser()){await loadServerConfig();refresh();}else status('off','Selene: aguardando login');restart();document.addEventListener('security:login',()=>loadServerConfig().then(refresh));}return{init,refresh,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
+}else localStorage.setItem(KEY,JSON.stringify(n));restart();return settings();}function ensureBadge(){if(badge)return badge;badge=document.createElement('div');badge.id='seleneConnectionBadge';badge.className='selene-badge selene-checking';badge.textContent='Selene: verificando...';(document.querySelector('.topbar')||document.querySelector('header'))?.appendChild(badge);return badge;}function status(t,x){const e=ensureBadge();e.className=`selene-badge selene-${t}`;e.textContent=x;e.title=x;}function unwrap(j){
+  if(Array.isArray(j)) return j;
+  if(!j || typeof j !== 'object') throw new Error('Resposta oficial inválida.');
+  if(j.Success === false || j.success === false || (j.Error && j.Error !== false))
+    throw new Error('Consulta à Selene retornou erro.');
+  for(const value of [j.Response,j.response,j.Data,j.data,j.items]){
+    if(Array.isArray(value)) return value;
+    if(value && Array.isArray(value.Response)) return value.Response;
+  }
+  if(Number(j.Count)===0 && !j.Response && !j.response) return [];
+  throw new Error('Formato de resposta oficial não reconhecido.');
+}function date(v){const d=new Date(v);return Number.isNaN(d.getTime())?Date.now():d.getTime();}function corridor(a){const f=String(a||'').split('-')[0].trim().toUpperCase();if(f==='RECEB'||f.startsWith('RECEB'))return'RECEB';if(/^[A-Z]$/.test(f)){const i=f.charCodeAt(0)-65,s=65+Math.floor(i/2)*2;return`${String.fromCharCode(s)}-${String.fromCharCode(Math.min(s+1,90))}`;}const n=Number(f.replace(/\D/g,''));if(n>=1&&n<=30){const s=n%2===0?n-1:n;return`${s}-${s+1}`;}return'OUTROS';}function pic(i){try{return /\bPIC\b/i.test([i?.type,i?.origin,i?.source,i?.collector,i?.system,i?.tipo,i?.origem,JSON.stringify(i)].join(' '));}catch{return false;}}async function get(route){
+  if(!route) throw new Error('Rotas oficiais não configuradas.');
+  // Nunca usar GitHub Pages para fazer consultas diretas a IPs privados da empresa.
+  if(!SecurityApi.isServerMode())
+    throw new Error('A leitura real exige servidor corporativo autorizado, não o GitHub Pages.');
+  return unwrap(await SecurityApi.integrationRead(route));
+}function map(i,type){
+  if(!i || typeof i !== 'object') return null;
+  const officialId=String(i.num_req ?? i.numReq ?? i.requestId ?? i.id ?? '').trim();
+  const address=String(i.endereco_orig ?? i.enderecoOrig ?? i.endereco ?? i.address ?? '').trim().toUpperCase();
+  if(!officialId || !address || address==='NULL') return null;
+  const key=type+':'+officialId+':'+address;
+  let hash=2166136261;
+  for(let p=0;p<key.length;p++){
+    hash^=key.charCodeAt(p);
+    hash=Math.imul(hash,16777619)>>>0;
+  }
+  const atValue=i.dat_hor_req ?? i.datHorReq ?? i.createdAt ?? i.dataHora ?? i.timestamp;
+  const at=atValue ? new Date(atValue).getTime() : NaN;
+  const when=Number.isFinite(at) ? at : undefined;
+  const isPic=pic(i);
+  const explicitGreen = i.liberado === true || i.liberado === 1 ||
+    /^(verde|green|#008000|#00ff00)$/i.test(String(i.icon_cor ?? i.cor ?? '').trim());
+  const operator=String(i.usuario_req ?? i.usuario_solic ?? i.solicitante ??
+    i.operator ?? i.operador ?? i.usuario ?? 'Não informado').trim();
+  return {
+    id:1000000000+hash,externalId:officialId,officialId,address,operator,
+    requestedByName:operator,originRequestNumber:officialId,
+    status:type==='pending'?'waiting':(explicitGreen?'ready':'floor'),
+    corridor:corridor(address),createdAt:when,loweredAt:type==='attendance'?when:undefined,
+    external:true,officialVerified:true,isPic,sourceType:'OFICIAL',
+    officialStatusRaw:i.ies_sit ?? i.ies_sit_novo ?? null
+  };
+}function merge(p,a){
+  const raw=[...p.map(i=>map(i,'pending')),...a.map(i=>map(i,'attendance'))];
+  if(p.length+a.length && raw.some(item=>!item))
+    throw new Error('Há requisições oficiais sem número ou endereço. Nenhum palete será exibido até corrigir o mapeamento.');
+  const mapById=new Map();
+  for(const item of raw){
+    if(mapById.has(item.id) && mapById.get(item.id).address !== item.address)
+      throw new Error('Colisão entre identificadores oficiais. Consulte a integração.');
+    mapById.set(item.id,item);
+  }
+  liveRequests=[...mapById.values()];
+  lastReadAt=Date.now();
+  Operation?.renderAll();
+  Dashboard?.render();
+  MyPallets?.render();
+}
+function currentRequests(){return lastReadAt ? liveRequests : [];}
+function hasLiveData(){return lastReadAt>0;}
+function clearLive(){
+  if(!lastReadAt && !liveRequests.length) return;
+  lastReadAt=0;liveRequests=[];
+  Operation?.renderAll();
+  Dashboard?.render();
+  MyPallets?.render();
+}async function lists(){const c=settings();return{pending:await get(c.routePending),attendance:await get(c.routeAttendance)};}async function refresh(){
+  if(SecurityApi.isServerMode() && !AppState.getUser()){
+    clearLive();status('off','Selene: aguardando login');return {ok:false};
+  }
+  await loadServerConfig();
+  const cfg=settings();
+  if(!cfg.enabled){
+    clearLive();status('off','Selene: integração oficial não configurada · sem paletes de teste');return {ok:false};
+  }
+  try{
+    status('checking','Selene: consultando paletes oficiais...');
+    const {pending,attendance}=await lists();
+    merge(pending,attendance);
+    status('online','Selene oficial: '+pending.length+' pendente(s), '+attendance.length+' em atendimento');
+    return {ok:true,pending:pending.length,attendance:attendance.length};
+  }catch(e){
+    clearLive();
+    status('offline','Selene: sem consulta oficial · nenhum palete será exibido');
+    return {ok:false,error:e.message};
+  }
+}async function testConnection(){const start=Date.now();await loadServerConfig();const c=settings(),checks=[{name:'Camada de integração',ok:true,detail:SecurityApi.isServerMode()?'Servidor intermediário ativo; navegador não acessa o sistema oficial diretamente.':SecurityApi.isAccountCloud()?'Supabase autenticado; integração oficial depende do endpoint corporativo.':'Acesso direto sem backend corporativo.'},{name:'URL da API',ok:/^https?:\/\//i.test(c.serverBase),detail:c.serverBase}];try{const{pending,attendance}=await lists();checks.push({name:'Pendentes',ok:true,detail:`${pending.length} registro(s)`},{name:'Em atendimento',ok:true,detail:`${attendance.length} registro(s)`});return{ok:true,checks,durationMs:Date.now()-start};}catch(e){checks.push({name:'Leitura da API',ok:false,detail:e.message});return{ok:false,checks,durationMs:Date.now()-start};}}function integrationMap(){const c=settings();return{architecture:SecurityApi.isServerMode()?'Navegador → Servidor Site Selene → sistema oficial / coletor':'Navegador autenticado + Supabase',server:c.serverBase,settings:{enabled:c.enabled,codGrupo:c.codGrupo,codEmp:c.codEmp,routePending:c.routePending,routeAttendance:c.routeAttendance,interval:c.interval},writeEnabled:false,secretsInBrowser:false,readProxy:SecurityApi.isServerMode(),futureWrite:'Implementar somente no servidor após o TI confirmar a rota oficial de escrita, sessão e parâmetros de movimentação.'};}function integrationGuide(){const c=settings();return['CHECKLIST TI — SITE SELENE 2.0',`1. Definir servidor/API no Painel TI: ${c.serverBase||'[não configurado]'}.`,'2. Informar as duas rotas oficiais de leitura (pendentes e em atendimento).',`3. Validar os parâmetros de grupo/empresa conforme o ambiente oficial.`,'4. Confirmar autenticação/sessão usada pelos sistemas internos.','5. Confirmar a rota oficial de escrita e os parâmetros exigidos para descer/subir.','6. Confirmar a origem do EXP-PIC e o contrato de leitura.','7. Só confirmar a movimentação na interface após resposta positiva do sistema oficial.','8. Validar concorrência com dois operadores.','9. Homologar com palete autorizado.','10. Só então habilitar escrita no servidor.'].join('\n');}async function processRequest(){throw new Error('Escrita real bloqueada: deve ser implementada no servidor junto ao TI.');}function restart(){if(timer)clearInterval(timer);const c=settings();if(c.enabled)timer=setInterval(refresh,Math.max(5000,c.interval));}async function init(){ensureBadge();if(!SecurityApi.isServerMode()||AppState.getUser()){await loadServerConfig();refresh();}else status('off','Selene: aguardando login');restart();document.addEventListener('security:login',()=>loadServerConfig().then(refresh));}return{init,refresh,currentRequests,hasLiveData,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
 const Reports = (() => {
   function escapeHtml(value=''){
     return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[char]);
@@ -2760,11 +2860,13 @@ const Dashboard = (() => {
   }
   function render(){
     const data=AppState.getData();
-    const history=data.history || [];
-    const today=history.filter(item=>item.time>=todayStart() && item.direction);
-    const waiting=data.requests.filter(item=>item.status==='waiting');
-    const floor=data.requests.filter(item=>item.status==='floor');
-    const ready=data.requests.filter(item=>item.status==='ready');
+    // Indicadores de presença devem refletir somente a lista oficial atual.
+    const official=SeleneIntegration.currentRequests();
+    const history=[];
+    const today=[];
+    const waiting=official.filter(item=>item.status==='waiting');
+    const floor=official.filter(item=>item.status==='floor');
+    const ready=official.filter(item=>item.status==='ready');
     const activeRequests=data.productionRequests.filter(item=>item.status==='open');
     const waitAvg=waiting.length ? waiting.reduce((sum,item)=>sum+(Date.now()-item.createdAt)/60000,0)/waiting.length : 0;
     UI.$('dashWaiting').textContent=waiting.length;
@@ -2791,7 +2893,7 @@ const Dashboard = (() => {
         <div><b>${item.address}</b><small>${item.action} · ${item.operator}</small></div>
         <time>${new Date(item.time).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</time>
       </div>`).join('') : '<div class="empty compact">Nenhuma atividade registrada.</div>';
-    const picOverdue=data.requests.filter(item=>item.isPic && item.status==='ready' && Date.now()-Number(item.loweredAt||item.createdAt)>=10*60000);
+    const picOverdue=official.filter(item=>item.isPic && item.status==='ready' && Date.now()-Number(item.loweredAt||item.createdAt)>=10*60000);
     const normalFloorLong=floor.filter(item=>!item.isPic && Date.now()-Number(item.loweredAt||item.createdAt)>=80*60000);
     const critical=[
       ...picOverdue.map(item=>({address:item.address,text:`EXP-PIC no chão há ${Math.floor((Date.now()-(item.loweredAt||item.createdAt))/60000)} min · subir agora`,type:'danger'})),
@@ -3074,7 +3176,7 @@ const TechnicalPanel=(()=>{function bytes(v){if(v<1024)return`${v} B`;if(v<10485
 ['Concorrência',cloud||server?'LOCK CENTRAL':'LOCAL',cloud||server?'O mesmo palete não pode ser movimentado ao mesmo tempo por dois operadores.':'Sem lock central.'],
 ['Backups',cloud?'DIÁRIO':s.automaticBackups?'AUTOMÁTICOS':'N/A',cloud?'Snapshot operacional anterior preservado diariamente no Supabase.':s.automaticBackups?'Cópias privadas diárias com retenção limitada.':'Sem backup automático.'],
 ['Sistema oficial','PENDENTE DE API', 'A integração de escrita com o sistema interno depende das rotas e autenticação fornecidas pelo TI da empresa.']
-];box.innerHTML=items.map(([l,v,d])=>`<article class="${server?'good':'warn'}"><span>${esc(l)}</span><b>${esc(v)}</b><small>${esc(d)}</small></article>`).join('');}async function render(){if(!Permissions.can('technical'))return;await SeleneIntegration.loadServerConfig?.();const d=AppState.getData(),m=map(),c=SeleneIntegration.getSettings();UI.$('techVersion').textContent=d.version||'2.0';UI.$('techProtocol').textContent=location.protocol.replace(':','').toUpperCase();UI.$('techHost').textContent=location.host||'arquivo local';UI.$('techStorage').textContent=bytes(ls());const rows=[['Usuários',AppState.users.length],['Contas TI',AppState.users.filter(u=>u.role==='ti').length],['Requisições abertas',(d.productionRequests||[]).filter(r=>r.status==='open').length],['Paletes na operação',(d.requests||[]).length],['Sincronização',DataSync.isConnected()?'Conectada':'Local/offline'],['Autenticação',SecurityApi.isServerMode()?'Servidor + sessão':SecurityApi.isAccountCloud()?'Supabase Auth':'Modo local'],['Sistema oficial pelo navegador',SecurityApi.isServerMode()?'NÃO':SecurityApi.isAccountCloud()?'Somente leitura quando a API permitir CORS':'Direto no navegador'],['Escrita oficial',m.writeEnabled?'LIBERADA':'BLOQUEADA']];UI.$('techDiagnostics').innerHTML=rows.map(([l,v])=>`<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('');UI.$('techIntegrationMap').textContent=JSON.stringify(m,null,2);UI.$('techApiBase').value=c.serverBase||'';UI.$('techCodGrupo').value=c.codGrupo||'';UI.$('techCodEmp').value=c.codEmp||'';UI.$('techRoutePending').value=c.routePending||'';UI.$('techRouteAttendance').value=c.routeAttendance||'';UI.$('techInterval').value=Math.round(Number(c.interval||10000)/1000);UI.$('techIntegrationEnabled').checked=c.enabled!==false;UI.$('techIntegrationGuide').textContent=SeleneIntegration.integrationGuide();UI.$('techIntegrationNotes').value=d.settings?.tiIntegrationNotes||'';await security();}function result(r){const b=UI.$('techConnectionResult');if(!b)return;b.className=`tech-test-result ${r?.ok?'ok':'error'}`;b.innerHTML=`<div class="tech-test-head"><b>${r?.ok?'✓ Leitura validada':'⚠ Verificação incompleta'}</b><span>${r?.durationMs??''} ms</span></div>${(r?.checks||[]).map(c=>`<div class="tech-test-line"><span class="${c.ok?'ok':'bad'}">${c.ok?'✓':'×'}</span><div><b>${esc(c.name)}</b><small>${esc(c.detail)}</small></div></div>`).join('')}`;}async function saveCfg(){const b=UI.$('techSaveIntegration');b.disabled=true;b.textContent='Salvando...';try{const n=await SeleneIntegration.saveSettings({enabled:UI.$('techIntegrationEnabled').checked,serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,interval:Number(UI.$('techInterval').value||10)*1000});AppState.addAudit('Configuração de integração alterada',`Servidor ${n.serverBase} · grupo ${n.codGrupo} · empresa ${n.codEmp}.`,{category:'integracao',secure:!SecurityApi.isServerMode()});UI.toast(SecurityApi.isServerMode()?'Configuração salva no servidor.':SecurityApi.isAccountCloud()?'Configuração salva no Supabase.':'Configuração local salva no navegador.');}catch(e){UI.toast(e.message);}finally{b.disabled=false;b.textContent='Salvar configuração';render();}}async function test(){const b=UI.$('techTestConnection');b.disabled=true;b.textContent='Testando...';try{const r=await SeleneIntegration.testConnection();result(r);AppState.addAudit('Validação de integração',r.ok?'Leitura validada.':'Leitura não concluída.',{category:'integracao',severity:r.ok?'info':'warning'});}finally{b.disabled=false;b.textContent='Testar conexão e leitura';render();}}function notes(){const d=AppState.getData();d.settings=d.settings||{};d.settings.tiIntegrationNotes=UI.$('techIntegrationNotes').value||'';AppState.save({source:'technical-notes'});UI.toast('Anotações salvas.');}async function guide(){const t=SeleneIntegration.integrationGuide();try{await navigator.clipboard.writeText(t);UI.toast('Roteiro copiado.');}catch{download('roteiro-integracao-selene.txt',t,'text/plain;charset=utf-8');}}function init(){UI.$('techRefresh')?.addEventListener('click',render);UI.$('techForceSync')?.addEventListener('click',()=>DataSync.forceSync());UI.$('techRefreshSelene')?.addEventListener('click',async()=>{await SeleneIntegration.refresh();render();});UI.$('techSaveIntegration')?.addEventListener('click',saveCfg);UI.$('techTestConnection')?.addEventListener('click',test);UI.$('techCopyGuide')?.addEventListener('click',guide);UI.$('techSaveNotes')?.addEventListener('click',notes);UI.$('techDownloadMap')?.addEventListener('click',()=>download('mapa-integracao-site-selene.json',JSON.stringify(map(),null,2)));UI.$('techDownloadSnapshot')?.addEventListener('click',()=>download(`site-selene-snapshot-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(AppState.exportOperationalSnapshot(),null,2)));document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});}return{init,render};})();;
+];box.innerHTML=items.map(([l,v,d])=>`<article class="${server?'good':'warn'}"><span>${esc(l)}</span><b>${esc(v)}</b><small>${esc(d)}</small></article>`).join('');}async function render(){if(!Permissions.can('technical'))return;await SeleneIntegration.loadServerConfig?.();const d=AppState.getData(),m=map(),c=SeleneIntegration.getSettings();UI.$('techVersion').textContent=d.version||'2.0';UI.$('techProtocol').textContent=location.protocol.replace(':','').toUpperCase();UI.$('techHost').textContent=location.host||'arquivo local';UI.$('techStorage').textContent=bytes(ls());const rows=[['Usuários',AppState.users.length],['Contas TI',AppState.users.filter(u=>u.role==='ti').length],['Requisições abertas',(d.productionRequests||[]).filter(r=>r.status==='open').length],['Paletes na operação',SeleneIntegration.currentRequests().length],['Sincronização',DataSync.isConnected()?'Conectada':'Local/offline'],['Autenticação',SecurityApi.isServerMode()?'Servidor + sessão':SecurityApi.isAccountCloud()?'Supabase Auth':'Modo local'],['Sistema oficial pelo navegador',SecurityApi.isServerMode()?'NÃO':SecurityApi.isAccountCloud()?'Somente leitura quando a API permitir CORS':'Direto no navegador'],['Escrita oficial',m.writeEnabled?'LIBERADA':'BLOQUEADA']];UI.$('techDiagnostics').innerHTML=rows.map(([l,v])=>`<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('');UI.$('techIntegrationMap').textContent=JSON.stringify(m,null,2);UI.$('techApiBase').value=c.serverBase||'';UI.$('techCodGrupo').value=c.codGrupo||'';UI.$('techCodEmp').value=c.codEmp||'';UI.$('techRoutePending').value=c.routePending||'';UI.$('techRouteAttendance').value=c.routeAttendance||'';UI.$('techInterval').value=Math.round(Number(c.interval||10000)/1000);UI.$('techIntegrationEnabled').checked=c.enabled!==false;UI.$('techIntegrationGuide').textContent=SeleneIntegration.integrationGuide();UI.$('techIntegrationNotes').value=d.settings?.tiIntegrationNotes||'';await security();}function result(r){const b=UI.$('techConnectionResult');if(!b)return;b.className=`tech-test-result ${r?.ok?'ok':'error'}`;b.innerHTML=`<div class="tech-test-head"><b>${r?.ok?'✓ Leitura validada':'⚠ Verificação incompleta'}</b><span>${r?.durationMs??''} ms</span></div>${(r?.checks||[]).map(c=>`<div class="tech-test-line"><span class="${c.ok?'ok':'bad'}">${c.ok?'✓':'×'}</span><div><b>${esc(c.name)}</b><small>${esc(c.detail)}</small></div></div>`).join('')}`;}async function saveCfg(){const b=UI.$('techSaveIntegration');b.disabled=true;b.textContent='Salvando...';try{const n=await SeleneIntegration.saveSettings({enabled:UI.$('techIntegrationEnabled').checked,serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,interval:Number(UI.$('techInterval').value||10)*1000});AppState.addAudit('Configuração de integração alterada',`Servidor ${n.serverBase} · grupo ${n.codGrupo} · empresa ${n.codEmp}.`,{category:'integracao',secure:!SecurityApi.isServerMode()});UI.toast(SecurityApi.isServerMode()?'Configuração salva no servidor.':SecurityApi.isAccountCloud()?'Configuração salva no Supabase.':'Configuração local salva no navegador.');}catch(e){UI.toast(e.message);}finally{b.disabled=false;b.textContent='Salvar configuração';render();}}async function test(){const b=UI.$('techTestConnection');b.disabled=true;b.textContent='Testando...';try{const r=await SeleneIntegration.testConnection();result(r);AppState.addAudit('Validação de integração',r.ok?'Leitura validada.':'Leitura não concluída.',{category:'integracao',severity:r.ok?'info':'warning'});}finally{b.disabled=false;b.textContent='Testar conexão e leitura';render();}}function notes(){const d=AppState.getData();d.settings=d.settings||{};d.settings.tiIntegrationNotes=UI.$('techIntegrationNotes').value||'';AppState.save({source:'technical-notes'});UI.toast('Anotações salvas.');}async function guide(){const t=SeleneIntegration.integrationGuide();try{await navigator.clipboard.writeText(t);UI.toast('Roteiro copiado.');}catch{download('roteiro-integracao-selene.txt',t,'text/plain;charset=utf-8');}}function init(){UI.$('techRefresh')?.addEventListener('click',render);UI.$('techForceSync')?.addEventListener('click',()=>DataSync.forceSync());UI.$('techRefreshSelene')?.addEventListener('click',async()=>{await SeleneIntegration.refresh();render();});UI.$('techSaveIntegration')?.addEventListener('click',saveCfg);UI.$('techTestConnection')?.addEventListener('click',test);UI.$('techCopyGuide')?.addEventListener('click',guide);UI.$('techSaveNotes')?.addEventListener('click',notes);UI.$('techDownloadMap')?.addEventListener('click',()=>download('mapa-integracao-site-selene.json',JSON.stringify(map(),null,2)));UI.$('techDownloadSnapshot')?.addEventListener('click',()=>download(`site-selene-snapshot-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(AppState.exportOperationalSnapshot(),null,2)));document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});}return{init,render};})();;
 document.addEventListener('DOMContentLoaded',async()=>{
   await SecurityApi.init();
   if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())document.body.classList.add('local-test-mode');
