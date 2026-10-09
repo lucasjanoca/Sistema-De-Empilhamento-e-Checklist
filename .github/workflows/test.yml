@@ -1,0 +1,39 @@
+name: test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'feat/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter arquivos
+        uses: actions/checkout@v4
+      - name: Conferir sintaxe do JavaScript
+        run: |
+          node --check empilhadores/assets/app.bundle.js
+          node --check empilhadores/assets/pallet-drag.js
+      - name: Validar integração do gesto de arrastar
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const html = fs.readFileSync('empilhadores/index.html','utf8');
+          const drag = fs.readFileSync('empilhadores/assets/pallet-drag.js','utf8');
+          const bundle = fs.readFileSync('empilhadores/assets/app.bundle.js','utf8');
+          const css = fs.readFileSync('empilhadores/assets/pallet-drag.css','utf8');
+          assert.match(html, /assets\/pallet-drag\.css/);
+          assert.match(html, /assets\/pallet-drag\.js/);
+          assert.ok(html.indexOf('assets/pallet-drag.js') > html.indexOf('assets/app.bundle.js'));
+          assert.match(drag, /pallet-card\.waiting/);
+          assert.match(drag, /isValidDrop\(event\.clientX, event\.clientY\)/);
+          assert.match(drag, /selene:pallet-dropped-down/);
+          assert.match(drag, /pointercancel/);
+          assert.match(bundle, /request\.status !== 'waiting' \|\| request\.external/);
+          assert.match(bundle, /document\.addEventListener\('selene:pallet-dropped-down'/);
+          assert.match(css, /touch-action: none/);
+          console.log('10 verificações de integração passaram.');
+          NODE

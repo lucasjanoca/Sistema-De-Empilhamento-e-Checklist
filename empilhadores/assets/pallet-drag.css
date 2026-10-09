@@ -1,0 +1,38 @@
+/* Drag-and-drop: somente paletes aguardando descida. */
+#topGrid .pallet-card.waiting:not([data-external="true"]) {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#topGrid .pallet-card.waiting:not([data-external="true"]):active { cursor: grabbing; }
+#topGrid .pallet-card.pallet-drag-source { opacity: .35; }
+.pallet-drag-ghost {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  margin: 0 !important;
+  pointer-events: none !important;
+  cursor: grabbing;
+  opacity: .94;
+  transform-origin: 0 0;
+  box-shadow: 0 18px 48px rgba(11, 41, 31, .38) !important;
+  filter: saturate(1.1);
+}
+.pallet-unified-scroll.pallet-dragging { scroll-behavior: auto; }
+.pallet-drop-target {
+  outline: 3px dashed #249c77;
+  outline-offset: -5px;
+  background: #e9faf2;
+}
+.pallet-drop-hover {
+  outline: 4px solid #168757;
+  outline-offset: -5px;
+  background: #d7f5e5;
+}
+.pallet-drop-hover .bottom-section-header { background: #b0edcc; }
+@media (prefers-reduced-motion: reduce) {
+  .pallet-drag-ghost { transition: none !important; }
+}
