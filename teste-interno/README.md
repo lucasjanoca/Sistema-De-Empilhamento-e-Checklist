@@ -9,6 +9,7 @@ O PC mantém uma pequena ponte de consulta de leitura e disponibiliza **o mesmo 
 1. No repositório GitHub, use **Code → Download ZIP** e extraia todos os arquivos numa pasta permitida do computador.
 2. É necessário ter **Node.js 18 ou superior** instalado nesse computador. Não são necessários pacotes npm.
 3. Abra a pasta `teste-interno` e dê dois cliques em **`INICIAR-PC-E-TABLETS.bat`**.
+   - Digite **a mesma empilhadeira selecionada no sistema original** (`emp1`, `emp2` etc.). Se for `emp1`, basta pressionar Enter.
 4. A janela preta mostrará o endereço para o computador, os endereços detectados para os tablets e um **código temporário gerado a cada início**. Não compartilhe esse código fora das pessoas autorizadas a participar do teste.
 5. No PC, abra `http://127.0.0.1:8765/empilhadores/`. O navegador solicitará usuário **`infotech`** e senha (o código exibido no PC).
 6. No tablet, usando a mesma rede interna e com conexão permitida ao PC, abra o **endereço IP exibido na janela**: `http://IP-DO-PC:8765/empilhadores/`. O tablet pedirá o mesmo usuário **`infotech`** e código temporário.
@@ -37,6 +38,14 @@ Por padrão: grupo 1 e empilhadeira `emp1`. Isso foi observado nas imagens e pod
 - Android/Chrome podem limitar algumas funções avançadas em páginas HTTP de IP privado, incluindo PWA e APIs que exigem contexto seguro. Login no Supabase ou outros recursos poderão precisar de HTTPS confiável.
 - Não instale software nem altere regras de firewall sem permissão para o equipamento. Não exponha a porta 8765 à internet nem use roteadores públicos.
 - O modo LAN não supre autenticação, autorização nem permissões das APIs de empresa; se o computador não conseguir consultar a API original, a tela continua sem dados.
+
+### Diagnóstico rápido
+
+Na janela preta do PC aparece um resumo como `[Consulta Selene] emp1 · 10 aguardando, 7 em atendimento`, ou um erro de leitura `HTTP 404/401/403`. Isso ajuda a diferenciar API incorreta de empilhadeira diferente.
+
+No site, a barra superior agora informa a empilhadeira, o grupo, a quantidade de requisições e eventual erro de leitura. Se a consulta trouxe requisições mas não aparecem cartões, confira **filtros de status**, **corredores** e se está usando o endereço do servidor local.
+
+**Não use o endereço público do GitHub Pages para este teste**, porque ele não consulta a ponte interna. No computador use `127.0.0.1:8765`; no tablet use o endereço LAN que aparece na janela do PC.
 
 ### Diagnóstico rápido
 
