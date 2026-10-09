@@ -1297,7 +1297,7 @@ const Operation = (() => {
           <span class="wait-status">${statusLabel}</span>
           <time data-elapsed-id="${request.id}">${elapsedClock(request)}</time>
         </div>
-        <div class="card-action">Toque para baixar ↓</div>
+        <div class="card-action">Detalhes · arraste ↓</div>
       </button>
     `;
   }
@@ -1324,7 +1324,7 @@ const Operation = (() => {
         hint = picOverdue ? '⚠ ALERTA VERMELHO · EXP-PIC +10 min no chão' : 'EXP-PIC liberado · subir em até 10 min ↑';
         timing = `<time class="floor-time pic-return-time ${picOverdue ? 'overdue' : ''}" data-pic-return-id="${request.id}">${picOverdue ? `Atrasado · ${floorElapsedClock(request)}` : `Tempo restante ${picReturnClock(request)}`}</time>`;
       }else{
-        hint = 'Toque para subir ↑';
+        hint = 'Detalhes · arraste ↑';
         const manualLabel=manualUnlockLabel(request);
         timing = `<time class="floor-time ready-time ${manualLabel ? 'manual-release' : ''}">${manualLabel || 'Liberado automaticamente · 1h30 concluída'}</time>`;
       }
@@ -2020,6 +2020,7 @@ const Operation = (() => {
   }
   function renderAll(){
     renderRequests();
+    document.dispatchEvent(new CustomEvent('selene:pallet-state-updated'));
     History.render();
     Indicators.render();
     renderSelectedCorridors();
@@ -2049,9 +2050,17 @@ const Operation = (() => {
         return;
       }
       const card = event.target.closest('.pallet-card');
-      if(card && !card.classList.contains('lowering') && !card.classList.contains('returning')){
-        moveRequest(Number(card.dataset.id));
+      if(card && UI.$('view-operacao').contains(card)){
+        document.dispatchEvent(new CustomEvent('selene:pallet-details', {detail:{id:Number(card.dataset.id)}}));
       }
+    });
+    document.addEventListener('selene:pallet-action', event => {
+      const id = Number(event.detail?.id);
+      if(!Number.isSafeInteger(id)) return;
+      const request = AppState.getData().requests.find(item => item.id === id);
+      if(!request || request.external || !Permissions.can('operate',AppState.getUser())) return;
+      if(['lowering','returning'].includes(request.status)) undoMovement(id);
+      else moveRequest(id);
     });
     UI.$('searchInput').addEventListener('input', renderRequests);
     UI.$('statusFilter').addEventListener('change', renderRequests);
