@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
-    environment: Literal["development", "test", "staging", "production"] = "production"
+    environment: Literal["development", "test", "preview", "staging", "production"] = "production"
     database_url: SecretStr
     session_secret: SecretStr
     public_origin: str
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
         origin = urlsplit(self.public_origin)
         if not origin.hostname or origin.username or origin.password or origin.query or origin.fragment or origin.path not in ("", "/"):
             raise ValueError("PUBLIC_ORIGIN inválido.")
-        if self.environment in ("staging", "production"):
+        if self.environment in ("preview", "staging", "production"):
             if origin.scheme != "https" or not self.secure_cookies:
                 raise ValueError("Ambiente operacional exige HTTPS e cookies Secure.")
         elif origin.scheme != "https" and origin.hostname not in ("localhost", "127.0.0.1", "testserver"):

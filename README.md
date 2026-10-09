@@ -1,4 +1,6 @@
-# Site Selene 2.2.0-rc.3
+# Site Selene 2.2.0-rc.4
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lucasjanoca/Sistema-De-Empilhamento-e-Checklist/tree/integracao-producao-main)
 
 Aplicação operacional do Empilhamento e Checklist, preparada para homologação com uma única fonte de verdade em PostgreSQL. O backend FastAPI decide autenticação, permissões, transições, autorizações, locks, timers, códigos temporários e auditoria. O navegador não armazena dados corporativos nem possui fallback operacional local.
 
@@ -20,6 +22,8 @@ Esta branch reconciliou a arquitetura transacional da PR #2 com a evolução pos
 A entrada em produção corporativa depende dos valores e da homologação listados em [PENDENCIAS-TI.md](PENDENCIAS-TI.md). Nenhum hostname, certificado, segredo, endpoint interno ou credencial foi inventado.
 
 Comece por [docs/IMPLEMENTACAO-EMPRESA.md](docs/IMPLEMENTACAO-EMPRESA.md) e [docs/INSTALACAO.md](docs/INSTALACAO.md), depois execute `python scripts/homologate.py` no ambiente configurado. O roteiro operacional está em [docs/PILOTO-CONTROLADO.md](docs/PILOTO-CONTROLADO.md), e os gates desta candidata estão em [docs/HOMOLOGACAO-2.2.0.md](docs/HOMOLOGACAO-2.2.0.md).
+
+Para uma demonstração pública descartável, sem dados reais e sem integração Selene, siga [docs/TESTE-PUBLICO.md](docs/TESTE-PUBLICO.md). Esse preview gratuito não substitui o staging corporativo.
 
 ## Limites deliberados
 

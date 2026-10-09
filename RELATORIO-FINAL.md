@@ -1,4 +1,4 @@
-# Relatório final — Sistema de Empilhadores 2.2.0 RC3
+# Relatório final — Sistema de Empilhadores 2.2.0 RC4
 
 Data da revisão: 08/10/2026. Branch candidata: `integracao-producao-main`.
 
@@ -26,6 +26,7 @@ GitHub continua adequado para código, CI e imagem. GitHub Pages não hospeda es
 - Foi criado `scripts/plan_supabase_migration.py`: inventaria o export legado, não escreve em banco, não inclui dados pessoais no relatório, recusa sobrescrita e bloqueia a migração quando houver informação de negócio ausente.
 - Foram adicionados testes para o planejador, proteção contra vazamento de nomes e healthcheck real do Compose.
 - Documentação de arquitetura, banco, implementação, migração e pendências foi reconciliada com a versão 2.2.0 e o head `0002_integration_outbox`.
+- Um preview público descartável foi preparado como Blueprint Render: HTTPS, Docker, PostgreSQL 17 privado, senha inicial fora do Git, migrations automáticas e integração externa desativada. A criação dos recursos depende do login do proprietário no Render.
 
 ## Supabase legado verificado
 
@@ -40,7 +41,7 @@ O projeto conectado está saudável em PostgreSQL 17, porém é compartilhado co
 
 ## Evidências executadas
 
-- **53/53 testes aprovados** em PostgreSQL 17 real.
+- **56/56 testes aprovados** em PostgreSQL 17 real.
 - Ruff, contratos públicos/JavaScript, acessibilidade/PWA e scanner de segredos aprovados.
 - `alembic check`: nenhuma operação pendente; migration atual `0002_integration_outbox`.
 - Cadeia de auditoria válida em 5.332 eventos do banco descartável acumulado.

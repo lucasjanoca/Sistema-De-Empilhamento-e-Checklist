@@ -2,7 +2,7 @@
 
 ## Automatizada
 
-- `pytest`: **53 aprovados** em PostgreSQL 17 real; `TEST-RESULTS.xml` guarda o JUnit.
+- `pytest`: **56 aprovados** em PostgreSQL 17 real; `TEST-RESULTS.xml` guarda o JUnit.
 - Ruff em `app`, `tests`, `migrations` e `scripts`: aprovado.
 - `scripts/check_public.py`: tipos públicos, sintaxe JavaScript, ausência de credenciais/dados operacionais e fronteira estática aprovados.
 - `scripts/check_ui_contract.py`: IDs, labels, dialogs, contratos JavaScript/HTML, manifestos, escopos e caches PWA aprovados.

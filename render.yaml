@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: sistema-empilhadores-preview-lucasjanoca
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: integracao-producao-main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: python scripts/render_preview.py
+    healthCheckPath: /health/ready
+    autoDeployTrigger: "off"
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: ENVIRONMENT
+        value: preview
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sistema-empilhadores-preview-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: PREVIEW_ADMIN_ID
+        value: ti-preview
+      - key: PREVIEW_ADMIN_NAME
+        value: Administrador do preview
+      - key: PREVIEW_ADMIN_PASSWORD
+        sync: false
+      - key: INTEGRATION_ADAPTER
+        value: ""
+      - key: BACKUP_SCHEDULE_MANAGED
+        value: "false"
+
+databases:
+  - name: sistema-empilhadores-preview-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"
+    databaseName: site_selene_preview
+    user: site_selene_preview
+    ipAllowList: []
