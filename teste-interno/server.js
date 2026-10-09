@@ -1,10 +1,12 @@
 'use strict';
 // Servidor LOCAL de teste: expõe somente leitura de quatro consultas da Selene.
 // Não instala nada na rede da empresa, não altera o sistema original,
-// não requer biblioteca externa e escuta somente 127.0.0.1.
+// não requer biblioteca externa e pode atender tablets da mesma rede com código temporário.
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const os = require('node:os');
+const crypto = require('node:crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_BASE = 'http://192.168.112.3/reqempilhadeira-api.prd';
@@ -33,7 +35,15 @@ function configFromEnv(env=process.env) {
     throw new Error('Grupo ou empilhadeira inválidos. Ex.: grupo 1 e emp1.');
   const port = Number(env.SELENE_TEST_PORT || 8765);
   if(!Number.isInteger(port) || port<0 || port>65535) throw new Error('Porta inválida.');
-  return {apiBase,codGrupo,codEmp,port};
+  // Acesso LAN precisa ser explicitamente habilitado. Sem ele, somente localhost.
+  const lanEnabled=String(env.SELENE_ALLOW_LAN || '')==='1';
+  const bindHost=lanEnabled?'0.0.0.0':'127.0.0.1';
+  const accessCode=lanEnabled
+    ? String(env.SELENE_TEST_ACCESS_CODE || crypto.randomBytes(18).toString('base64url'))
+    : '';
+  if(lanEnabled && accessCode.length<16)
+    throw new Error('O código de acesso precisa ter pelo menos 16 caracteres.');
+  return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode};
 }
 
 function json(res,status,value){
@@ -80,21 +90,67 @@ async function readUpstream(cfg,entry){
   return parsed;
 }
 
+function isPrivateIPv4(input){
+  const value=String(input||'').replace(/^::ffff:/,'');
+  if(value==='::1' || value==='127.0.0.1') return true;
+  const segments=value.split('.').map(Number);
+  if(segments.length!==4||segments.some(n=>!Number.isInteger(n)||n<0||n>255))return false;
+  return segments[0]===10 ||
+    (segments[0]===192&&segments[1]===168) ||
+    (segments[0]===172&&segments[1]>=16&&segments[1]<=31) ||
+    segments[0]===127;
+}
 function allowedBrowserRequest(req){
+  // Não servir recursos a clientes fora da LAN, nem permitir CORS externo.
+  if(!isPrivateIPv4(req.socket?.remoteAddress)) return false;
   if(req.headers['sec-fetch-site']==='cross-site')return false;
   const origin=req.headers.origin;
   if(!origin)return true;
   try{
     const url=new URL(origin);
-    return url.hostname==='127.0.0.1' || url.hostname==='localhost';
+    const host=req.headers.host;
+    return (url.protocol==='http:' || url.protocol==='https:') && url.host===host;
   }catch{return false;}
+}
+function authenticated(req,cfg){
+  if(!cfg.lanEnabled) return true; // localhost-only, não exposto na rede
+  const raw=String(req.headers.authorization||'');
+  if(!raw.startsWith('Basic ') || raw.length>2048) return false;
+  let payload;
+  try{payload=Buffer.from(raw.slice(6),'base64').toString('utf8');}
+  catch{return false;}
+  const separator=payload.indexOf(':');
+  if(separator<0||payload.slice(0,separator)!=='infotech')return false;
+  const actual=crypto.createHash('sha256').update(payload.slice(separator+1)).digest();
+  const expected=crypto.createHash('sha256').update(String(cfg.accessCode)).digest();
+  return crypto.timingSafeEqual(actual,expected);
+}
+function requireAuthentication(res){
+  res.writeHead(401,{
+    'WWW-Authenticate':'Basic realm="InfoTech - teste interno", charset="UTF-8"',
+    'Content-Type':'text/plain; charset=utf-8',
+    'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',
+    'Referrer-Policy':'no-referrer'
+  });
+  res.end('Acesso de teste restrito. Informe usuario infotech e codigo mostrado no computador.');
+}
+function localAddresses(){
+  const addresses = [];
+  for(const interfaces of Object.values(os.networkInterfaces())){
+    for(const iface of interfaces || []){
+      if((iface.family==='IPv4'||iface.family===4) && !iface.internal &&
+        isPrivateIPv4(iface.address)) addresses.push(iface.address);
+    }
+  }
+  return [...new Set(addresses)];
 }
 
 function createHandler(cfg,options={}){
   let pendingSnapshot=null;
   const root = options.root || ROOT;
   return async (req,res)=>{
-    if(!allowedBrowserRequest(req))return json(res,403,{ok:false,error:'Solicitação de outra origem bloqueada.'});
+    if(!allowedBrowserRequest(req))return json(res,403,{ok:false,error:'Acesso fora da rede interna ou de outra origem bloqueado.'});
+    if(!authenticated(req,cfg))return requireAuthentication(res);
     if(req.method!=='GET' && req.method!=='HEAD')return json(res,405,{ok:false,error:'Este servidor é somente leitura.'});
     let pathname;
     try{pathname=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname);}
@@ -150,15 +206,23 @@ function createServer(cfg=configFromEnv(),options={}){
 if(require.main===module){
   const cfg=configFromEnv();
   const server=createServer(cfg);
-  server.listen(cfg.port,'127.0.0.1',()=>{
+  server.listen(cfg.port,cfg.bindHost,()=>{
     const port=server.address().port;
     console.log('');
     console.log('InfoTech / Selene — teste de leitura interna');
-    console.log('Abrir no navegador: http://127.0.0.1:'+port+'/empilhadores/');
+    console.log('Computador: http://127.0.0.1:'+port+'/empilhadores/');
+    if(cfg.lanEnabled){
+      const addresses=localAddresses();
+      for(const address of addresses)console.log('Tablet na mesma rede: http://'+address+':'+port+'/empilhadores/');
+      if(!addresses.length)console.log('Nenhum IPv4 privado da rede encontrado. Verifique Wi-Fi/LAN.');
+      console.log('Usuario do acesso restrito: infotech');
+      console.log('Codigo temporario: '+cfg.accessCode);
+      console.log('AVISO: HTTP na LAN nao e criptografado. Uso temporario em rede isolada.');
+    }
     console.log('Grupo: '+cfg.codGrupo+' | Empilhadeira: '+cfg.codEmp);
     console.log('Somente consultas GET; movimentacoes oficiais DESATIVADAS.');
     console.log('Pressione Ctrl+C para encerrar.');
     console.log('');
   });
 }
-module.exports={createServer,configFromEnv,readUpstream,upstreamUrl,routes};
+module.exports={createServer,configFromEnv,readUpstream,upstreamUrl,routes,isPrivateIPv4,authenticated,localAddresses};
