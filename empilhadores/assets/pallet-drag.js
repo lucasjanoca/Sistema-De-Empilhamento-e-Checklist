@@ -50,6 +50,16 @@
     }
   }
 
+  function scheduleGhostPaint(g) {
+    if(g.paintRaf !== null) return;
+    // Atualiza no máximo uma vez por frame, inclusive em mouse de polling elevado.
+    g.paintRaf = requestAnimationFrame(() => {
+      g.paintRaf = null;
+      if(gesture !== g || !g.dragging) return;
+      positionGhost(g);
+    });
+  }
+
   function autoScroll(g) {
     // Só solicita novos frames quando o cursor está perto das bordas e há rolagem.
     if(g.raf !== null) return;
@@ -101,7 +111,8 @@
 
   function cleanUp(g) {
     if (!g) return;
-    if (g.raf) cancelAnimationFrame(g.raf);
+    if (g.raf !== null) cancelAnimationFrame(g.raf);
+    if (g.paintRaf !== null) cancelAnimationFrame(g.paintRaf);
     g.ghost?.remove();
     g.source.classList.remove('pallet-drag-source');
     scroller.classList.remove('pallet-dragging');
@@ -131,7 +142,7 @@
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
       width: rect.width, height: rect.height,
-      dragging: false, ghost: null, raf: null
+      dragging: false, ghost: null, raf: null, paintRaf: null
     };
     try { card.setPointerCapture(event.pointerId); } catch {}
   }
@@ -155,7 +166,7 @@
     }
     if (g.dragging) {
       if (event.cancelable) event.preventDefault();
-      positionGhost(g);
+      scheduleGhostPaint(g);
       autoScroll(g);
     }
   });
