@@ -130,7 +130,9 @@
         (event.pointerType === 'mouse' && event.button !== 0)) return;
 
     const card = event.target.closest(selector);
-    if (!card || !grid.contains(card) || card.dataset.external === 'true') return;
+    if (!card || !grid.contains(card)) return;
+    if(card.dataset.external === 'true' &&
+       !(typeof SeleneIntegration!=='undefined' && SeleneIntegration.canTestMove?.())) return;
     const rect = card.getBoundingClientRect();
 
     gesture = {
