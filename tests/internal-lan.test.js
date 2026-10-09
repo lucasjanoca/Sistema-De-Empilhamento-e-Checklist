@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 const http=require('node:http');
 const {createServer,configFromEnv,isPrivateIPv4,upstreamUrl,readUpstream,routes}=require('../teste-interno/server.js');
 const fs=require('node:fs');
+const {identifier}=require('../teste-interno/test-movements');
 const bundle=fs.readFileSync('empilhadores/assets/app.bundle.js','utf8');
 
 const code='um_codigo_de_teste_com_24_caracteres';
@@ -87,6 +88,37 @@ async function main(){
     assert.equal(data.pending.Response.length,1);
     assert.equal(data.attendance.Response.length,1);
     assert.equal(data.readOnly,true);
+    assert.equal(data.testMode,true,'Ativa simulação, sem escrita corporativa');
+    const palletId=identifier({num_req:1001,endereco_orig:'11-001-1'},'pending').id;
+    const moveEndpoint=base+'/api/selene-test/move';
+    let moveResponse=await original(moveEndpoint,{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:palletId,direction:'down'})
+    });
+    assert.equal(moveResponse.status,200,'Descida de teste permitida para palete verificado');
+    let moved=await moveResponse.json();
+    assert.equal(moved.state.status,'lowering');
+    moveResponse=await original(moveEndpoint,{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:palletId,direction:'down'})
+    });
+    assert.equal(moveResponse.status,409,'Bloqueia movimento duplicado');
+    res=await original(base+'/api/selene-read/snapshot',{headers:{Authorization:auth}});
+    const synchronized=await res.json();
+    assert.equal(synchronized.testMovements.overlays[palletId].status,'lowering',
+      'Outro dispositivo ve a mesma movimentação');
+    const undoResponse=await original(base+'/api/selene-test/undo',{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:palletId})
+    });
+    assert.equal(undoResponse.status,200,'Desfaz antes de 10s');
+    assert.equal((await undoResponse.json()).state.status,'waiting');
+    const nonexistent=await original(moveEndpoint,{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:123,direction:'up'})
+    });
+    assert.equal(nonexistent.status,409,'Nenhum palete inventado pode ser movimentado');
+
     assert.equal(data.codEmp,'emp1');
     assert.equal(data.codGrupo,'1');
     assert.equal(data.feedback,null,'Feedback opcional nao bloqueia os paletes');
@@ -118,7 +150,7 @@ async function main(){
       Authorization:'Basic '+Buffer.from('infotech:senha-incorreta').toString('base64')
     }});
     assert.equal(res.status,401,'Senha errada bloqueada');
-    console.log('21 verificações passaram: PC/tablet LAN, consulta plural/singular, status, senha e bloqueio de escrita.');
+    console.log('28 verificações passaram: PC/tablet, movimentações de teste compartilhadas, senha e proteção da API corporativa.');
   }finally{await stop(server);global.fetch=original}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
