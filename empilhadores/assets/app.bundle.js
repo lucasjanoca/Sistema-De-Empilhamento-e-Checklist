@@ -1241,6 +1241,8 @@ const Operation = (() => {
     return formatDurationSeconds(Math.floor(floorElapsedMs(request) / 1000));
   }
   function unlockDueFloorRequests(){
+    // A aplicação não altera a liberação de requisições oficiais em modo leitura.
+    return false;
     const data = AppState.getData();
     let changed = false;
     data.requests.forEach(request => {
@@ -1265,13 +1267,14 @@ const Operation = (() => {
     return changed;
   }
   function visibleRequests(){
-    const data = AppState.getData();
-    const query = UI.$('searchInput').value.toLowerCase().trim();
-    const status = UI.$('statusFilter').value;
-    return data.requests.filter(request =>
+    const data=AppState.getData();
+    const query=UI.$('searchInput').value.toLowerCase().trim();
+    const status=UI.$('statusFilter').value;
+    // Nunca misturar itens manuais/localStorage/Supabase com paletes oficiais.
+    return SeleneIntegration.currentRequests().filter(request =>
       data.selectedCorridors.includes(request.corridor) &&
-      (!query || `${request.address} ${request.operator}`.toLowerCase().includes(query)) &&
-      (status === 'all' || request.status === status || pendingMovements.has(request.id) || ['lowering','returning'].includes(request.status))
+      (!query || (String(request.address)+' '+String(request.operator)).toLowerCase().includes(query)) &&
+      (status === 'all' || request.status === status)
     ).sort(compareAddresses);
   }
   function picMarkup(request){
@@ -1399,7 +1402,7 @@ const Operation = (() => {
   }
 
   function renderRequests(){
-    unlockDueFloorRequests();
+    // Não transformar status oficial com relógios locais.
     const list = visibleRequests();
     const boardFor = request => {
       const pending = pendingMovements.get(request.id);
@@ -1416,14 +1419,17 @@ const Operation = (() => {
       const pending = pendingMovements.get(request.id);
       return pending ? pendingMovementCard(request,pending) : cardTemplate(request);
     };
+    const empty = SeleneIntegration.hasLiveData()
+      ? 'Nenhum palete oficial nesta seleção.'
+      : 'Sem consulta à Selene. Paletes de teste e registros locais estão ocultos.';
     UI.$('topGrid').innerHTML = top.length
       ? top.map(display).join('')
-      : '<div class="empty">Nenhum palet nesta seleção.</div>';
+      : '<div class="empty">'+empty+'</div>';
     UI.$('bottomGrid').innerHTML = bottom.length
       ? bottom.map(display).join('')
       : (UI.$('availableOnly').checked
-          ? '<div class="empty">Nenhum palet disponível para subir.</div>'
-          : '<div class="empty">Nenhum palet baixado.</div>');
+          ? '<div class="empty">'+empty+'</div>'
+          : '<div class="empty">'+empty+'</div>');
   }
   function updateElapsedClocks(){
     const unlocked = unlockDueFloorRequests();
@@ -1431,7 +1437,7 @@ const Operation = (() => {
       renderAll();
       return;
     }
-    const data = AppState.getData();
+    const data = {requests:SeleneIntegration.currentRequests()};
     document.querySelectorAll('[data-elapsed-id]').forEach(element => {
       const request = data.requests.find(r => r.id === Number(element.dataset.elapsedId));
       if(!request) return;
@@ -1844,6 +1850,8 @@ const Operation = (() => {
   }
 
   function requestPallet(address,operator,options={}){
+    UI.toast('Solicitações manuais desativadas: somente paletes reais da Selene.');
+    return false;
     if(!Permissions.can('requestPallet')){
       UI.toast('Seu perfil não possui permissão para pedir paletes.');
       return false;
@@ -2112,6 +2120,9 @@ const Operation = (() => {
     UI.$('searchInput').addEventListener('input', renderRequests);
     UI.$('statusFilter').addEventListener('change', renderRequests);
     UI.$('availableOnly').addEventListener('change', renderRequests);
+    UI.$('requestButton').disabled = true;
+    UI.$('requestButton').title = 'Paletes reais são carregados pela integração oficial';
+    UI.$('requestButton').textContent = 'Somente paletes oficiais';
     UI.$('requestButton').addEventListener('click', () => {
       if(!Permissions.can('requestPallet')){
         UI.toast('Seu perfil não possui permissão para pedir paletes.');
@@ -2288,7 +2299,7 @@ const MyPallets=(()=>{
   function rows(){
     const user=AppState.getUser();
     if(!user) return [];
-    return (AppState.getData().requests||[]).filter(item=>
+    return SeleneIntegration.currentRequests().filter(item=>
       item.requestedByMatricula===user.matricula ||
       item.lastHandledByMatricula===user.matricula ||
       (!item.requestedByMatricula && String(item.operator||'')===String(user.nome||''))
@@ -2321,7 +2332,7 @@ const Indicators = (() => {
     UI.$('metricDown').textContent = down;
     UI.$('metricUp').textContent = up;
     UI.$('metricCanceled').textContent = canceled;
-    UI.$('metricOpen').textContent = data.requests.length;
+    UI.$('metricOpen').textContent = SeleneIntegration.currentRequests().length;
     const productionRequest = Operation.getOpenProductionRequest();
     const productionTotal = productionRequest
       ? productionRequest.downCount + productionRequest.upCount
@@ -2345,7 +2356,7 @@ const Indicators = (() => {
         `).join('')
       : '<div class="empty">Sem movimentações registradas.</div>';
     const alerts = [];
-    data.requests.forEach(request => {
+    SeleneIntegration.currentRequests().forEach(request => {
       const ageMinutes = Math.floor((Date.now() - request.createdAt) / 60000);
       const floorAgeMinutes = Math.floor((Date.now() - Number(request.loweredAt || request.createdAt)) / 60000);
       if(request.isPic && request.status === 'ready' && floorAgeMinutes >= 10){
@@ -2848,11 +2859,13 @@ const Dashboard = (() => {
   }
   function render(){
     const data=AppState.getData();
-    const history=data.history || [];
-    const today=history.filter(item=>item.time>=todayStart() && item.direction);
-    const waiting=data.requests.filter(item=>item.status==='waiting');
-    const floor=data.requests.filter(item=>item.status==='floor');
-    const ready=data.requests.filter(item=>item.status==='ready');
+    // Indicadores de presença devem refletir somente a lista oficial atual.
+    const official=SeleneIntegration.currentRequests();
+    const history=[];
+    const today=[];
+    const waiting=official.filter(item=>item.status==='waiting');
+    const floor=official.filter(item=>item.status==='floor');
+    const ready=official.filter(item=>item.status==='ready');
     const activeRequests=data.productionRequests.filter(item=>item.status==='open');
     const waitAvg=waiting.length ? waiting.reduce((sum,item)=>sum+(Date.now()-item.createdAt)/60000,0)/waiting.length : 0;
     UI.$('dashWaiting').textContent=waiting.length;
@@ -2879,7 +2892,7 @@ const Dashboard = (() => {
         <div><b>${item.address}</b><small>${item.action} · ${item.operator}</small></div>
         <time>${new Date(item.time).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</time>
       </div>`).join('') : '<div class="empty compact">Nenhuma atividade registrada.</div>';
-    const picOverdue=data.requests.filter(item=>item.isPic && item.status==='ready' && Date.now()-Number(item.loweredAt||item.createdAt)>=10*60000);
+    const picOverdue=official.filter(item=>item.isPic && item.status==='ready' && Date.now()-Number(item.loweredAt||item.createdAt)>=10*60000);
     const normalFloorLong=floor.filter(item=>!item.isPic && Date.now()-Number(item.loweredAt||item.createdAt)>=80*60000);
     const critical=[
       ...picOverdue.map(item=>({address:item.address,text:`EXP-PIC no chão há ${Math.floor((Date.now()-(item.loweredAt||item.createdAt))/60000)} min · subir agora`,type:'danger'})),
@@ -3162,7 +3175,7 @@ const TechnicalPanel=(()=>{function bytes(v){if(v<1024)return`${v} B`;if(v<10485
 ['Concorrência',cloud||server?'LOCK CENTRAL':'LOCAL',cloud||server?'O mesmo palete não pode ser movimentado ao mesmo tempo por dois operadores.':'Sem lock central.'],
 ['Backups',cloud?'DIÁRIO':s.automaticBackups?'AUTOMÁTICOS':'N/A',cloud?'Snapshot operacional anterior preservado diariamente no Supabase.':s.automaticBackups?'Cópias privadas diárias com retenção limitada.':'Sem backup automático.'],
 ['Sistema oficial','PENDENTE DE API', 'A integração de escrita com o sistema interno depende das rotas e autenticação fornecidas pelo TI da empresa.']
-];box.innerHTML=items.map(([l,v,d])=>`<article class="${server?'good':'warn'}"><span>${esc(l)}</span><b>${esc(v)}</b><small>${esc(d)}</small></article>`).join('');}async function render(){if(!Permissions.can('technical'))return;await SeleneIntegration.loadServerConfig?.();const d=AppState.getData(),m=map(),c=SeleneIntegration.getSettings();UI.$('techVersion').textContent=d.version||'2.0';UI.$('techProtocol').textContent=location.protocol.replace(':','').toUpperCase();UI.$('techHost').textContent=location.host||'arquivo local';UI.$('techStorage').textContent=bytes(ls());const rows=[['Usuários',AppState.users.length],['Contas TI',AppState.users.filter(u=>u.role==='ti').length],['Requisições abertas',(d.productionRequests||[]).filter(r=>r.status==='open').length],['Paletes na operação',(d.requests||[]).length],['Sincronização',DataSync.isConnected()?'Conectada':'Local/offline'],['Autenticação',SecurityApi.isServerMode()?'Servidor + sessão':SecurityApi.isAccountCloud()?'Supabase Auth':'Modo local'],['Sistema oficial pelo navegador',SecurityApi.isServerMode()?'NÃO':SecurityApi.isAccountCloud()?'Somente leitura quando a API permitir CORS':'Direto no navegador'],['Escrita oficial',m.writeEnabled?'LIBERADA':'BLOQUEADA']];UI.$('techDiagnostics').innerHTML=rows.map(([l,v])=>`<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('');UI.$('techIntegrationMap').textContent=JSON.stringify(m,null,2);UI.$('techApiBase').value=c.serverBase||'';UI.$('techCodGrupo').value=c.codGrupo||'';UI.$('techCodEmp').value=c.codEmp||'';UI.$('techRoutePending').value=c.routePending||'';UI.$('techRouteAttendance').value=c.routeAttendance||'';UI.$('techInterval').value=Math.round(Number(c.interval||10000)/1000);UI.$('techIntegrationEnabled').checked=c.enabled!==false;UI.$('techIntegrationGuide').textContent=SeleneIntegration.integrationGuide();UI.$('techIntegrationNotes').value=d.settings?.tiIntegrationNotes||'';await security();}function result(r){const b=UI.$('techConnectionResult');if(!b)return;b.className=`tech-test-result ${r?.ok?'ok':'error'}`;b.innerHTML=`<div class="tech-test-head"><b>${r?.ok?'✓ Leitura validada':'⚠ Verificação incompleta'}</b><span>${r?.durationMs??''} ms</span></div>${(r?.checks||[]).map(c=>`<div class="tech-test-line"><span class="${c.ok?'ok':'bad'}">${c.ok?'✓':'×'}</span><div><b>${esc(c.name)}</b><small>${esc(c.detail)}</small></div></div>`).join('')}`;}async function saveCfg(){const b=UI.$('techSaveIntegration');b.disabled=true;b.textContent='Salvando...';try{const n=await SeleneIntegration.saveSettings({enabled:UI.$('techIntegrationEnabled').checked,serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,interval:Number(UI.$('techInterval').value||10)*1000});AppState.addAudit('Configuração de integração alterada',`Servidor ${n.serverBase} · grupo ${n.codGrupo} · empresa ${n.codEmp}.`,{category:'integracao',secure:!SecurityApi.isServerMode()});UI.toast(SecurityApi.isServerMode()?'Configuração salva no servidor.':SecurityApi.isAccountCloud()?'Configuração salva no Supabase.':'Configuração local salva no navegador.');}catch(e){UI.toast(e.message);}finally{b.disabled=false;b.textContent='Salvar configuração';render();}}async function test(){const b=UI.$('techTestConnection');b.disabled=true;b.textContent='Testando...';try{const r=await SeleneIntegration.testConnection();result(r);AppState.addAudit('Validação de integração',r.ok?'Leitura validada.':'Leitura não concluída.',{category:'integracao',severity:r.ok?'info':'warning'});}finally{b.disabled=false;b.textContent='Testar conexão e leitura';render();}}function notes(){const d=AppState.getData();d.settings=d.settings||{};d.settings.tiIntegrationNotes=UI.$('techIntegrationNotes').value||'';AppState.save({source:'technical-notes'});UI.toast('Anotações salvas.');}async function guide(){const t=SeleneIntegration.integrationGuide();try{await navigator.clipboard.writeText(t);UI.toast('Roteiro copiado.');}catch{download('roteiro-integracao-selene.txt',t,'text/plain;charset=utf-8');}}function init(){UI.$('techRefresh')?.addEventListener('click',render);UI.$('techForceSync')?.addEventListener('click',()=>DataSync.forceSync());UI.$('techRefreshSelene')?.addEventListener('click',async()=>{await SeleneIntegration.refresh();render();});UI.$('techSaveIntegration')?.addEventListener('click',saveCfg);UI.$('techTestConnection')?.addEventListener('click',test);UI.$('techCopyGuide')?.addEventListener('click',guide);UI.$('techSaveNotes')?.addEventListener('click',notes);UI.$('techDownloadMap')?.addEventListener('click',()=>download('mapa-integracao-site-selene.json',JSON.stringify(map(),null,2)));UI.$('techDownloadSnapshot')?.addEventListener('click',()=>download(`site-selene-snapshot-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(AppState.exportOperationalSnapshot(),null,2)));document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});}return{init,render};})();;
+];box.innerHTML=items.map(([l,v,d])=>`<article class="${server?'good':'warn'}"><span>${esc(l)}</span><b>${esc(v)}</b><small>${esc(d)}</small></article>`).join('');}async function render(){if(!Permissions.can('technical'))return;await SeleneIntegration.loadServerConfig?.();const d=AppState.getData(),m=map(),c=SeleneIntegration.getSettings();UI.$('techVersion').textContent=d.version||'2.0';UI.$('techProtocol').textContent=location.protocol.replace(':','').toUpperCase();UI.$('techHost').textContent=location.host||'arquivo local';UI.$('techStorage').textContent=bytes(ls());const rows=[['Usuários',AppState.users.length],['Contas TI',AppState.users.filter(u=>u.role==='ti').length],['Requisições abertas',(d.productionRequests||[]).filter(r=>r.status==='open').length],['Paletes na operação',SeleneIntegration.currentRequests().length],['Sincronização',DataSync.isConnected()?'Conectada':'Local/offline'],['Autenticação',SecurityApi.isServerMode()?'Servidor + sessão':SecurityApi.isAccountCloud()?'Supabase Auth':'Modo local'],['Sistema oficial pelo navegador',SecurityApi.isServerMode()?'NÃO':SecurityApi.isAccountCloud()?'Somente leitura quando a API permitir CORS':'Direto no navegador'],['Escrita oficial',m.writeEnabled?'LIBERADA':'BLOQUEADA']];UI.$('techDiagnostics').innerHTML=rows.map(([l,v])=>`<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('');UI.$('techIntegrationMap').textContent=JSON.stringify(m,null,2);UI.$('techApiBase').value=c.serverBase||'';UI.$('techCodGrupo').value=c.codGrupo||'';UI.$('techCodEmp').value=c.codEmp||'';UI.$('techRoutePending').value=c.routePending||'';UI.$('techRouteAttendance').value=c.routeAttendance||'';UI.$('techInterval').value=Math.round(Number(c.interval||10000)/1000);UI.$('techIntegrationEnabled').checked=c.enabled!==false;UI.$('techIntegrationGuide').textContent=SeleneIntegration.integrationGuide();UI.$('techIntegrationNotes').value=d.settings?.tiIntegrationNotes||'';await security();}function result(r){const b=UI.$('techConnectionResult');if(!b)return;b.className=`tech-test-result ${r?.ok?'ok':'error'}`;b.innerHTML=`<div class="tech-test-head"><b>${r?.ok?'✓ Leitura validada':'⚠ Verificação incompleta'}</b><span>${r?.durationMs??''} ms</span></div>${(r?.checks||[]).map(c=>`<div class="tech-test-line"><span class="${c.ok?'ok':'bad'}">${c.ok?'✓':'×'}</span><div><b>${esc(c.name)}</b><small>${esc(c.detail)}</small></div></div>`).join('')}`;}async function saveCfg(){const b=UI.$('techSaveIntegration');b.disabled=true;b.textContent='Salvando...';try{const n=await SeleneIntegration.saveSettings({enabled:UI.$('techIntegrationEnabled').checked,serverBase:UI.$('techApiBase').value,codGrupo:UI.$('techCodGrupo').value,codEmp:UI.$('techCodEmp').value,routePending:UI.$('techRoutePending').value,routeAttendance:UI.$('techRouteAttendance').value,interval:Number(UI.$('techInterval').value||10)*1000});AppState.addAudit('Configuração de integração alterada',`Servidor ${n.serverBase} · grupo ${n.codGrupo} · empresa ${n.codEmp}.`,{category:'integracao',secure:!SecurityApi.isServerMode()});UI.toast(SecurityApi.isServerMode()?'Configuração salva no servidor.':SecurityApi.isAccountCloud()?'Configuração salva no Supabase.':'Configuração local salva no navegador.');}catch(e){UI.toast(e.message);}finally{b.disabled=false;b.textContent='Salvar configuração';render();}}async function test(){const b=UI.$('techTestConnection');b.disabled=true;b.textContent='Testando...';try{const r=await SeleneIntegration.testConnection();result(r);AppState.addAudit('Validação de integração',r.ok?'Leitura validada.':'Leitura não concluída.',{category:'integracao',severity:r.ok?'info':'warning'});}finally{b.disabled=false;b.textContent='Testar conexão e leitura';render();}}function notes(){const d=AppState.getData();d.settings=d.settings||{};d.settings.tiIntegrationNotes=UI.$('techIntegrationNotes').value||'';AppState.save({source:'technical-notes'});UI.toast('Anotações salvas.');}async function guide(){const t=SeleneIntegration.integrationGuide();try{await navigator.clipboard.writeText(t);UI.toast('Roteiro copiado.');}catch{download('roteiro-integracao-selene.txt',t,'text/plain;charset=utf-8');}}function init(){UI.$('techRefresh')?.addEventListener('click',render);UI.$('techForceSync')?.addEventListener('click',()=>DataSync.forceSync());UI.$('techRefreshSelene')?.addEventListener('click',async()=>{await SeleneIntegration.refresh();render();});UI.$('techSaveIntegration')?.addEventListener('click',saveCfg);UI.$('techTestConnection')?.addEventListener('click',test);UI.$('techCopyGuide')?.addEventListener('click',guide);UI.$('techSaveNotes')?.addEventListener('click',notes);UI.$('techDownloadMap')?.addEventListener('click',()=>download('mapa-integracao-site-selene.json',JSON.stringify(map(),null,2)));UI.$('techDownloadSnapshot')?.addEventListener('click',()=>download(`site-selene-snapshot-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(AppState.exportOperationalSnapshot(),null,2)));document.addEventListener('view:changed',e=>{if(e.detail.name==='tecnico')render();});}return{init,render};})();;
 document.addEventListener('DOMContentLoaded',async()=>{
   await SecurityApi.init();
   if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())document.body.classList.add('local-test-mode');
