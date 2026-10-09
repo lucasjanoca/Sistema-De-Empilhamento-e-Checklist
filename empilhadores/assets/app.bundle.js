@@ -1121,6 +1121,7 @@ const Auth=(()=>{
 })();;
 const Operation = (() => {
   const timers = new Map();
+  let movementTicker = null;
   let elapsedRefreshTimer = null;
   const FLOOR_UNLOCK_MS = 90 * 60 * 1000;
   const WAIT_ALERT_MS = 10 * 60 * 1000;
@@ -1557,44 +1558,67 @@ const Operation = (() => {
     startTimer(request.id);
   }
 
+  // Um relógio compartilhado atualiza somente os contadores visíveis.
+  // Não serializa o estado inteiro a cada 250ms para cada palete.
+  function stopMovementTickerWhenIdle(){
+    if(timers.size === 0 && movementTicker !== null){
+      clearInterval(movementTicker);
+      movementTicker = null;
+    }
+  }
+  function stopTimer(id){
+    const entry = timers.get(id);
+    if(entry) clearTimeout(entry.timeout);
+    timers.delete(id);
+    stopMovementTickerWhenIdle();
+  }
+  function updateMovementCountdowns(){
+    const requests = new Map(AppState.getData().requests.map(request => [request.id, request]));
+    const now = Date.now();
+    for(const [id, entry] of [...timers]){
+      const request = requests.get(id);
+      if(!request || !['lowering','returning'].includes(request.status)){
+        stopTimer(id);
+        continue;
+      }
+      const deadline = Number(request.movementDeadlineAt || entry.deadline);
+      if(deadline !== entry.deadline){
+        stopTimer(id);
+        startTimer(id);
+        continue;
+      }
+      const remaining = Math.max(0, Math.ceil((deadline - now) / 1000));
+      request.remaining = remaining;
+      const counter = UI.$('countdown-' + id);
+      if(counter && counter.textContent !== remaining + 's') counter.textContent = remaining + 's';
+    }
+    stopMovementTickerWhenIdle();
+  }
   function startTimer(id){
-    if(timers.has(id))return;
-
-    const tick=()=>{
-      const current=AppState.getData().requests.find(r=>r.id===id);
-      if(!current || !['lowering','returning'].includes(current.status)){
-        const active=timers.get(id);
-        if(active)clearInterval(active);
-        timers.delete(id);
+    const request = AppState.getData().requests.find(item => item.id === id);
+    if(!request || !['lowering','returning'].includes(request.status)) return;
+    const deadline = Number(request.movementDeadlineAt ||
+      (Number(request.movementStartedAt || Date.now()) + 10_000));
+    request.movementDeadlineAt = deadline;
+    const existing = timers.get(id);
+    if(existing?.deadline === deadline) return;
+    if(existing) stopTimer(id);
+    const timeout = setTimeout(() => {
+      // Conferir o estado atual: outros tablets podem ter atualizado o palete.
+      timers.delete(id);
+      stopMovementTickerWhenIdle();
+      const current = AppState.getData().requests.find(item => item.id === id);
+      if(!current || !['lowering','returning'].includes(current.status)) return;
+      if(Number(current.movementDeadlineAt) !== deadline){
+        startTimer(id);
         return;
       }
-
-      const deadline=Number(
-        current.movementDeadlineAt ||
-        (Number(current.movementStartedAt||Date.now())+10_000)
-      );
-      current.movementDeadlineAt=deadline;
-      current.remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));
-
-      const counter=UI.$(`countdown-${id}`);
-      if(counter)counter.textContent=`${current.remaining}s`;
-
-      AppState.save({silent:true,preserveTimestamp:true});
-
-      if(Date.now()>=deadline){
-        const active=timers.get(id);
-        if(active)clearInterval(active);
-        timers.delete(id);
-        finalizeMovement(id);
-      }
-    };
-
-    tick();
-    const current=AppState.getData().requests.find(r=>r.id===id);
-    if(current && ['lowering','returning'].includes(current.status)){
-      const timer=setInterval(tick,250);
-      timers.set(id,timer);
-    }
+      if(Date.now() >= deadline) finalizeMovement(id);
+      else startTimer(id);
+    }, Math.max(0, deadline - Date.now()));
+    timers.set(id, {timeout, deadline});
+    if(movementTicker === null) movementTicker = setInterval(updateMovementCountdowns, 250);
+    updateMovementCountdowns();
   }
 
   function resumeMovementTimers(){
@@ -1617,9 +1641,7 @@ const Operation = (() => {
   }
 
   function undoMovement(id){
-    const timer=timers.get(id);
-    if(timer)clearInterval(timer);
-    timers.delete(id);
+    stopTimer(id);
 
     const request=AppState.getData().requests.find(r=>r.id===id);
     if(!request)return;
