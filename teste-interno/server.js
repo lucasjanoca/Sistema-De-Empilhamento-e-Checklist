@@ -1,13 +1,13 @@
 'use strict';
-// Servidor LOCAL de teste: expõe somente leitura de quatro consultas da Selene.
-// Não instala nada na rede da empresa, não altera o sistema original,
-// não requer biblioteca externa e pode atender tablets da mesma rede com código temporário.
+// Aplicação de implantação: lê requisições da Selene e só envia movimentações
+// se existir um adaptador corporativo explícito e servidor HTTPS autorizado.
+// Não utiliza simulação nem movimentação fictícia.
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const {createTestMovements}=require('./test-movements');
+const {createOfficialOperations}=require('./official-operations');
 
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_BASE = 'http://192.168.112.3/reqempilhadeira-api.prd';
@@ -48,7 +48,9 @@ function configFromEnv(env=process.env) {
     : '';
   if(lanEnabled && accessCode.length<12)
     throw new Error('A senha de acesso deve conter pelo menos 12 caracteres.');
-  return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode,customAccessCode,accessUsername};
+  const officialWritesEnabled=String(env.SELENE_OFFICIAL_WRITES||'')==='1';
+  const adapterPath=String(env.SELENE_WRITE_ADAPTER_PATH||'').trim();
+  return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode,customAccessCode,accessUsername,officialWritesEnabled,adapterPath};
 }
 
 function json(res,status,value){
@@ -170,7 +172,7 @@ function createHandler(cfg,options={}){
   let pendingSnapshot=null;
   let lastRead={ok:false,checkedAt:null,pending:0,attendance:0,error:'Ainda não foi feita consulta.'};
   let lastPrinted='';
-  const testMovements=createTestMovements();
+  const operations=options.operations||createOfficialOperations({config:cfg,readUpstream,routes});
   const root = options.root || ROOT;
   return async (req,res)=>{
     if(!allowedBrowserRequest(req))return json(res,403,{ok:false,error:'Acesso fora da rede interna ou de outra origem bloqueado.'});
@@ -178,26 +180,33 @@ function createHandler(cfg,options={}){
     let pathname;
     try{pathname=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname);}
     catch{return json(res,400,{ok:false,error:'Caminho inválido.'});}
-    if(req.method==='POST' && ['/api/selene-test/move','/api/selene-test/undo'].includes(pathname)){
-      // Escreve APENAS no simulador em memória deste PC, nunca na API original.
-      const chunks=[];
-      let size=0;
-      for await(const chunk of req){
-        size+=chunk.length;
-        if(size>2048)return json(res,413,{ok:false,error:'Requisição muito grande.'});
-        chunks.push(chunk);
+    if(req.method==='POST' && pathname==='/api/selene-operation/move'){
+      if(!operations.enabled())
+        return json(res,503,{ok:false,error:'Movimentação oficial indisponível: falta o adaptador de escrita da Selene.'});
+      if(cfg.lanEnabled && !(req.socket?.remoteAddress==='127.0.0.1' ||
+           req.socket?.remoteAddress==='::1' || req.socket?.remoteAddress==='::ffff:127.0.0.1')){
+        return json(res,403,{ok:false,error:'Gravação disponível somente via servidor local ou proxy HTTPS autorizado.'});
       }
-      let input;
-      try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'));}
-      catch{return json(res,400,{ok:false,error:'Requisição JSON inválida.'});}
-      const action=pathname.endsWith('/undo')?'undo':input?.direction;
-      const result=testMovements.act(input?.id,action,cfg.accessUsername||'Operador de teste');
-      return json(res,result.ok?200:result.status,result);
+      let raw='';
+      try{
+        for await(const chunk of req){
+          raw+=chunk.toString('utf8');
+          if(Buffer.byteLength(raw)>2048)return json(res,413,{ok:false,error:'Corpo da requisição muito grande.'});
+        }
+        const payload=JSON.parse(raw);
+        const response=await operations.move({
+          id:payload?.id,direction:payload?.direction,
+          actor:cfg.accessUsername
+        });
+        return json(res,response.ok?200:(response.status||409),response);
+      }catch(error){
+        return json(res,400,{ok:false,error:String(error.message||'Movimentação recusada').slice(0,250)});
+      }
     }
     if(req.method!=='GET' && req.method!=='HEAD')
-      return json(res,405,{ok:false,error:'A escrita na API oficial da Selene está desativada.'});
+      return json(res,405,{ok:false,error:'Rota não aceita escrita.'});
     if(pathname==='/api/selene-read/status')
-      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pollMs:3000,writeEnabled:false,testMoveEnabled:true,read:lastRead});
+      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pollMs:5000,writeEnabled:operations.enabled(),officialOperations:true,read:lastRead});
     if(pathname==='/api/selene-read/snapshot'){
       try{
         if(!pendingSnapshot){
@@ -214,7 +223,6 @@ function createHandler(cfg,options={}){
               }
               return Number.isFinite(Number(list?.Count)) ? Number(list.Count) : 0;
             }
-            testMovements.update(pending,attendance);
             lastRead={
               ok:true,checkedAt:new Date().toISOString(),
               pending:count(pending),attendance:count(attendance),error:null
@@ -229,8 +237,7 @@ function createHandler(cfg,options={}){
               codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pending,attendance,feedback:null,addresses:null};
           })().finally(()=>{pendingSnapshot=null;});
         }
-        const current=await pendingSnapshot;
-        return json(res,200,{...current,testMode:true,testMovements:testMovements.snapshot()});
+        return json(res,200,await pendingSnapshot);
       }catch(error){
         lastRead={ok:false,checkedAt:new Date().toISOString(),pending:0,attendance:0,
           error:String(error?.message||'Falha desconhecida').slice(0,240)};
@@ -243,7 +250,7 @@ function createHandler(cfg,options={}){
           codGrupo:cfg.codGrupo,codEmp:cfg.codEmp});
       }
     }
-    if(pathname.startsWith('/api/'))return json(res,404,{ok:false,error:'Rota indisponível; simulação limitada à memória do servidor.'});
+    if(pathname.startsWith('/api/'))return json(res,404,{ok:false,error:'Rota inexistente.'});
     if(pathname==='/') pathname='/empilhadores/';
     if(pathname.endsWith('/')) pathname+='index.html';
     const target=path.resolve(root,'.'+pathname);
@@ -262,6 +269,11 @@ function createHandler(cfg,options={}){
   };
 }
 
+function operationsEnabledMessage(cfg){
+  return cfg.officialWritesEnabled
+    ? 'Escrita solicitada: exige adaptador corporativo e validacao das respostas oficiais.'
+    : 'Movimentacoes: BLOQUEADAS ate configurar o contrato de escrita oficial.';
+}
 function createServer(cfg=configFromEnv(),options={}){
   return http.createServer(createHandler(cfg,options));
 }
@@ -272,7 +284,7 @@ if(require.main===module){
   server.listen(cfg.port,cfg.bindHost,()=>{
     const port=server.address().port;
     console.log('');
-    console.log('InfoTech / Selene — teste de leitura interna');
+    console.log('InfoTech / Selene — aplicacao para instalacao no PC');
     console.log('Computador: http://127.0.0.1:'+port+'/empilhadores/');
     if(cfg.lanEnabled){
       const addresses=localAddresses();
@@ -281,13 +293,13 @@ if(require.main===module){
       console.log('Usuario do acesso restrito: '+cfg.accessUsername);
       if(cfg.customAccessCode) console.log('Senha de acesso: a mesma que voce digitou ao iniciar (nao exibida).');
       else console.log('Codigo temporario: '+cfg.accessCode);
-      console.log('AVISO: HTTP na LAN nao e criptografado. Uso temporario em rede isolada.');
+      console.log('AVISO: HTTP LAN nao e adequado para operacao definitiva. Configure HTTPS no servidor da empresa.');
     }
     console.log('Grupo: '+cfg.codGrupo+' | Empilhadeira: '+cfg.codEmp);
-    console.log('Consultas oficiais: somente GET. Arraste de teste sincroniza PC/tablets em memoria.');
-    console.log('Movimentacoes oficiais da Selene continuam DESATIVADAS.');
+    console.log('Paletes: consultas oficiais.');
+    console.log(operationsEnabledMessage(cfg));
     console.log('Pressione Ctrl+C para encerrar.');
     console.log('');
   });
 }
-module.exports={createServer,configFromEnv,readUpstream,upstreamUrl,routes,isPrivateIPv4,authenticated,localAddresses};
+module.exports={createServer,configFromEnv,readUpstream,upstreamUrl,routes,isPrivateIPv4,authenticated,localAddresses,operationsEnabledMessage};
