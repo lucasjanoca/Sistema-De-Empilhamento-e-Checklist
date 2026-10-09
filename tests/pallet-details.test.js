@@ -40,7 +40,7 @@ const ctx={
     dispatchEvent(event){actions.push(event);}
   },
   AppState:{getData:()=>({requests,history}),getUser:()=>({role:'empilhador'})},
-  SeleneIntegration:{currentRequests:()=>requests,canTestMove:()=>false},
+  SeleneIntegration:{currentRequests:()=>requests,canOfficialMove:()=>false},
   Permissions:{can:()=>canOperate},
   CustomEvent:class {constructor(type,opts){this.type=type;this.detail=opts.detail;}},
   Date,Number,String,Set,Math
