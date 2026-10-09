@@ -16,9 +16,13 @@ jobs:
         run: |
           node --check empilhadores/assets/app.bundle.js
           node --check empilhadores/assets/pallet-drag.js
+          node --check empilhadores/assets/pallet-details.js
           node --check tests/pallet-drag.test.js
+          node --check tests/pallet-details.test.js
       - name: Simular o movimento com mouse
         run: node tests/pallet-drag.test.js
+      - name: Testar histórico e controle de acesso
+        run: node tests/pallet-details.test.js
       - name: Validar regras operacionais e vinculação de arquivos
         run: |
           node <<'NODE'
@@ -28,6 +32,7 @@ jobs:
           const drag = fs.readFileSync('empilhadores/assets/pallet-drag.js','utf8');
           const bundle = fs.readFileSync('empilhadores/assets/app.bundle.js','utf8');
           const css = fs.readFileSync('empilhadores/assets/pallet-drag.css','utf8');
+          const details = fs.readFileSync('empilhadores/assets/pallet-details.js','utf8');
           assert.match(html, /assets\/pallet-drag\.css/);
           assert.match(html, /assets\/pallet-drag\.js/);
           assert.ok(html.indexOf('assets/pallet-drag.js') > html.indexOf('assets/app.bundle.js'));
@@ -42,5 +47,15 @@ jobs:
           assert.match(bundle, /receivePalletDrop\(event, 'ready'\)/);
           assert.match(css, /touch-action: none/);
           assert.match(css, /transition: none !important/);
-          console.log('14 verificações de integração passaram.');
+          assert.match(html, /assets\/pallet-details\.js/);
+          assert.match(html, /assets\/pallet-details\.css/);
+          assert.match(html, /id="palletDetailsDialog"/);
+          assert.match(details, /selene:pallet-details/);
+          assert.match(details, /selene:pallet-action/);
+          assert.match(bundle, /document\.dispatchEvent\(new CustomEvent\('selene:pallet-details'/);
+          assert.match(bundle, /document\.addEventListener\('selene:pallet-action'/);
+          const timerArea = bundle.slice(bundle.indexOf('function startTimer(id)'),bundle.indexOf('function resumeMovementTimers()'));
+          assert.doesNotMatch(timerArea,/AppState\.save\(/);
+          assert.match(timerArea,/movementTicker/);
+          console.log('23 verificações de integração passaram.');
           NODE
