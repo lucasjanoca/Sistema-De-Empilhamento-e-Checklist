@@ -23,6 +23,8 @@ jobs:
           node --check tests/official-only.test.js
           node --check teste-interno/server.js
           node --check tests/internal-lan.test.js
+          node --check teste-interno/test-movements.js
+          node --check tests/pallet-live-move.test.js
       - name: Simular o movimento com mouse
         run: node tests/pallet-drag.test.js
       - name: Testar histórico e controle de acesso
@@ -33,6 +35,8 @@ jobs:
         run: node tests/official-only.test.js
       - name: Testar acesso PC e tablet na LAN
         run: node tests/internal-lan.test.js
+      - name: Movimentações de teste no PC e tablet
+        run: node tests/pallet-live-move.test.js
       - name: Validar regras operacionais e vinculação de arquivos
         run: |
           node <<'NODE'
@@ -52,7 +56,8 @@ jobs:
           assert.match(drag, /selene:pallet-dropped-down/);
           assert.match(drag, /selene:pallet-dropped-up/);
           assert.match(drag, /pointercancel/);
-          assert.match(bundle, /request\.status !== requiredStatus \|\| request\.external/);
+          assert.match(bundle, /request\.status !== requiredStatus/);
+          assert.match(bundle, /SeleneIntegration\.testAction\(id,direction\)/);
           assert.match(bundle, /receivePalletDrop\(event, 'waiting'\)/);
           assert.match(bundle, /receivePalletDrop\(event, 'ready'\)/);
           assert.match(css, /touch-action: none/);
@@ -77,5 +82,8 @@ jobs:
           assert.match(bundle,/Solicitações manuais desativadas/);
           assert.match(bundle,/A leitura real exige servidor corporativo autorizado/);
           assert.match(bundle,/Sem consulta à Selene/);
-          console.log('33 verificações de integração passaram.');
+          assert.match(drag,/SeleneIntegration\.canTestMove/);
+          assert.match(bundle,/testMovements:data\.testMovements/);
+          assert.match(bundle,/MODO TESTE \(não altera Selene\)/);
+          console.log('36 verificações de integração passaram.');
           NODE
