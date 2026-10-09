@@ -1121,6 +1121,7 @@ const Auth=(()=>{
 })();;
 const Operation = (() => {
   const timers = new Map();
+  const pendingMovements = new Map(); // Somente visual até confirmar o lock.
   let movementTicker = null;
   let elapsedRefreshTimer = null;
   const FLOOR_UNLOCK_MS = 90 * 60 * 1000;
@@ -1270,7 +1271,7 @@ const Operation = (() => {
     return data.requests.filter(request =>
       data.selectedCorridors.includes(request.corridor) &&
       (!query || `${request.address} ${request.operator}`.toLowerCase().includes(query)) &&
-      (status === 'all' || request.status === status)
+      (status === 'all' || request.status === status || pendingMovements.has(request.id) || ['lowering','returning'].includes(request.status))
     ).sort(compareAddresses);
   }
   function picMarkup(request){
@@ -1367,20 +1368,59 @@ const Operation = (() => {
     if(['lowering','returning'].includes(request.status)) return movingCard(request);
     return stableCard(request);
   }
+
+  function pendingMovementCard(request,direction){
+    const down = direction === 'down';
+    return '<article class="pallet-card ' + (down ? 'lowering' : 'returning') +
+      ' pallet-pending-validation" data-id="' + request.id + '" aria-live="polite">' +
+      '<div><div class="pallet-title-line"><b>' + request.address + '</b>' +
+      (request.isPic ? '<span class="pic-badge">EXP-PIC</span>' : '') +
+      '</div><small>' + (request.operator || '') + '</small>' + handlerMarkup(request) +
+      '</div><div class="card-footer"><span>' +
+      (down ? '↓ Validando descida...' : '↑ Validando subida...') +
+      '</span><b>…</b></div></article>';
+  }
+  function focusPendingMovement(id,direction){
+    const viewport = UI.$('palletUnifiedScroll');
+    const grid = UI.$(direction === 'down' ? 'bottomGrid' : 'topGrid');
+    const card = [...(grid?.querySelectorAll('.pallet-card') || [])]
+      .find(element => Number(element.dataset.id) === id);
+    if(!viewport || !card) return;
+    const frame = viewport.getBoundingClientRect();
+    const rect = card.getBoundingClientRect();
+    let delta = 0;
+    if(rect.top < frame.top + 8) delta = rect.top - frame.top - 10;
+    else if(rect.bottom > frame.bottom - 8) delta = rect.bottom - frame.bottom + 10;
+    if(!delta) return;
+    const previous = viewport.style.scrollBehavior;
+    viewport.style.scrollBehavior = 'auto';
+    viewport.scrollTop += delta;
+    viewport.style.scrollBehavior = previous;
+  }
+
   function renderRequests(){
     unlockDueFloorRequests();
-    const data = AppState.getData();
     const list = visibleRequests();
-    const top = list.filter(r => ['waiting','returning'].includes(r.status));
-    let bottom = list.filter(r => ['lowering','floor','ready'].includes(r.status));
+    const boardFor = request => {
+      const pending = pendingMovements.get(request.id);
+      return pending || (['waiting','returning'].includes(request.status) ? 'up' : 'down');
+    };
+    const top = list.filter(request => boardFor(request) === 'up');
+    let bottom = list.filter(request => boardFor(request) === 'down');
     if(UI.$('availableOnly').checked){
-      bottom = bottom.filter(r => r.status === 'ready');
+      bottom = bottom.filter(request =>
+        request.status === 'ready' || request.status === 'lowering' ||
+        pendingMovements.get(request.id) === 'down');
     }
+    const display = request => {
+      const pending = pendingMovements.get(request.id);
+      return pending ? pendingMovementCard(request,pending) : cardTemplate(request);
+    };
     UI.$('topGrid').innerHTML = top.length
-      ? top.map(cardTemplate).join('')
+      ? top.map(display).join('')
       : '<div class="empty">Nenhum palet nesta seleção.</div>';
     UI.$('bottomGrid').innerHTML = bottom.length
-      ? bottom.map(cardTemplate).join('')
+      ? bottom.map(display).join('')
       : (UI.$('availableOnly').checked
           ? '<div class="empty">Nenhum palet disponível para subir.</div>'
           : '<div class="empty">Nenhum palet baixado.</div>');
@@ -1493,69 +1533,76 @@ const Operation = (() => {
     }
   }
 
-  async function startMovement(request,direction){
-    if(timers.has(request.id)||request.__locking)return;
 
-    request.__locking=true;
+  async function startMovement(request,direction){
+    if(timers.has(request.id) || request.__locking || pendingMovements.has(request.id)) return;
+    const id = request.id;
+    const requiredStatus = direction === 'down' ? 'waiting' : 'ready';
+    if(request.status !== requiredStatus) return;
+
+    // Estado temporário SOMENTE na tela. Nenhuma movimentação é registrada até obter o lock.
+    request.__locking = true;
+    pendingMovements.set(id,direction);
+    renderRequests();
+    focusPendingMovement(id,direction);
+
     try{
       await SecurityApi.acquirePalletLock(request,direction);
     }catch(error){
-      request.__locking=false;
-      UI.toast(
-        error?.payload?.lockedBy
-          ? `Palet já está sendo movimentado por ${error.payload.lockedBy}.`
-          : (error?.message||'Este palet já está sendo movimentado.')
-      );
-      AppState.addAudit(
-        'Movimentação concorrente bloqueada',
-        `Tentativa bloqueada no palet ${request.address}.`,
-        {category:'seguranca',severity:'warning'}
-      );
+      request.__locking = false;
+      pendingMovements.delete(id);
+      renderRequests();
+      UI.toast(error?.payload?.lockedBy
+        ? 'Palet já está sendo movimentado por ' + error.payload.lockedBy + '.'
+        : (error?.message||'Este palet já está sendo movimentado.'));
+      AppState.addAudit('Movimentação concorrente bloqueada',
+        'Tentativa bloqueada no palet ' + request.address + '.',
+        {category:'seguranca',severity:'warning'});
       return;
     }
-    request.__locking=false;
 
-    const user=AppState.getUser();
-    const tablet=AppState.getTablet();
-    const production=getOpenProductionRequest(user);
-    if(!production){
+    request.__locking = false;
+    const current = AppState.getData().requests.find(item => item.id === id);
+    const user = AppState.getUser();
+    const tablet = AppState.getTablet();
+    const production = getOpenProductionRequest(user);
+    if(!current || current.status !== requiredStatus || !user ||
+       !Permissions.can('operate',user) || !tablet?.name || !production){
+      pendingMovements.delete(id);
+      renderRequests();
       await SecurityApi.releasePalletLock(request);
-      UI.toast('A requisição foi encerrada. Inicie outra antes de movimentar.');
+      UI.toast('O estado da requisição mudou ou o acesso expirou. Confira e tente novamente.');
       return;
     }
 
-    request.lastHandledByMatricula=user?.matricula||'';
-    request.lastHandledByName=user?.nome||'';
-    request.lastHandledTablet=tablet?.name||tablet?.id||'';
-    request.lastHandledAt=Date.now();
-    request.movementActorName=user?.nome||'Sistema';
-    request.movementActorMatricula=user?.matricula||'sistema';
-    request.movementActorRole=user?.role||'sistema';
-    request.previousStatus=request.status;
-    request.status=direction==='down'?'lowering':'returning';
-    request.movementRequestId=production.id;
-    request.movementRequestNumber=production.number;
-    request.movementStartedAt=Date.now();
-    request.movementDeadlineAt=request.movementStartedAt+10_000;
-    request.remaining=10;
+    current.lastHandledByMatricula=user.matricula||'';
+    current.lastHandledByName=user.nome||'';
+    current.lastHandledTablet=tablet.name||tablet.id||'';
+    current.lastHandledAt=Date.now();
+    current.movementActorName=user.nome||'Sistema';
+    current.movementActorMatricula=user.matricula||'sistema';
+    current.movementActorRole=user.role||'sistema';
+    current.previousStatus=current.status;
+    current.status=direction==='down'?'lowering':'returning';
+    current.movementRequestId=production.id;
+    current.movementRequestNumber=production.number;
+    current.movementStartedAt=Date.now();
+    current.movementDeadlineAt=current.movementStartedAt+10_000;
+    current.remaining=10;
+    pendingMovements.delete(id);
 
-    addHistory(
-      request.address,
-      direction==='down'
-        ? 'Descida iniciada — 10s para cancelar'
-        : 'Subida iniciada — 10s para voltar',
-      null,
-      {requestNumber:production.number,tabletName:tablet?.name||''}
-    );
-
+    // Substitui o cartão de validação por "Descendo" ou "Subindo", no mesmo destino.
+    renderRequests();
+    addHistory(current.address,
+      direction==='down' ? 'Descida iniciada — 10s para cancelar'
+                         : 'Subida iniciada — 10s para voltar',
+      null,{requestNumber:production.number,tabletName:tablet.name||''});
     AppState.save({source:'operation'});
     renderAll();
-    UI.toast(
-      direction==='down'
-        ? 'O palet já foi para baixo. Você tem 10 segundos para cancelar.'
-        : 'O palet já foi para cima. Você tem 10 segundos para voltar.'
-    );
-    startTimer(request.id);
+    startTimer(current.id);
+    UI.toast(direction==='down'
+      ? 'Palet na área de baixo. Você tem 10 segundos para cancelar.'
+      : 'Palet na área de cima. Você tem 10 segundos para voltar.');
   }
 
   // Um relógio compartilhado atualiza somente os contadores visíveis.
