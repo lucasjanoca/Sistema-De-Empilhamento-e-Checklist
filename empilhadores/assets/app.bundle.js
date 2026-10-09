@@ -2325,7 +2325,8 @@ const MyPallets=(()=>{
 const Indicators = (() => {
   function render(){
     const data = AppState.getData();
-    const history = data.history;
+    // Eventos locais anteriores não são movimentos confirmados pela Selene.
+    const history = [];
     const down = history.filter(h => h.direction === 'down').length;
     const up = history.filter(h => h.direction === 'up').length;
     const canceled = history.filter(h => h.action.toLowerCase().includes('cancelada')).length;
