@@ -15,6 +15,19 @@ assert.equal(cfg.bindHost,'0.0.0.0');
 assert.equal(cfg.lanEnabled,true);
 assert.ok(cfg.accessCode.length>=12);
 assert.equal(cfg.customAccessCode,true);
+const usernameConfig=configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/api',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',
+  SELENE_ALLOW_LAN:'1',SELENE_TEST_USERNAME:'123456',
+  SELENE_TEST_ACCESS_CODE:code,SELENE_TEST_PORT:'0'
+});
+assert.equal(usernameConfig.accessUsername,'123456');
+assert.throws(()=>configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/api',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',
+  SELENE_ALLOW_LAN:'1',SELENE_TEST_USERNAME:'identificador-errado',
+  SELENE_TEST_ACCESS_CODE:code,SELENE_TEST_PORT:'0'
+}),/Matrícula/);
 const chosenPassword='SenhaEscolhida!';
 const chosenConfig=configFromEnv({
   SELENE_API_BASE:'http://127.0.0.1:33333/reqempilhadeira-api.prd',
@@ -39,6 +52,8 @@ const starterScript=fs.readFileSync('teste-interno/INICIAR-PC-E-TABLETS.ps1','ut
 assert.match(starter,/INICIAR-PC-E-TABLETS\.ps1/);
 assert.match(starterScript,/Read-Host.*-AsSecureString/);
 assert.match(starterScript,/SELENE_TEST_ACCESS_CODE/);
+assert.match(starterScript,/SELENE_TEST_USERNAME/);
+assert.match(starterScript,/Matricula para login/);
 assert.match(starterScript,/ZeroFreeBSTR/);
 assert.equal(isPrivateIPv4('192.168.112.3'),true);
 assert.equal(isPrivateIPv4('172.20.10.1'),true);
