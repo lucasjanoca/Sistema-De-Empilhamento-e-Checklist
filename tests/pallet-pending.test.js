@@ -44,7 +44,7 @@ const context={
     save:opts=>saves.push(opts),
     addAudit:(...args)=>history.push(['audit',...args])
   },
-  SeleneIntegration:{currentRequests:()=>data.requests,hasLiveData:()=>true},
+  SeleneIntegration:{currentRequests:()=>data.requests,hasLiveData:()=>true,canOfficialMove:()=>false},
   UI:{
     $:id=>elements[id],
     toast:message=>messages.push(message)

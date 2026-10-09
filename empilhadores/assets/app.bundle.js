@@ -1281,8 +1281,8 @@ const Operation = (() => {
     return request.isPic ? '<span class="pic-badge">EXP-PIC</span><div class="pic-message">⚠ Avisar armazenista</div>' : '';
   }
   function handlerMarkup(request){
-    if(request.external && SeleneIntegration.canTestMove())
-      return '<small class="handler-info">⚠ MODO TESTE · não altera o sistema original</small>';
+    if(request.external)
+      return '<small class="handler-info">Requisição oficial da Selene</small>';
     if(!request.lastHandledByName) return '';
     const tablet = request.lastHandledTablet ? ` · ${request.lastHandledTablet}` : '';
     return `<small class="handler-info">Último: ${request.lastHandledByName}${tablet}</small>`;
@@ -1493,24 +1493,26 @@ const Operation = (() => {
     }
 
     if(request.external){
-      if(!SeleneIntegration.canTestMove()){
-        UI.toast('A movimentação oficial não está conectada; abra o teste pelo servidor do PC.');
+      if(!SeleneIntegration.canOfficialMove()){
+        UI.toast('Movimentação indisponível: falta configurar a escrita oficial da Selene no servidor.');
         return;
       }
       if(['lowering','returning'].includes(request.status)){
-        SeleneIntegration.testAction(request.id,'undo');
-      }else if(['waiting','ready'].includes(request.status)){
+        UI.toast('Cancelamento oficial não configurado. Confira a requisição no sistema original.');
+        return;
+      }
+      if(['waiting','ready'].includes(request.status)){
         const direction=request.status==='waiting'?'down':'up';
         if(pendingMovements.has(id))return;
         pendingMovements.set(id,direction);
         renderRequests();
         focusPendingMovement(id,direction);
-        SeleneIntegration.testAction(id,direction).finally(()=>{
+        SeleneIntegration.officialAction(id,direction).finally(()=>{
           pendingMovements.delete(id);
           renderRequests();
         });
       }else{
-        UI.toast('Palete vermelho ainda não está liberado para subir no sistema original.');
+        UI.toast('Palete não liberado para movimentação nesta situação oficial.');
       }
       return;
     }
@@ -2131,7 +2133,7 @@ const Operation = (() => {
         event.stopPropagation();
         const id=Number(undo.dataset.undo);
         const official=SeleneIntegration.currentRequests().find(item=>item.id===id);
-        if(official?.external)SeleneIntegration.testAction(id,'undo');
+        if(official?.external)UI.toast('O cancelamento depende do comando oficial da Selene, ainda não configurado.');
         else undoMovement(id);
         return;
       }
@@ -2751,7 +2753,7 @@ async function probeLocalBridge(){
     const res=await fetch('/api/selene-read/status',{cache:'no-store',signal:AbortSignal.timeout(3500)});
     if(!res.ok)throw new Error('Ponte de leitura indisponível.');
     const info=await res.json();
-    if(info?.ok!==true || info.mode!=='local-interno-readonly' || info.writeEnabled!==false)
+    if(info?.ok!==true || info.mode!=='local-interno-readonly' || typeof info.writeEnabled!=='boolean')
       throw new Error('Servidor local não reconhecido.');
     localBridgeCfg=info;
     localBridgeActive=true;
@@ -2811,7 +2813,7 @@ else if(SecurityApi.isAccountCloud()){
     external:true,officialVerified:true,isPic,sourceType:'OFICIAL',
     officialStatusRaw:i.ies_sit ?? i.ies_sit_novo ?? null
   };
-}function merge(p,a,testState=null){
+}function merge(p,a){
   const raw=[...p.map(i=>map(i,'pending')),...a.map(i=>map(i,'attendance'))];
   if(p.length+a.length && raw.some(item=>!item))
     throw new Error('Há requisições oficiais sem número ou endereço. Nenhum palete será exibido até corrigir o mapeamento.');
@@ -2821,21 +2823,7 @@ else if(SecurityApi.isAccountCloud()){
       throw new Error('Colisão entre identificadores oficiais. Consulte a integração.');
     mapById.set(item.id,item);
   }
-  const overlays=testState?.overlays||{};
-  liveRequests=[...mapById.values()].flatMap(item=>{
-    const overlay=overlays[item.id];
-    if(!overlay)return [item];
-    if(overlay.status==='hidden')return [];
-    return [{
-      ...item,
-      status:overlay.status,
-      remaining:Number(overlay.remaining||0),
-      movementDeadlineAt:overlay.deadline||null,
-      lastHandledByName:String(overlay.lastActor||'Operador de teste'),
-      testMovement:overlay.isTestMovement===true,
-      previousStatus:item.status
-    }];
-  });
+  liveRequests=[...mapById.values()];
   lastReadAt=Date.now();
   Operation?.renderAll();
   Dashboard?.render();
@@ -2862,36 +2850,37 @@ function clearLive(){
       attendance:unwrap(data.attendance),
       feedback:data.feedback?unwrap(data.feedback):[],
       addresses:data.addresses?unwrap(data.addresses):[],
-      testMovements:data.testMovements||null
+      officialOperations:Boolean(data.officialOperations)
     };
   }
   const cfg=settings();
   return {pending:await get(cfg.routePending),attendance:await get(cfg.routeAttendance)};
-}function canTestMove(){return Boolean(localBridgeActive && localBridgeCfg?.testMoveEnabled);}
-async function testAction(id,action){
-  if(!canTestMove() || !Number.isSafeInteger(Number(id))) {
-    UI.toast('Abra a versão de teste no endereço do PC para movimentar paletes.');
+}function canOfficialMove(){
+  return Boolean(localBridgeActive && localBridgeCfg?.officialOperations &&
+    localBridgeCfg?.writeEnabled===true);
+}
+async function officialAction(id,direction){
+  if(!canOfficialMove() || !Number.isSafeInteger(Number(id)) ||
+     !['down','up'].includes(direction)){
+    UI.toast('A movimentação oficial ainda não está disponível neste servidor.');
     return false;
   }
-  const undo=action==='undo';
-  const endpoint=undo?'/api/selene-test/undo':'/api/selene-test/move';
   try{
-    const response=await fetch(endpoint,{
+    const response=await fetch('/api/selene-operation/move',{
       method:'POST',credentials:'same-origin',cache:'no-store',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:Number(id),direction:action}),
-      signal:AbortSignal.timeout(5000)
+      body:JSON.stringify({id:Number(id),direction}),
+      signal:AbortSignal.timeout(12000)
     });
-    const result=await response.json();
-    if(!response.ok || result?.ok!==true)
-      throw new Error(result?.error||'O servidor de teste recusou a movimentação.');
+    const outcome=await response.json();
+    if(!response.ok || outcome?.confirmed!==true || outcome?.ok!==true)
+      throw new Error(outcome?.error||'A Selene não confirmou a operação.');
     await refresh();
-    UI.toast(undo?'Movimentação de TESTE cancelada.':
-      action==='down'?'Descida de TESTE iniciada · 10 segundos para cancelar.':
-                       'Subida de TESTE iniciada · 10 segundos para cancelar.');
+    UI.toast(direction==='down'?'Descida confirmada pelo sistema oficial.':
+                               'Subida confirmada pelo sistema oficial.');
     return true;
   }catch(error){
-    UI.toast(String(error?.message||'Erro na movimentação de teste.'));
+    UI.toast(String(error?.message||'Sem confirmação da movimentação.'));
     await refresh();
     return false;
   }
@@ -2908,9 +2897,9 @@ async function refresh(){
   }
   try{
     status('checking','Selene: consultando paletes oficiais...');
-    const {pending,attendance,testMovements}=await lists();
-    merge(pending,attendance,testMovements);
-    status('online','Selene ao vivo: '+pending.length+' pendente(s), '+attendance.length+' em atendimento · '+cfg.codEmp+' / grupo '+cfg.codGrupo+(canTestMove()?' · MODO TESTE (não altera Selene)':' · somente leitura'));
+    const {pending,attendance}=await lists();
+    merge(pending,attendance);
+    status('online','Selene: '+pending.length+' pendente(s), '+attendance.length+' em atendimento · '+cfg.codEmp+' / grupo '+cfg.codGrupo+(canOfficialMove()?' · escrita oficial habilitada':' · aguardando integração de movimentação'));
     return {ok:true,pending:pending.length,attendance:attendance.length};
   }catch(e){
     clearLive();
@@ -2926,7 +2915,7 @@ async function refresh(){
   }else status('off','Selene: aguardando login');
   restart();
   document.addEventListener('security:login',()=>loadServerConfig().then(refresh));
-}return{init,refresh,currentRequests,hasLiveData,canTestMove,testAction,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
+}return{init,refresh,currentRequests,hasLiveData,canOfficialMove,officialAction,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
 const Reports = (() => {
   function escapeHtml(value=''){
     return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[char]);
