@@ -35,7 +35,17 @@ async function main(){
       return {confirmed:true,officialId:req.officialId};
     }
   };
-  const operations=createOfficialOperations({config,readUpstream,routes,adapter:writer});
+  const noIdentity=createOfficialOperations({config,readUpstream,routes,adapter:writer});
+  assert.equal(noIdentity.enabled(),false,'Sem validador de login escrita deve ficar bloqueada');
+  assert.equal(await noIdentity.authenticate({}),null);
+  const operatorValidator={
+    async authenticate(req){
+      return req?.authenticated ? {matricula:'123456',canOperate:true} : null;
+    }
+  };
+  const operations=createOfficialOperations({config,readUpstream,routes,adapter:writer,operatorValidator});
+  assert.deepEqual(await operations.authenticate({authenticated:true}),{matricula:'123456'});
+  assert.equal(await operations.authenticate({authenticated:false}),null);
   assert.equal(operations.enabled(),true);
   assert.equal((await operations.move({id:idRed,direction:'up'})).status,409);
   assert.equal((await operations.move({id:123456,direction:'down'})).status,409);
@@ -51,7 +61,8 @@ async function main(){
   const failed=createOfficialOperations({
     config,readUpstream:async (_cfg,r)=>r.path.includes('Pendentes')?pending():attendance(),
     routes,
-    adapter:{move:async req=>({confirmed:false,officialId:req.officialId})}
+    adapter:{move:async req=>({confirmed:false,officialId:req.officialId})},
+    operatorValidator
   });
   const rejected=await failed.move({id:idPending,direction:'down'});
   assert.equal(rejected.ok,false,'Sem confirmacao nao relata sucesso');
