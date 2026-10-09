@@ -164,6 +164,7 @@ function localAddresses(){
 function createHandler(cfg,options={}){
   let pendingSnapshot=null;
   let lastRead={ok:false,checkedAt:null,pending:0,attendance:0,error:'Ainda não foi feita consulta.'};
+  let lastPrinted='';
   const root = options.root || ROOT;
   return async (req,res)=>{
     if(!allowedBrowserRequest(req))return json(res,403,{ok:false,error:'Acesso fora da rede interna ou de outra origem bloqueado.'});
@@ -194,6 +195,12 @@ function createHandler(cfg,options={}){
               ok:true,checkedAt:new Date().toISOString(),
               pending:count(pending),attendance:count(attendance),error:null
             };
+            const marker='ok:'+lastRead.pending+':'+lastRead.attendance;
+            if(marker!==lastPrinted){
+              console.log('[Consulta Selene] '+cfg.codEmp+' · '+lastRead.pending+
+                ' aguardando, '+lastRead.attendance+' em atendimento.');
+              lastPrinted=marker;
+            }
             return {ok:true,source:'Selene',readOnly:true,retrievedAt:lastRead.checkedAt,
               codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pending,attendance,feedback:null,addresses:null};
           })().finally(()=>{pendingSnapshot=null;});
@@ -202,6 +209,11 @@ function createHandler(cfg,options={}){
       }catch(error){
         lastRead={ok:false,checkedAt:new Date().toISOString(),pending:0,attendance:0,
           error:String(error?.message||'Falha desconhecida').slice(0,240)};
+        const marker='erro:'+lastRead.error;
+        if(marker!==lastPrinted){
+          console.warn('[Consulta Selene] Falha em '+cfg.codEmp+': '+lastRead.error);
+          lastPrinted=marker;
+        }
         return json(res,503,{ok:false,error:'Não foi possível consultar a API interna: '+lastRead.error,
           codGrupo:cfg.codGrupo,codEmp:cfg.codEmp});
       }
