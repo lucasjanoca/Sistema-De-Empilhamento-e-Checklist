@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 const http=require('node:http');
 const {createServer,configFromEnv,isPrivateIPv4,upstreamUrl,readUpstream,routes}=require('../teste-interno/server.js');
 const fs=require('node:fs');
+const {identifier}=require('../teste-interno/test-movements');
 const bundle=fs.readFileSync('empilhadores/assets/app.bundle.js','utf8');
 
 const code='um_codigo_de_teste_com_24_caracteres';
@@ -14,6 +15,19 @@ assert.equal(cfg.bindHost,'0.0.0.0');
 assert.equal(cfg.lanEnabled,true);
 assert.ok(cfg.accessCode.length>=12);
 assert.equal(cfg.customAccessCode,true);
+const usernameConfig=configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/api',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',
+  SELENE_ALLOW_LAN:'1',SELENE_TEST_USERNAME:'123456',
+  SELENE_TEST_ACCESS_CODE:code,SELENE_TEST_PORT:'0'
+});
+assert.equal(usernameConfig.accessUsername,'123456');
+assert.throws(()=>configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/api',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',
+  SELENE_ALLOW_LAN:'1',SELENE_TEST_USERNAME:'identificador-errado',
+  SELENE_TEST_ACCESS_CODE:code,SELENE_TEST_PORT:'0'
+}),/Matrícula/);
 const chosenPassword='SenhaEscolhida!';
 const chosenConfig=configFromEnv({
   SELENE_API_BASE:'http://127.0.0.1:33333/reqempilhadeira-api.prd',
@@ -38,6 +52,8 @@ const starterScript=fs.readFileSync('teste-interno/INICIAR-PC-E-TABLETS.ps1','ut
 assert.match(starter,/INICIAR-PC-E-TABLETS\.ps1/);
 assert.match(starterScript,/Read-Host.*-AsSecureString/);
 assert.match(starterScript,/SELENE_TEST_ACCESS_CODE/);
+assert.match(starterScript,/SELENE_TEST_USERNAME/);
+assert.match(starterScript,/Matricula para login/);
 assert.match(starterScript,/ZeroFreeBSTR/);
 assert.equal(isPrivateIPv4('192.168.112.3'),true);
 assert.equal(isPrivateIPv4('172.20.10.1'),true);
@@ -87,6 +103,37 @@ async function main(){
     assert.equal(data.pending.Response.length,1);
     assert.equal(data.attendance.Response.length,1);
     assert.equal(data.readOnly,true);
+    assert.equal(data.testMode,true,'Ativa simulação, sem escrita corporativa');
+    const palletId=identifier({num_req:1001,endereco_orig:'11-001-1'},'pending').id;
+    const moveEndpoint=base+'/api/selene-test/move';
+    let moveResponse=await original(moveEndpoint,{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:palletId,direction:'down'})
+    });
+    assert.equal(moveResponse.status,200,'Descida de teste permitida para palete verificado');
+    let moved=await moveResponse.json();
+    assert.equal(moved.state.status,'lowering');
+    moveResponse=await original(moveEndpoint,{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:palletId,direction:'down'})
+    });
+    assert.equal(moveResponse.status,409,'Bloqueia movimento duplicado');
+    res=await original(base+'/api/selene-read/snapshot',{headers:{Authorization:auth}});
+    const synchronized=await res.json();
+    assert.equal(synchronized.testMovements.overlays[palletId].status,'lowering',
+      'Outro dispositivo ve a mesma movimentação');
+    const undoResponse=await original(base+'/api/selene-test/undo',{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:palletId})
+    });
+    assert.equal(undoResponse.status,200,'Desfaz antes de 10s');
+    assert.equal((await undoResponse.json()).state.status,'waiting');
+    const nonexistent=await original(moveEndpoint,{
+      method:'POST',headers:{Authorization:auth,'Content-Type':'application/json'},
+      body:JSON.stringify({id:123,direction:'up'})
+    });
+    assert.equal(nonexistent.status,409,'Nenhum palete inventado pode ser movimentado');
+
     assert.equal(data.codEmp,'emp1');
     assert.equal(data.codGrupo,'1');
     assert.equal(data.feedback,null,'Feedback opcional nao bloqueia os paletes');
@@ -118,7 +165,7 @@ async function main(){
       Authorization:'Basic '+Buffer.from('infotech:senha-incorreta').toString('base64')
     }});
     assert.equal(res.status,401,'Senha errada bloqueada');
-    console.log('21 verificações passaram: PC/tablet LAN, consulta plural/singular, status, senha e bloqueio de escrita.');
+    console.log('28 verificações passaram: PC/tablet, movimentações de teste compartilhadas, senha e proteção da API corporativa.');
   }finally{await stop(server);global.fetch=original}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
