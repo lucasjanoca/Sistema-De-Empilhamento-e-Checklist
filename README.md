@@ -1,43 +1,20 @@
-# Sistema de Empilhamento e Checklist
+# Sistema de Empilhadores e Checklist — InfoTech.io
 
-Sistema operacional da InfoTech.io para gestão de paletes e acesso integrado ao Checklist.
+Interface de operação de paletes, com login, seleção de equipamento, corredores, dashboard, histórico e integração com o Checklist.
 
-## Empilhadores
+**Instalação no PC:** consulte [GUIA-IMPLANTACAO.md](GUIA-IMPLANTACAO.md) e execute **INICIAR-SISTEMA.bat**.
 
-- Login por número do crachá + senha usando Supabase Auth.
-- Perfis Emp, Encarregado e TI.
-- Usuários centralizados no Supabase.
-- Nome do operador usado nas requisições, movimentações, histórico e auditoria.
-- Seleção manual de equipamento cadastrado a cada sessão.
-- Paletes para baixar e subir, confirmação de movimentação, cancelamento e histórico.
-- EXP-PIC com tratamento prioritário e regra operacional de retorno.
-- Requisições de produção por usuário.
-- Corredores, busca, filtros, relatórios e exportações.
-- Locks centrais para impedir movimentação simultânea do mesmo palete.
-- Estado operacional sincronizado pelo Supabase entre computadores/tablets.
-- Auditoria administrativa central.
-- Backup diário do snapshot operacional anterior no Supabase.
+## Integração com a Selene
 
-## Checklist
+A leitura de requisições é feita a partir das consultas oficiais de pendentes e em atendimento, quando o computador consegue acessar a API na rede interna. Nenhum palete fictício é inserido para completar o painel.
 
-O acesso ao Checklist usa código de 6 dígitos gerado no Sistema de Empilhadores, válido por 2 minutos e de uso único. A validação é feita pelo backend Supabase, permitindo gerar em um aparelho e usar em outro.
+A versão para implantação **não utiliza movimentos de simulação**. Uma descida/subida só será aceita após configuração do **adaptador de escrita oficial privado**, validação do estado do palete e confirmação posterior pela API.
 
-## Integração com o sistema oficial da empresa
+**Ainda não temos o contrato e o endpoint de escrita oficial da Selene. Sem eles, os movimentos permanecem bloqueados e o site não substitui o sistema corporativo.** O [guia](GUIA-IMPLANTACAO.md) detalha os requisitos exatos para concluir isso de forma segura e implantar por HTTPS nos tablets.
 
-O Site Selene funciona como aplicação operacional independente. A integração automática com a API/sistema interno da empresa continua protegida até a TI fornecer e homologar:
-- URL/servidor oficial;
-- autenticação/sessão;
-- rotas de leitura;
-- rota de escrita para descer/subir;
-- parâmetros/payloads e retornos;
-- origem oficial do EXP-PIC.
+## Links
 
-Nenhuma credencial corporativa deve ser colocada no frontend público.
+- [Sistema de Empilhadores (interface pública)](https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/empilhadores/)
+- [Checklist](https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/checklist/)
 
-## Publicação
-
-Empilhadores:
-https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/empilhadores/
-
-Checklist:
-https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/checklist/
+A hospedagem estática em GitHub Pages não possui acesso automático à API da rede interna.
