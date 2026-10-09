@@ -16,7 +16,10 @@ jobs:
         run: |
           node --check empilhadores/assets/app.bundle.js
           node --check empilhadores/assets/pallet-drag.js
-      - name: Validar integração do gesto de arrastar
+          node --check tests/pallet-drag.test.js
+      - name: Simular o movimento com mouse
+        run: node tests/pallet-drag.test.js
+      - name: Validar regras operacionais e vinculação de arquivos
         run: |
           node <<'NODE'
           const fs = require('node:fs');
@@ -29,11 +32,15 @@ jobs:
           assert.match(html, /assets\/pallet-drag\.js/);
           assert.ok(html.indexOf('assets/pallet-drag.js') > html.indexOf('assets/app.bundle.js'));
           assert.match(drag, /pallet-card\.waiting/);
-          assert.match(drag, /isValidDrop\(event\.clientX, event\.clientY\)/);
+          assert.match(drag, /pallet-card\.ready/);
+          assert.match(drag, /isValidDrop\(event\.clientX, event\.clientY, g\.direction\)/);
           assert.match(drag, /selene:pallet-dropped-down/);
+          assert.match(drag, /selene:pallet-dropped-up/);
           assert.match(drag, /pointercancel/);
-          assert.match(bundle, /request\.status !== 'waiting' \|\| request\.external/);
-          assert.match(bundle, /document\.addEventListener\('selene:pallet-dropped-down'/);
+          assert.match(bundle, /request\.status !== requiredStatus \|\| request\.external/);
+          assert.match(bundle, /receivePalletDrop\(event, 'waiting'\)/);
+          assert.match(bundle, /receivePalletDrop\(event, 'ready'\)/);
           assert.match(css, /touch-action: none/);
-          console.log('10 verificações de integração passaram.');
+          assert.match(css, /transition: none !important/);
+          console.log('14 verificações de integração passaram.');
           NODE
