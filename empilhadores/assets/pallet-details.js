@@ -20,7 +20,7 @@
       .map(n => String(n).padStart(2,'0')).join(':');
   }
   function render(id,open=true){
-    const req = AppState.getData().requests.find(item => item.id === id);
+    const req = SeleneIntegration.currentRequests().find(item => item.id === id);
     if(!req){
       if(dialog.open) dialog.close();
       return;
@@ -38,14 +38,10 @@
     $('palletDetailsRequester').textContent = req.requestedByName || req.operator || 'Não informado';
     $('palletDetailsLastOperator').textContent = req.lastHandledByName || 'Sem movimentação registrada';
     $('palletDetailsEquipment').textContent = req.lastHandledTablet || 'Não informado';
-    $('palletDetailsCreated').textContent = fmt(req.createdAt);
+    $('palletDetailsCreated').textContent = req.createdAt ? fmt(req.createdAt) : 'Não informado';
 
-    // Endereço e número da requisição juntos evitam misturar históricos de paletes
-    // distintos que reaproveitaram um mesmo endereço.
-    const history = AppState.getData().history.filter(item =>
-      item.address === req.address &&
-      (knownNumbers.size === 0 || knownNumbers.has(String(item.requestNumber || '')))
-    ).sort((a,b) => Number(a.time || 0) - Number(b.time || 0)).slice(-100);
+    // Só mostrar eventos oficiais: não confundir histórico local com a Selene.
+    const history = [];
     $('palletDetailsHistory').innerHTML = history.length ? history.map((item,index) => {
       const last = index ? history[index-1] : null;
       const elapsed = last ? span(Number(item.time || 0)-Number(last.time || 0)) : '—';
@@ -53,7 +49,7 @@
         '</td><td>' + esc(fmt(item.time)) +
         '</td><td>' + esc(elapsed) +
         '</td><td>' + esc(item.action || '—') + '</td></tr>';
-    }).join('') : '<tr><td colspan="4">Nenhum histórico registrado para esta requisição.</td></tr>';
+    }).join('') : '<tr><td colspan="4">O histórico oficial desta requisição ainda não está conectado.</td></tr>';
 
     const permitted = Permissions.can('operate',AppState.getUser()) && !req.external;
     const labels = {
@@ -81,7 +77,7 @@
   $('palletDetailsClose').addEventListener('click', () => dialog.close());
   $('palletDetailsAction').addEventListener('click', () => {
     const id = Number(dialog.dataset.id);
-    const current = AppState.getData().requests.find(req => req.id === id);
+    const current = SeleneIntegration.currentRequests().find(req => req.id === id);
     dialog.close();
     if(!current || current.external || !Permissions.can('operate',AppState.getUser())) return;
     document.dispatchEvent(new CustomEvent('selene:pallet-action',{detail:{id}}));
