@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const http=require('node:http');
-const {createServer,configFromEnv,isPrivateIPv4,upstreamUrl,readUpstream,routes}=require('../teste-interno/server.js');
+const {createServer,configFromEnv,isPrivateIPv4,upstreamUrl,readUpstream,routes,authenticated}=require('../teste-interno/server.js');
 const fs=require('node:fs');
 const bundle=fs.readFileSync('empilhadores/assets/app.bundle.js','utf8');
 
@@ -14,6 +14,28 @@ assert.equal(cfg.bindHost,'0.0.0.0');
 assert.equal(cfg.lanEnabled,true);
 assert.ok(cfg.accessCode.length>=12);
 assert.equal(cfg.customAccessCode,true);
+assert.equal(cfg.accessUsername,'infotech','Mantem compatibilidade de inicializacao manual');
+const matrículaTeste='123456'; // dado sintetico, nao e matricula real
+const matriculaCfg=configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/reqempilhadeira-api.prd',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',
+  SELENE_ALLOW_LAN:'1',SELENE_TEST_USERNAME:matrículaTeste,
+  SELENE_TEST_ACCESS_CODE:code,SELENE_TEST_PORT:'0'
+});
+assert.equal(matriculaCfg.accessUsername,matrículaTeste);
+assert.equal(matriculaCfg.customUsername,true);
+const requestFor=username=>({
+  headers:{authorization:'Basic '+Buffer.from(username+':'+code).toString('base64')}
+});
+assert.equal(authenticated(requestFor(matrículaTeste),matriculaCfg),true,'Matricula aceita como usuario');
+assert.equal(authenticated(requestFor('infotech'),matriculaCfg),false,'Usuario antigo negado');
+assert.throws(()=>configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/api',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',
+  SELENE_ALLOW_LAN:'1',SELENE_TEST_USERNAME:'matricula-errada',
+  SELENE_TEST_ACCESS_CODE:code,SELENE_TEST_PORT:'0'
+}),/matrícula.*dígitos/);
+
 const chosenPassword='SenhaEscolhida!';
 const chosenConfig=configFromEnv({
   SELENE_API_BASE:'http://127.0.0.1:33333/reqempilhadeira-api.prd',
@@ -38,6 +60,8 @@ const starterScript=fs.readFileSync('teste-interno/INICIAR-PC-E-TABLETS.ps1','ut
 assert.match(starter,/INICIAR-PC-E-TABLETS\.ps1/);
 assert.match(starterScript,/Read-Host.*-AsSecureString/);
 assert.match(starterScript,/SELENE_TEST_ACCESS_CODE/);
+assert.match(starterScript,/SELENE_TEST_USERNAME/);
+assert.match(starterScript,/Read-Host "Matricula de acesso/);
 assert.match(starterScript,/ZeroFreeBSTR/);
 assert.equal(isPrivateIPv4('192.168.112.3'),true);
 assert.equal(isPrivateIPv4('172.20.10.1'),true);
