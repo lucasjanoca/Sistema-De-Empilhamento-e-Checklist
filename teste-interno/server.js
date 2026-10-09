@@ -52,7 +52,8 @@ function configFromEnv(env=process.env) {
   if(lanEnabled && accessCode.length<12)
     throw new Error('A senha de acesso deve conter pelo menos 12 caracteres.');
   const adapterPath=String(env.SELENE_WRITE_ADAPTER_PATH||'').trim();
-  return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode,customAccessCode,accessUsername,officialWritesEnabled,adapterPath};
+  const operatorAuthPath=String(env.SELENE_OPERATOR_AUTH_ADAPTER_PATH||'').trim();
+  return {apiBase,codGrupo,codEmp,port,lanEnabled,bindHost,accessCode,customAccessCode,accessUsername,officialWritesEnabled,adapterPath,operatorAuthPath};
 }
 
 function json(res,status,value){
@@ -189,6 +190,8 @@ function createHandler(cfg,options={}){
            req.socket?.remoteAddress==='::1' || req.socket?.remoteAddress==='::ffff:127.0.0.1')){
         return json(res,403,{ok:false,error:'Gravação disponível somente via servidor local ou proxy HTTPS autorizado.'});
       }
+      const operator=await operations.authenticate(req);
+      if(!operator)return json(res,403,{ok:false,error:'Operador não autenticado ou sem permissão de movimentação.'});
       let raw='';
       try{
         for await(const chunk of req){
@@ -198,7 +201,7 @@ function createHandler(cfg,options={}){
         const payload=JSON.parse(raw);
         const response=await operations.move({
           id:payload?.id,direction:payload?.direction,
-          actor:cfg.accessUsername
+          actor:operator.matricula
         });
         return json(res,response.ok?200:(response.status||409),response);
       }catch(error){
