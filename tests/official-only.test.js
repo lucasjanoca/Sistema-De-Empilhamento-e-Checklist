@@ -27,6 +27,7 @@ const context={
   Operation:{renderAll:()=>{}},Dashboard:{render:()=>{}},MyPallets:{render:()=>{}},
   document:{createElement:()=>({className:'',textContent:'',title:''}),querySelector:()=>({appendChild:()=>{}})},
   localStorage:{getItem:()=>null,setItem:()=>{}},
+  location:{hostname:'github.io'},
   setInterval:()=>1,clearInterval:()=>{},
   Date,Array,Math,Map,String,Number,JSON,Object
 };
