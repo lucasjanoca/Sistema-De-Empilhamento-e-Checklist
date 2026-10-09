@@ -2233,13 +2233,13 @@ const History = (() => {
     if(!select)return;
     const current=select.value;
     const requests=[...new Set(
-      AppState.getData().history.map(item=>String(item.requestNumber||'').trim()).filter(Boolean)
+      [].map(item=>String(item.requestNumber||'').trim()).filter(Boolean)
     )].sort((a,b)=>b.localeCompare(a,'pt-BR',{numeric:true}));
     select.innerHTML='<option value="">Todas as requisições</option>'+requests.map(number=>`<option value="${escapeHtml(number)}">${escapeHtml(number)}</option>`).join('');
     if(requests.includes(current))select.value=current;
   }
   function filteredHistory(){
-    const history=AppState.getData().history;
+    const history=[]; // Histórico oficial de feedback ainda não conectado.
     const query=(UI.$('historySearchInput')?.value||'').trim().toLowerCase();
     const requestFilter=UI.$('historyRequestFilter')?.value||'';
     const eventFilter=UI.$('historyEventFilter')?.value||'';
@@ -2255,7 +2255,7 @@ const History = (() => {
     });
   }
   function render(){
-    const history=AppState.getData().history;
+    const history=[]; // Não exibir histórico manual como dado oficial.
     populateRequestFilter();
     const filtered=filteredHistory();
     UI.$('liveHistory').innerHTML = history.length
