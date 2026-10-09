@@ -57,7 +57,7 @@ function json(res,status,value){
 }
 
 const routes = Object.freeze({
-  pending: {path:'api/Requisicao/ObtemRequisicoesPendente',situacao:'1',group:true},
+  pending: {path:'api/Requisicao/ObtemRequisicoesPendentes',alternativePath:'api/Requisicao/ObtemRequisicoesPendente',situacao:'1',group:true},
   attendance: {path:'api/Requisicao/ObtemRequisicoesAtendimento',situacao:'3',group:true},
   feedback: {path:'api/Requisicao/ObtemFeedBack'},
   addresses: {path:'api/Enderecos/ObtemEnderecosPendentes'}
@@ -73,21 +73,37 @@ function upstreamUrl(cfg,entry){
 }
 
 async function readUpstream(cfg,entry){
-  const url=upstreamUrl(cfg,entry);
-  const response=await fetch(url,{
-    method:'GET',headers:{'Accept':'application/json'},redirect:'error',
-    signal:AbortSignal.timeout(6500),cache:'no-store'
-  });
-  if(!response.ok)throw new Error('API respondeu HTTP '+response.status+' em '+entry.path.split('/').pop());
-  if(Number(response.headers.get('content-length') || 0)>MAX_BODY)
-    throw new Error('Resposta acima do limite seguro.');
-  const body=await response.text();
-  if(Buffer.byteLength(body)>MAX_BODY)throw new Error('Resposta acima do limite seguro.');
-  let parsed;
-  try{parsed=JSON.parse(body);}catch{throw new Error('API retornou JSON inválido.');}
-  if(!Array.isArray(parsed) && (!parsed || typeof parsed!=='object'))
-    throw new Error('Formato da resposta inesperado.');
-  return parsed;
+  // Algumas versões do webapp usam "Pendentes" e outras "Pendente".
+  // A alternativa é usada SOMENTE após 404, nunca após 401/403.
+  async function attempt(route){
+    const url=upstreamUrl(cfg,{...entry,path:route});
+    const response=await fetch(url,{
+      method:'GET',headers:{'Accept':'application/json'},redirect:'error',
+      signal:AbortSignal.timeout(6500),cache:'no-store'
+    });
+    if(!response.ok){
+      const e=new Error('API respondeu HTTP '+response.status+' em '+route.split('/').pop()+
+        ' (grupo '+cfg.codGrupo+', empilhadeira '+cfg.codEmp+')');
+      e.status=response.status;
+      throw e;
+    }
+    if(Number(response.headers.get('content-length')||0)>MAX_BODY)
+      throw new Error('Resposta acima do limite seguro.');
+    const body=await response.text();
+    if(Buffer.byteLength(body)>MAX_BODY)throw new Error('Resposta acima do limite seguro.');
+    let parsed;
+    try{parsed=JSON.parse(body);}catch{throw new Error('API retornou JSON inválido.');}
+    if(!Array.isArray(parsed) && (!parsed || typeof parsed!=='object'))
+      throw new Error('Formato da resposta inesperado.');
+    if(parsed?.Success===false || parsed?.Error===true)
+      throw new Error('API retornou falha na consulta '+route.split('/').pop());
+    return parsed;
+  }
+  try{return await attempt(entry.path);}
+  catch(error){
+    if(error.status!==404 || !entry.alternativePath)throw error;
+    return attempt(entry.alternativePath);
+  }
 }
 
 function isPrivateIPv4(input){
@@ -147,6 +163,8 @@ function localAddresses(){
 
 function createHandler(cfg,options={}){
   let pendingSnapshot=null;
+  let lastRead={ok:false,checkedAt:null,pending:0,attendance:0,error:'Ainda não foi feita consulta.'};
+  let lastPrinted='';
   const root = options.root || ROOT;
   return async (req,res)=>{
     if(!allowedBrowserRequest(req))return json(res,403,{ok:false,error:'Acesso fora da rede interna ou de outra origem bloqueado.'});
@@ -156,28 +174,48 @@ function createHandler(cfg,options={}){
     try{pathname=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname);}
     catch{return json(res,400,{ok:false,error:'Caminho inválido.'});}
     if(pathname==='/api/selene-read/status')
-      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pollMs:5000,writeEnabled:false});
+      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pollMs:5000,writeEnabled:false,read:lastRead});
     if(pathname==='/api/selene-read/snapshot'){
       try{
         if(!pendingSnapshot){
           pendingSnapshot=(async()=>{
+            // Esses dois GETs determinam o painel. Feedback e endereços são opcionais
+            // e não podem bloquear cada atualização da lista de paletes.
             const [pending,attendance]=await Promise.all([
               readUpstream(cfg,routes.pending),readUpstream(cfg,routes.attendance)
             ]);
-            // Feedback e endereços são complementares; não devem esconder paletes
-            // quando algum desses dois serviços opcionais estiver indisponível.
-            const [feedback,addresses]=await Promise.allSettled([
-              readUpstream(cfg,routes.feedback),readUpstream(cfg,routes.addresses)
-            ]);
-            return {ok:true,source:'Selene',readOnly:true,retrievedAt:new Date().toISOString(),
-              pending,attendance,
-              feedback:feedback.status==='fulfilled'?feedback.value:null,
-              addresses:addresses.status==='fulfilled'?addresses.value:null};
+            function count(list){
+              if(Array.isArray(list))return list.length;
+              for(const values of [list?.Response,list?.response,list?.Data,list?.data]){
+                if(Array.isArray(values))return values.length;
+              }
+              return Number.isFinite(Number(list?.Count)) ? Number(list.Count) : 0;
+            }
+            lastRead={
+              ok:true,checkedAt:new Date().toISOString(),
+              pending:count(pending),attendance:count(attendance),error:null
+            };
+            const marker='ok:'+lastRead.pending+':'+lastRead.attendance;
+            if(marker!==lastPrinted){
+              console.log('[Consulta Selene] '+cfg.codEmp+' · '+lastRead.pending+
+                ' aguardando, '+lastRead.attendance+' em atendimento.');
+              lastPrinted=marker;
+            }
+            return {ok:true,source:'Selene',readOnly:true,retrievedAt:lastRead.checkedAt,
+              codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pending,attendance,feedback:null,addresses:null};
           })().finally(()=>{pendingSnapshot=null;});
         }
         return json(res,200,await pendingSnapshot);
       }catch(error){
-        return json(res,503,{ok:false,error:'Não foi possível consultar a API interna: '+error.message});
+        lastRead={ok:false,checkedAt:new Date().toISOString(),pending:0,attendance:0,
+          error:String(error?.message||'Falha desconhecida').slice(0,240)};
+        const marker='erro:'+lastRead.error;
+        if(marker!==lastPrinted){
+          console.warn('[Consulta Selene] Falha em '+cfg.codEmp+': '+lastRead.error);
+          lastPrinted=marker;
+        }
+        return json(res,503,{ok:false,error:'Não foi possível consultar a API interna: '+lastRead.error,
+          codGrupo:cfg.codGrupo,codEmp:cfg.codEmp});
       }
     }
     if(pathname.startsWith('/api/'))return json(res,404,{ok:false,error:'Rota indisponível (somente leitura).'});

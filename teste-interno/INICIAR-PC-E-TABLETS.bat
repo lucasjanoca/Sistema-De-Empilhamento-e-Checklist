@@ -9,6 +9,13 @@ if errorlevel 1 (
   exit /b 1
 )
 set "SELENE_ALLOW_LAN=1"
+if not defined SELENE_COD_EMP (
+  echo.
+  echo Selecione a MESMA empilhadeira mostrada no sistema original.
+  set /p SELENE_COD_EMP=Codigo da empilhadeira [emp1]: 
+)
+if not defined SELENE_COD_EMP set "SELENE_COD_EMP=emp1"
+echo Consultando %SELENE_COD_EMP% na rede interna.
 echo ============================================================
 echo  InfoTech - teste interno Selene (PC + tablet)
 echo ============================================================

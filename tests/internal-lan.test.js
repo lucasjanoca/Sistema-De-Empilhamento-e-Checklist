@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const http=require('node:http');
-const {createServer,configFromEnv,isPrivateIPv4,upstreamUrl,routes}=require('../teste-interno/server.js');
+const {createServer,configFromEnv,isPrivateIPv4,upstreamUrl,readUpstream,routes}=require('../teste-interno/server.js');
 const fs=require('node:fs');
 const bundle=fs.readFileSync('empilhadores/assets/app.bundle.js','utf8');
 
@@ -21,6 +21,7 @@ assert.equal(configFromEnv({
   SELENE_API_BASE:'http://127.0.0.1:3000/api',
   SELENE_TEST_PORT:'0'
 }).bindHost,'127.0.0.1');
+assert.match(routes.pending.path,/ObtemRequisicoesPendentes$/);
 const up=upstreamUrl(cfg,routes.pending);
 assert.equal(up.searchParams.get('codEmp'),'emp1');
 assert.equal(up.searchParams.get('situacao'),'1');
@@ -33,8 +34,14 @@ async function listen(s){
 async function stop(s){await new Promise(resolve=>s.close(resolve))}
 async function main(){
   const original=global.fetch;
+  let pending404=false;
+  let usedFallback=false;
   global.fetch=async(url)=>{
     const target=String(url);
+    if(pending404 && target.includes('ObtemRequisicoesPendentes'))
+      return {ok:false,status:404,headers:new Map(),text:async()=>''};
+    if(pending404 && target.includes('ObtemRequisicoesPendente') &&
+       !target.includes('ObtemRequisicoesPendentes')) usedFallback=true;
     let payload={Success:true,Response:[],Count:0};
     if(target.includes('ObtemRequisicoesPendente'))
       payload={Success:true,Response:[{num_req:1001,endereco_orig:'11-001-1'}],Count:1};
@@ -54,6 +61,22 @@ async function main(){
     assert.equal(data.pending.Response.length,1);
     assert.equal(data.attendance.Response.length,1);
     assert.equal(data.readOnly,true);
+    assert.equal(data.codEmp,'emp1');
+    assert.equal(data.codGrupo,'1');
+    assert.equal(data.feedback,null,'Feedback opcional nao bloqueia os paletes');
+    res=await original(base+'/api/selene-read/status',{headers:{Authorization:auth}});
+    assert.equal(res.status,200);
+    let stat=await res.json();
+    assert.equal(stat.read.ok,true);
+    assert.equal(stat.read.pending,1);
+    assert.equal(stat.read.attendance,1);
+
+    pending404=true;
+    res=await original(base+'/api/selene-read/snapshot',{headers:{Authorization:auth}});
+    assert.equal(res.status,200,'Rota alternativa deve ser usada apos 404');
+    assert.equal((await res.json()).pending.Response.length,1);
+    assert.equal(usedFallback,true,'Consulta de Pendente singular foi testada apos plural 404');
+    pending404=false;
     res=await original(base+'/empilhadores/',{headers:{Authorization:auth}});
     assert.equal(res.status,200);
     assert.match(await res.text(),/view-operacao/);
@@ -69,7 +92,7 @@ async function main(){
       Authorization:'Basic '+Buffer.from('infotech:senha-incorreta').toString('base64')
     }});
     assert.equal(res.status,401,'Senha errada bloqueada');
-    console.log('14 verificações passaram: PC/tablet LAN, senha, consultas oficiais e bloqueio de escrita.');
+    console.log('21 verificações passaram: PC/tablet LAN, consulta plural/singular, status, senha e bloqueio de escrita.');
   }finally{await stop(server);global.fetch=original}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

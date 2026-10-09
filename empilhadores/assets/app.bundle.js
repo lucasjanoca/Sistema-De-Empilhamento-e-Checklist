@@ -1419,9 +1419,12 @@ const Operation = (() => {
       const pending = pendingMovements.get(request.id);
       return pending ? pendingMovementCard(request,pending) : cardTemplate(request);
     };
-    const empty = SeleneIntegration.hasLiveData()
-      ? 'Nenhum palete oficial nesta seleção.'
-      : 'Sem consulta à Selene. Paletes de teste e registros locais estão ocultos.';
+    const officialTotal=SeleneIntegration.currentRequests().length;
+    const empty = !SeleneIntegration.hasLiveData()
+      ? 'Sem consulta à Selene. Paletes de teste e registros locais estão ocultos.'
+      : officialTotal>0 && list.length===0
+        ? 'A Selene enviou '+officialTotal+' palete(s), mas os filtros ou corredores selecionados estão ocultando todos.'
+        : 'Nenhum palete oficial nesta seleção.';
     UI.$('topGrid').innerHTML = top.length
       ? top.map(display).join('')
       : '<div class="empty">'+empty+'</div>';
@@ -2833,11 +2836,11 @@ function clearLive(){
     status('checking','Selene: consultando paletes oficiais...');
     const {pending,attendance}=await lists();
     merge(pending,attendance);
-    status('online','Selene ao vivo: '+pending.length+' pendente(s), '+attendance.length+' em atendimento'+(localBridgeActive?' · somente leitura':''));
+    status('online','Selene ao vivo: '+pending.length+' pendente(s), '+attendance.length+' em atendimento · '+cfg.codEmp+' / grupo '+cfg.codGrupo+(localBridgeActive?' · somente leitura':''));
     return {ok:true,pending:pending.length,attendance:attendance.length};
   }catch(e){
     clearLive();
-    status('offline','Selene: sem consulta à rede · nenhum palete será exibido');
+    status('offline','Selene: sem consulta à rede · '+String(e?.message||'erro desconhecido').slice(0,150));
     return {ok:false,error:e.message};
   }
 }async function testConnection(){const start=Date.now();await loadServerConfig();const c=settings(),checks=[{name:'Camada de integração',ok:true,detail:SecurityApi.isServerMode()?'Servidor intermediário ativo; navegador não acessa o sistema oficial diretamente.':SecurityApi.isAccountCloud()?'Supabase autenticado; integração oficial depende do endpoint corporativo.':'Acesso direto sem backend corporativo.'},{name:'URL da API',ok:/^https?:\/\//i.test(c.serverBase),detail:c.serverBase}];try{const{pending,attendance}=await lists();checks.push({name:'Pendentes',ok:true,detail:`${pending.length} registro(s)`},{name:'Em atendimento',ok:true,detail:`${attendance.length} registro(s)`});return{ok:true,checks,durationMs:Date.now()-start};}catch(e){checks.push({name:'Leitura da API',ok:false,detail:e.message});return{ok:false,checks,durationMs:Date.now()-start};}}function integrationMap(){const c=settings();return{architecture:localBridgeActive?'Navegador → Servidor local (127.0.0.1) → API interna da Selene · leitura':SecurityApi.isServerMode()?'Navegador → Servidor Site Selene → sistema oficial / coletor':'Navegador autenticado + Supabase',server:c.serverBase,settings:{enabled:c.enabled,codGrupo:c.codGrupo,codEmp:c.codEmp,routePending:c.routePending,routeAttendance:c.routeAttendance,interval:c.interval},writeEnabled:false,secretsInBrowser:false,readProxy:localBridgeActive||SecurityApi.isServerMode(),futureWrite:'Implementar somente no servidor após o TI confirmar a rota oficial de escrita, sessão e parâmetros de movimentação.'};}function integrationGuide(){const c=settings();return['CHECKLIST TI — SITE SELENE 2.0',`1. Definir servidor/API no Painel TI: ${c.serverBase||'[não configurado]'}.`,'2. Informar as duas rotas oficiais de leitura (pendentes e em atendimento).',`3. Validar os parâmetros de grupo/empresa conforme o ambiente oficial.`,'4. Confirmar autenticação/sessão usada pelos sistemas internos.','5. Confirmar a rota oficial de escrita e os parâmetros exigidos para descer/subir.','6. Confirmar a origem do EXP-PIC e o contrato de leitura.','7. Só confirmar a movimentação na interface após resposta positiva do sistema oficial.','8. Validar concorrência com dois operadores.','9. Homologar com palete autorizado.','10. Só então habilitar escrita no servidor.'].join('\n');}async function processRequest(){throw new Error('Escrita real bloqueada: deve ser implementada no servidor junto ao TI.');}function restart(){if(timer)clearInterval(timer);const c=settings();if(c.enabled)timer=setInterval(refresh,Math.max(5000,c.interval));}async function init(){
