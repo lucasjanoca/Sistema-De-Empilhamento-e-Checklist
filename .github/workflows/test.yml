@@ -19,10 +19,13 @@ jobs:
           node --check empilhadores/assets/pallet-details.js
           node --check tests/pallet-drag.test.js
           node --check tests/pallet-details.test.js
+          node --check tests/pallet-pending.test.js
       - name: Simular o movimento com mouse
         run: node tests/pallet-drag.test.js
       - name: Testar histórico e controle de acesso
         run: node tests/pallet-details.test.js
+      - name: Testar movimentação imediata e lock atrasado
+        run: node tests/pallet-pending.test.js
       - name: Validar regras operacionais e vinculação de arquivos
         run: |
           node <<'NODE'
@@ -57,5 +60,9 @@ jobs:
           const timerArea = bundle.slice(bundle.indexOf('function startTimer(id)'),bundle.indexOf('function resumeMovementTimers()'));
           assert.doesNotMatch(timerArea,/AppState\.save\(/);
           assert.match(timerArea,/movementTicker/);
-          console.log('23 verificações de integração passaram.');
+          assert.match(bundle,/pendingMovements\.set\(id,direction\)/);
+          assert.match(bundle,/current\.status=direction==='down'\?'lowering':'returning'/);
+          assert.match(bundle,/request\.status === 'lowering' \|\|/);
+          assert.match(drag,/scheduleGhostPaint\(g\)/);
+          console.log('27 verificações de integração passaram.');
           NODE
