@@ -35,8 +35,8 @@
       waiting:'Aguardando descida',lowering:'Descendo',floor:'No chão · não liberado',
       ready:'Liberado para subir',returning:'Subindo'
     })[req.status] || req.status;
-    if(SeleneIntegration.canTestMove())
-      $('palletDetailsStatus').textContent += ' · TESTE (não altera Selene)';
+    if(SeleneIntegration.canOfficialMove())
+      $('palletDetailsStatus').textContent += ' · Selene oficial';
     $('palletDetailsRequester').textContent = req.requestedByName || req.operator || 'Não informado';
     $('palletDetailsLastOperator').textContent = req.lastHandledByName || 'Sem movimentação registrada';
     $('palletDetailsEquipment').textContent = req.lastHandledTablet || 'Não informado';
@@ -53,17 +53,18 @@
         '</td><td>' + esc(item.action || '—') + '</td></tr>';
     }).join('') : '<tr><td colspan="4">O histórico oficial desta requisição ainda não está conectado.</td></tr>';
 
-    const permitted = Permissions.can('operate',AppState.getUser()) && (!req.external || SeleneIntegration.canTestMove());
+    const permitted = Permissions.can('operate',AppState.getUser()) && (!req.external || SeleneIntegration.canOfficialMove());
     const labels = {
       waiting:'Iniciar descida ↓',ready:'Iniciar subida ↑',
       lowering:'Cancelar descida',returning:'Cancelar subida'
     };
+    if(req.external){delete labels.lowering;delete labels.returning;}
     if(!req.external && ['ti','encarregado'].includes(AppState.getUser()?.role))
       labels.floor = 'Autorizar subida';
     const button = $('palletDetailsAction');
     const label = permitted ? labels[req.status] : '';
     button.hidden = !label;
-    button.textContent = label ? (req.external?'TESTE: ':'')+label : '';
+    button.textContent = label ? (req.external?'OFICIAL: ':'')+label : '';
     button.dataset.id = String(req.id);
     dialog.dataset.id = String(req.id);
     if(open && !dialog.open) dialog.showModal();
@@ -81,7 +82,7 @@
     const id = Number(dialog.dataset.id);
     const current = SeleneIntegration.currentRequests().find(req => req.id === id);
     dialog.close();
-    if(!current || (current.external && !SeleneIntegration.canTestMove()) || !Permissions.can('operate',AppState.getUser())) return;
+    if(!current || (current.external && !SeleneIntegration.canOfficialMove()) || !Permissions.can('operate',AppState.getUser())) return;
     document.dispatchEvent(new CustomEvent('selene:pallet-action',{detail:{id}}));
   });
 })();
