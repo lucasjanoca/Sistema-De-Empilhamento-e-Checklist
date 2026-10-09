@@ -19,7 +19,7 @@ echo ============================================================
 echo.
 echo A senha de acesso ao teste sera solicitada em sigilo.
 echo Escolha sempre a mesma senha se quiser mante-la em cada teste.
-echo Usuario no navegador: infotech
+echo Usuario no navegador: sua matricula, informada ao iniciar.
 echo.
 powershell -NoProfile -File "%~dp0INICIAR-PC-E-TABLETS.ps1"
 if errorlevel 1 echo O teste nao iniciou. Confira a mensagem acima.
