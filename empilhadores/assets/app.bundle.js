@@ -1281,6 +1281,8 @@ const Operation = (() => {
     return request.isPic ? '<span class="pic-badge">EXP-PIC</span><div class="pic-message">⚠ Avisar armazenista</div>' : '';
   }
   function handlerMarkup(request){
+    if(request.external && SeleneIntegration.canTestMove())
+      return '<small class="handler-info">⚠ MODO TESTE · não altera o sistema original</small>';
     if(!request.lastHandledByName) return '';
     const tablet = request.lastHandledTablet ? ` · ${request.lastHandledTablet}` : '';
     return `<small class="handler-info">Último: ${request.lastHandledByName}${tablet}</small>`;
@@ -1478,7 +1480,7 @@ const Operation = (() => {
   function moveRequest(id){
     const data=AppState.getData();
     const user=AppState.getUser();
-    const request=data.requests.find(r=>r.id===id);
+    const request=data.requests.find(r=>r.id===id) || SeleneIntegration.currentRequests().find(r=>r.id===id);
     if(!request || !user)return;
 
     if(!Permissions.can('operate',user)){
@@ -1487,7 +1489,25 @@ const Operation = (() => {
     }
 
     if(request.external){
-      UI.toast('Palet recebido da Selene em modo de leitura. A baixa real ainda não está ativada.');
+      if(!SeleneIntegration.canTestMove()){
+        UI.toast('A movimentação oficial não está conectada; abra o teste pelo servidor do PC.');
+        return;
+      }
+      if(['lowering','returning'].includes(request.status)){
+        SeleneIntegration.testAction(request.id,'undo');
+      }else if(['waiting','ready'].includes(request.status)){
+        const direction=request.status==='waiting'?'down':'up';
+        if(pendingMovements.has(id))return;
+        pendingMovements.set(id,direction);
+        renderRequests();
+        focusPendingMovement(id,direction);
+        SeleneIntegration.testAction(id,direction).finally(()=>{
+          pendingMovements.delete(id);
+          renderRequests();
+        });
+      }else{
+        UI.toast('Palete vermelho ainda não está liberado para subir no sistema original.');
+      }
       return;
     }
 
@@ -2093,8 +2113,9 @@ const Operation = (() => {
     const receivePalletDrop = (event, requiredStatus) => {
       const id = Number(event.detail?.id);
       if (!Number.isSafeInteger(id)) return;
-      const request = AppState.getData().requests.find(item => item.id === id);
-      if (!request || request.status !== requiredStatus || request.external) return;
+      const request = SeleneIntegration.currentRequests().find(item => item.id === id) ||
+        AppState.getData().requests.find(item => item.id === id);
+      if (!request || request.status !== requiredStatus) return;
       // Reutiliza as validações e o temporizador de movimentação já existentes.
       moveRequest(id);
     };
@@ -2104,7 +2125,10 @@ const Operation = (() => {
       const undo = event.target.closest('[data-undo]');
       if(undo){
         event.stopPropagation();
-        undoMovement(Number(undo.dataset.undo));
+        const id=Number(undo.dataset.undo);
+        const official=SeleneIntegration.currentRequests().find(item=>item.id===id);
+        if(official?.external)SeleneIntegration.testAction(id,'undo');
+        else undoMovement(id);
         return;
       }
       const card = event.target.closest('.pallet-card');
@@ -2115,9 +2139,11 @@ const Operation = (() => {
     document.addEventListener('selene:pallet-action', event => {
       const id = Number(event.detail?.id);
       if(!Number.isSafeInteger(id)) return;
-      const request = AppState.getData().requests.find(item => item.id === id);
-      if(!request || request.external || !Permissions.can('operate',AppState.getUser())) return;
-      if(['lowering','returning'].includes(request.status)) undoMovement(id);
+      const request = SeleneIntegration.currentRequests().find(item => item.id === id) ||
+        AppState.getData().requests.find(item => item.id === id);
+      if(!request || !Permissions.can('operate',AppState.getUser())) return;
+      if(request.external)moveRequest(id);
+      else if(['lowering','returning'].includes(request.status)) undoMovement(id);
       else moveRequest(id);
     });
     UI.$('searchInput').addEventListener('input', renderRequests);
@@ -2781,7 +2807,7 @@ else if(SecurityApi.isAccountCloud()){
     external:true,officialVerified:true,isPic,sourceType:'OFICIAL',
     officialStatusRaw:i.ies_sit ?? i.ies_sit_novo ?? null
   };
-}function merge(p,a){
+}function merge(p,a,testState=null){
   const raw=[...p.map(i=>map(i,'pending')),...a.map(i=>map(i,'attendance'))];
   if(p.length+a.length && raw.some(item=>!item))
     throw new Error('Há requisições oficiais sem número ou endereço. Nenhum palete será exibido até corrigir o mapeamento.');
@@ -2791,7 +2817,21 @@ else if(SecurityApi.isAccountCloud()){
       throw new Error('Colisão entre identificadores oficiais. Consulte a integração.');
     mapById.set(item.id,item);
   }
-  liveRequests=[...mapById.values()];
+  const overlays=testState?.overlays||{};
+  liveRequests=[...mapById.values()].flatMap(item=>{
+    const overlay=overlays[item.id];
+    if(!overlay)return [item];
+    if(overlay.status==='hidden')return [];
+    return [{
+      ...item,
+      status:overlay.status,
+      remaining:Number(overlay.remaining||0),
+      movementDeadlineAt:overlay.deadline||null,
+      lastHandledByName:String(overlay.lastActor||'Operador de teste'),
+      testMovement:overlay.isTestMovement===true,
+      previousStatus:item.status
+    }];
+  });
   lastReadAt=Date.now();
   Operation?.renderAll();
   Dashboard?.render();
@@ -2817,12 +2857,42 @@ function clearLive(){
       pending:unwrap(data.pending),
       attendance:unwrap(data.attendance),
       feedback:data.feedback?unwrap(data.feedback):[],
-      addresses:data.addresses?unwrap(data.addresses):[]
+      addresses:data.addresses?unwrap(data.addresses):[],
+      testMovements:data.testMovements||null
     };
   }
   const cfg=settings();
   return {pending:await get(cfg.routePending),attendance:await get(cfg.routeAttendance)};
-}async function refresh(){
+}function canTestMove(){return Boolean(localBridgeActive && localBridgeCfg?.testMoveEnabled);}
+async function testAction(id,action){
+  if(!canTestMove() || !Number.isSafeInteger(Number(id))) {
+    UI.toast('Abra a versão de teste no endereço do PC para movimentar paletes.');
+    return false;
+  }
+  const undo=action==='undo';
+  const endpoint=undo?'/api/selene-test/undo':'/api/selene-test/move';
+  try{
+    const response=await fetch(endpoint,{
+      method:'POST',credentials:'same-origin',cache:'no-store',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:Number(id),direction:action}),
+      signal:AbortSignal.timeout(5000)
+    });
+    const result=await response.json();
+    if(!response.ok || result?.ok!==true)
+      throw new Error(result?.error||'O servidor de teste recusou a movimentação.');
+    await refresh();
+    UI.toast(undo?'Movimentação de TESTE cancelada.':
+      action==='down'?'Descida de TESTE iniciada · 10 segundos para cancelar.':
+                       'Subida de TESTE iniciada · 10 segundos para cancelar.');
+    return true;
+  }catch(error){
+    UI.toast(String(error?.message||'Erro na movimentação de teste.'));
+    await refresh();
+    return false;
+  }
+}
+async function refresh(){
   if(!localBridgeActive) await probeLocalBridge();
   if(SecurityApi.isServerMode() && !AppState.getUser()){
     clearLive();status('off','Selene: aguardando login');return {ok:false};
@@ -2834,9 +2904,9 @@ function clearLive(){
   }
   try{
     status('checking','Selene: consultando paletes oficiais...');
-    const {pending,attendance}=await lists();
-    merge(pending,attendance);
-    status('online','Selene ao vivo: '+pending.length+' pendente(s), '+attendance.length+' em atendimento · '+cfg.codEmp+' / grupo '+cfg.codGrupo+(localBridgeActive?' · somente leitura':''));
+    const {pending,attendance,testMovements}=await lists();
+    merge(pending,attendance,testMovements);
+    status('online','Selene ao vivo: '+pending.length+' pendente(s), '+attendance.length+' em atendimento · '+cfg.codEmp+' / grupo '+cfg.codGrupo+(canTestMove()?' · MODO TESTE (não altera Selene)':' · somente leitura'));
     return {ok:true,pending:pending.length,attendance:attendance.length};
   }catch(e){
     clearLive();
@@ -2852,7 +2922,7 @@ function clearLive(){
   }else status('off','Selene: aguardando login');
   restart();
   document.addEventListener('security:login',()=>loadServerConfig().then(refresh));
-}return{init,refresh,currentRequests,hasLiveData,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
+}return{init,refresh,currentRequests,hasLiveData,canTestMove,testAction,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
 const Reports = (() => {
   function escapeHtml(value=''){
     return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[char]);
