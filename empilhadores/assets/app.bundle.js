@@ -2683,14 +2683,52 @@ const UsersAdmin=(()=>{
   }
   return{init,render};
 })();
-const SeleneIntegration=(()=>{const DEFAULT='',KEY='empilhamento_integracao_v20_entrega';let timer=null,badge=null,serverCfg=null;let liveRequests=[];let lastReadAt=0;function defaults(){return{enabled:false,serverBase:DEFAULT,codGrupo:'',codEmp:'',routePending:'',routeAttendance:'',interval:10000,writeEnabled:false};}function local(){
+const SeleneIntegration=(()=>{const DEFAULT='',KEY='empilhamento_integracao_v20_entrega';let timer=null,badge=null,serverCfg=null;let liveRequests=[];let lastReadAt=0;let localBridgeActive=false;let localBridgeCfg=null;function defaults(){return{enabled:false,serverBase:DEFAULT,codGrupo:'',codEmp:'',routePending:'',routeAttendance:'',interval:10000,writeEnabled:false};}function local(){
   try{
     if(SecurityApi.isAccountCloud()){
       return Object.assign(defaults(),AppState.getData().settings?.integration||{},{writeEnabled:false});
     }
     return Object.assign(defaults(),JSON.parse(localStorage.getItem(KEY)||'{}'),{writeEnabled:false});
   }catch{return defaults();}
-}function settings(){return Object.assign(defaults(),serverCfg||local(),{writeEnabled:false});}async function loadServerConfig(){if(!SecurityApi.isServerMode())return settings();try{const c=await SecurityApi.getIntegrationConfig();if(c)serverCfg=Object.assign(defaults(),c,{writeEnabled:false});}catch{}return settings();}async function saveSettings(input={}){const c=settings(),n={enabled:input.enabled!==undefined?!!input.enabled:c.enabled,serverBase:String(input.serverBase??c.serverBase).trim().replace(/\/+$/,''),codGrupo:String(input.codGrupo??c.codGrupo).trim(),codEmp:String(input.codEmp??c.codEmp).trim(),routePending:String(input.routePending??c.routePending).trim(),routeAttendance:String(input.routeAttendance??c.routeAttendance).trim(),interval:Math.max(5000,Number(input.interval??c.interval)||10000),writeEnabled:false};if(SecurityApi.isServerMode())serverCfg=Object.assign(n,await SecurityApi.saveIntegrationConfig(n)||{}, {writeEnabled:false});
+}function settings(){
+  const cfg=Object.assign(defaults(),serverCfg||local(),{writeEnabled:false});
+  if(localBridgeActive && localBridgeCfg){
+    // Configuração efetiva fornecida pelo servidor LOCAL em execução.
+    return Object.assign(cfg,{
+      enabled:true,codGrupo:String(localBridgeCfg.codGrupo),
+      codEmp:String(localBridgeCfg.codEmp),interval:Math.max(5000,Number(localBridgeCfg.pollMs)||5000),
+      writeEnabled:false
+    });
+  }
+  return cfg;
+}
+async function probeLocalBridge(){
+  // No tablet, a ponte fica no IPv4 privado do PC; no PC fica em localhost.
+  const hostname=String(location.hostname||'');
+  const parts=hostname.split('.').map(Number);
+  const internal=hostname==='localhost' || hostname==='127.0.0.1' ||
+    (parts.length===4 && parts.every(n=>Number.isInteger(n)&&n>=0&&n<=255) &&
+      (parts[0]===10 || (parts[0]===192&&parts[1]===168) ||
+       (parts[0]===172&&parts[1]>=16&&parts[1]<=31)));
+  if(!internal){
+    localBridgeActive=false;
+    return false;
+  }
+  try{
+    const res=await fetch('/api/selene-read/status',{cache:'no-store',signal:AbortSignal.timeout(3500)});
+    if(!res.ok)throw new Error('Ponte de leitura indisponível.');
+    const info=await res.json();
+    if(info?.ok!==true || info.mode!=='local-interno-readonly' || info.writeEnabled!==false)
+      throw new Error('Servidor local não reconhecido.');
+    localBridgeCfg=info;
+    localBridgeActive=true;
+    return true;
+  }catch{
+    localBridgeActive=false;
+    localBridgeCfg=null;
+    return false;
+  }
+}async function loadServerConfig(){if(!SecurityApi.isServerMode())return settings();try{const c=await SecurityApi.getIntegrationConfig();if(c)serverCfg=Object.assign(defaults(),c,{writeEnabled:false});}catch{}return settings();}async function saveSettings(input={}){const c=settings(),n={enabled:input.enabled!==undefined?!!input.enabled:c.enabled,serverBase:String(input.serverBase??c.serverBase).trim().replace(/\/+$/,''),codGrupo:String(input.codGrupo??c.codGrupo).trim(),codEmp:String(input.codEmp??c.codEmp).trim(),routePending:String(input.routePending??c.routePending).trim(),routeAttendance:String(input.routeAttendance??c.routeAttendance).trim(),interval:Math.max(5000,Number(input.interval??c.interval)||10000),writeEnabled:false};if(SecurityApi.isServerMode())serverCfg=Object.assign(n,await SecurityApi.saveIntegrationConfig(n)||{}, {writeEnabled:false});
 else if(SecurityApi.isAccountCloud()){
   const d=AppState.getData();
   d.settings=d.settings||{};
@@ -2764,7 +2802,25 @@ function clearLive(){
   Operation?.renderAll();
   Dashboard?.render();
   MyPallets?.render();
-}async function lists(){const c=settings();return{pending:await get(c.routePending),attendance:await get(c.routeAttendance)};}async function refresh(){
+}async function lists(){
+  if(localBridgeActive){
+    const response=await fetch('/api/selene-read/snapshot',{
+      method:'GET',cache:'no-store',signal:AbortSignal.timeout(9500)
+    });
+    const data=await response.json();
+    if(!response.ok || data?.ok!==true || data.readOnly!==true)
+      throw new Error(data?.error||'Não foi possível ler a rede interna.');
+    return {
+      pending:unwrap(data.pending),
+      attendance:unwrap(data.attendance),
+      feedback:data.feedback?unwrap(data.feedback):[],
+      addresses:data.addresses?unwrap(data.addresses):[]
+    };
+  }
+  const cfg=settings();
+  return {pending:await get(cfg.routePending),attendance:await get(cfg.routeAttendance)};
+}async function refresh(){
+  if(!localBridgeActive) await probeLocalBridge();
   if(SecurityApi.isServerMode() && !AppState.getUser()){
     clearLive();status('off','Selene: aguardando login');return {ok:false};
   }
@@ -2777,14 +2833,23 @@ function clearLive(){
     status('checking','Selene: consultando paletes oficiais...');
     const {pending,attendance}=await lists();
     merge(pending,attendance);
-    status('online','Selene oficial: '+pending.length+' pendente(s), '+attendance.length+' em atendimento');
+    status('online','Selene ao vivo: '+pending.length+' pendente(s), '+attendance.length+' em atendimento'+(localBridgeActive?' · somente leitura':''));
     return {ok:true,pending:pending.length,attendance:attendance.length};
   }catch(e){
     clearLive();
-    status('offline','Selene: sem consulta oficial · nenhum palete será exibido');
+    status('offline','Selene: sem consulta à rede · nenhum palete será exibido');
     return {ok:false,error:e.message};
   }
-}async function testConnection(){const start=Date.now();await loadServerConfig();const c=settings(),checks=[{name:'Camada de integração',ok:true,detail:SecurityApi.isServerMode()?'Servidor intermediário ativo; navegador não acessa o sistema oficial diretamente.':SecurityApi.isAccountCloud()?'Supabase autenticado; integração oficial depende do endpoint corporativo.':'Acesso direto sem backend corporativo.'},{name:'URL da API',ok:/^https?:\/\//i.test(c.serverBase),detail:c.serverBase}];try{const{pending,attendance}=await lists();checks.push({name:'Pendentes',ok:true,detail:`${pending.length} registro(s)`},{name:'Em atendimento',ok:true,detail:`${attendance.length} registro(s)`});return{ok:true,checks,durationMs:Date.now()-start};}catch(e){checks.push({name:'Leitura da API',ok:false,detail:e.message});return{ok:false,checks,durationMs:Date.now()-start};}}function integrationMap(){const c=settings();return{architecture:SecurityApi.isServerMode()?'Navegador → Servidor Site Selene → sistema oficial / coletor':'Navegador autenticado + Supabase',server:c.serverBase,settings:{enabled:c.enabled,codGrupo:c.codGrupo,codEmp:c.codEmp,routePending:c.routePending,routeAttendance:c.routeAttendance,interval:c.interval},writeEnabled:false,secretsInBrowser:false,readProxy:SecurityApi.isServerMode(),futureWrite:'Implementar somente no servidor após o TI confirmar a rota oficial de escrita, sessão e parâmetros de movimentação.'};}function integrationGuide(){const c=settings();return['CHECKLIST TI — SITE SELENE 2.0',`1. Definir servidor/API no Painel TI: ${c.serverBase||'[não configurado]'}.`,'2. Informar as duas rotas oficiais de leitura (pendentes e em atendimento).',`3. Validar os parâmetros de grupo/empresa conforme o ambiente oficial.`,'4. Confirmar autenticação/sessão usada pelos sistemas internos.','5. Confirmar a rota oficial de escrita e os parâmetros exigidos para descer/subir.','6. Confirmar a origem do EXP-PIC e o contrato de leitura.','7. Só confirmar a movimentação na interface após resposta positiva do sistema oficial.','8. Validar concorrência com dois operadores.','9. Homologar com palete autorizado.','10. Só então habilitar escrita no servidor.'].join('\n');}async function processRequest(){throw new Error('Escrita real bloqueada: deve ser implementada no servidor junto ao TI.');}function restart(){if(timer)clearInterval(timer);const c=settings();if(c.enabled)timer=setInterval(refresh,Math.max(5000,c.interval));}async function init(){ensureBadge();if(!SecurityApi.isServerMode()||AppState.getUser()){await loadServerConfig();refresh();}else status('off','Selene: aguardando login');restart();document.addEventListener('security:login',()=>loadServerConfig().then(refresh));}return{init,refresh,currentRequests,hasLiveData,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
+}async function testConnection(){const start=Date.now();await loadServerConfig();const c=settings(),checks=[{name:'Camada de integração',ok:true,detail:SecurityApi.isServerMode()?'Servidor intermediário ativo; navegador não acessa o sistema oficial diretamente.':SecurityApi.isAccountCloud()?'Supabase autenticado; integração oficial depende do endpoint corporativo.':'Acesso direto sem backend corporativo.'},{name:'URL da API',ok:/^https?:\/\//i.test(c.serverBase),detail:c.serverBase}];try{const{pending,attendance}=await lists();checks.push({name:'Pendentes',ok:true,detail:`${pending.length} registro(s)`},{name:'Em atendimento',ok:true,detail:`${attendance.length} registro(s)`});return{ok:true,checks,durationMs:Date.now()-start};}catch(e){checks.push({name:'Leitura da API',ok:false,detail:e.message});return{ok:false,checks,durationMs:Date.now()-start};}}function integrationMap(){const c=settings();return{architecture:localBridgeActive?'Navegador → Servidor local (127.0.0.1) → API interna da Selene · leitura':SecurityApi.isServerMode()?'Navegador → Servidor Site Selene → sistema oficial / coletor':'Navegador autenticado + Supabase',server:c.serverBase,settings:{enabled:c.enabled,codGrupo:c.codGrupo,codEmp:c.codEmp,routePending:c.routePending,routeAttendance:c.routeAttendance,interval:c.interval},writeEnabled:false,secretsInBrowser:false,readProxy:localBridgeActive||SecurityApi.isServerMode(),futureWrite:'Implementar somente no servidor após o TI confirmar a rota oficial de escrita, sessão e parâmetros de movimentação.'};}function integrationGuide(){const c=settings();return['CHECKLIST TI — SITE SELENE 2.0',`1. Definir servidor/API no Painel TI: ${c.serverBase||'[não configurado]'}.`,'2. Informar as duas rotas oficiais de leitura (pendentes e em atendimento).',`3. Validar os parâmetros de grupo/empresa conforme o ambiente oficial.`,'4. Confirmar autenticação/sessão usada pelos sistemas internos.','5. Confirmar a rota oficial de escrita e os parâmetros exigidos para descer/subir.','6. Confirmar a origem do EXP-PIC e o contrato de leitura.','7. Só confirmar a movimentação na interface após resposta positiva do sistema oficial.','8. Validar concorrência com dois operadores.','9. Homologar com palete autorizado.','10. Só então habilitar escrita no servidor.'].join('\n');}async function processRequest(){throw new Error('Escrita real bloqueada: deve ser implementada no servidor junto ao TI.');}function restart(){if(timer)clearInterval(timer);const c=settings();if(c.enabled)timer=setInterval(refresh,Math.max(5000,c.interval));}async function init(){
+  ensureBadge();
+  await probeLocalBridge();
+  if(!SecurityApi.isServerMode()||AppState.getUser()){
+    await loadServerConfig();
+    await refresh();
+  }else status('off','Selene: aguardando login');
+  restart();
+  document.addEventListener('security:login',()=>loadServerConfig().then(refresh));
+}return{init,refresh,currentRequests,hasLiveData,integrationMap,processRequest,getSettings:settings,saveSettings,testConnection,integrationGuide,loadServerConfig};})();;
 const Reports = (() => {
   function escapeHtml(value=''){
     return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'})[char]);

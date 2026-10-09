@@ -21,6 +21,8 @@ jobs:
           node --check tests/pallet-details.test.js
           node --check tests/pallet-pending.test.js
           node --check tests/official-only.test.js
+          node --check teste-interno/server.js
+          node --check tests/internal-lan.test.js
       - name: Simular o movimento com mouse
         run: node tests/pallet-drag.test.js
       - name: Testar histórico e controle de acesso
@@ -29,6 +31,8 @@ jobs:
         run: node tests/pallet-pending.test.js
       - name: Validar modo somente oficial
         run: node tests/official-only.test.js
+      - name: Testar acesso PC e tablet na LAN
+        run: node tests/internal-lan.test.js
       - name: Validar regras operacionais e vinculação de arquivos
         run: |
           node <<'NODE'

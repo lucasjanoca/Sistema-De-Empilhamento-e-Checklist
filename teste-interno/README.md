@@ -1,0 +1,49 @@
+# Teste interno no PC e no tablet — paletes oficiais da Selene
+
+**Objetivo:** exibir no nosso layout os endereços e requisições que o sistema original retorna, sem paletes de teste e **sem escrever/subir/baixar dados no servidor original**.
+
+O PC mantém uma pequena ponte de consulta de leitura e disponibiliza **o mesmo site para tablets conectados à rede interna que conseguem alcançar o computador**. O endereço público no GitHub Pages não é usado para consultar dados internos.
+
+## Como iniciar no PC (Windows)
+
+1. No repositório GitHub, use **Code → Download ZIP** e extraia todos os arquivos numa pasta permitida do computador.
+2. É necessário ter **Node.js 18 ou superior** instalado nesse computador. Não são necessários pacotes npm.
+3. Abra a pasta `teste-interno` e dê dois cliques em **`INICIAR-PC-E-TABLETS.bat`**.
+4. A janela preta mostrará o endereço para o computador, os endereços detectados para os tablets e um **código temporário gerado a cada início**. Não compartilhe esse código fora das pessoas autorizadas a participar do teste.
+5. No PC, abra `http://127.0.0.1:8765/empilhadores/`. O navegador solicitará usuário **`infotech`** e senha (o código exibido no PC).
+6. No tablet, usando a mesma rede interna e com conexão permitida ao PC, abra o **endereço IP exibido na janela**: `http://IP-DO-PC:8765/empilhadores/`. O tablet pedirá o mesmo usuário **`infotech`** e código temporário.
+7. Depois do controle de acesso, faça o login normal no Sistema de Empilhadores. A aplicação deverá mostrar o aviso **Selene ao vivo** quando conseguir ler a API original.
+
+**Mantenha o PC ligado, a janela do servidor aberta e o acesso à rede ativo.** O PC funciona como ponte; se desligar ou perder conexão, os tablets ficarão sem a leitura. Se o tablet não conseguir abrir o endereço do PC, a rede pode isolar tablets de computadores ou impedir a porta. Não tente contornar essas restrições; é necessário um caminho de rede permitido.
+
+### O que é compartilhado
+
+As consultas são feitas pela ponte local, não por cada tablet diretamente. A atualização ocorre aproximadamente a cada 5 segundos; a página compara as duas listas oficiais. Quando não consegue consultar a API, **não mostra paletes inventados ou obsoletos**.
+
+Consultas de leitura já identificadas:
+- Pendentes: `GET api/Requisicao/ObtemRequisicoesPendente`, `situacao=1`.
+- Em atendimento: `GET api/Requisicao/ObtemRequisicoesAtendimento`, `situacao=3`.
+- Feedback: `GET api/Requisicao/ObtemFeedBack`.
+- Endereços pendentes: `GET api/Enderecos/ObtemEnderecosPendentes`.
+
+Por padrão: grupo 1 e empilhadeira `emp1`. Isso foi observado nas imagens e poderá não representar todas as empilhadeiras. Antes de executar o servidor, é possível alterar variáveis `SELENE_COD_GRUPO`, `SELENE_COD_EMP` e `SELENE_API_BASE`. A ponte não leva senhas, cookies nem tokens da sessão oficial.
+
+### Segurança e limites
+
+- **A ponte é somente leitura**. Todos os métodos diferentes de GET/HEAD são rejeitados; a interação por arraste não envia comandos à Selene.
+- Ativar acesso LAN é **uma ação explícita** do arquivo `.bat`. Sem `SELENE_ALLOW_LAN=1`, o servidor escuta somente `127.0.0.1`.
+- Em modo LAN, a ponte exige uma **senha aleatória temporária** para arquivos e consultas, limita clientes a endereços privados e bloqueia chamadas de outras origens.
+- **HTTP em rede local não é criptografado.** O código temporário e os dados consultados podem ser observados por equipamentos com acesso à rede. Use apenas numa rede de testes isolada e aprovada para esses dados. Se o ambiente exigir confidencialidade, interrompa o teste até haver HTTPS com certificado confiável no tablet.
+- Android/Chrome podem limitar algumas funções avançadas em páginas HTTP de IP privado, incluindo PWA e APIs que exigem contexto seguro. Login no Supabase ou outros recursos poderão precisar de HTTPS confiável.
+- Não instale software nem altere regras de firewall sem permissão para o equipamento. Não exponha a porta 8765 à internet nem use roteadores públicos.
+- O modo LAN não supre autenticação, autorização nem permissões das APIs de empresa; se o computador não conseguir consultar a API original, a tela continua sem dados.
+
+### Diagnóstico rápido
+
+- **Tablet não abre a página:** verificar se o IP mostrado pertence à rede alcançável pelo tablet e se a porta local está permitida.
+- **Login da ponte não funciona:** usuário `infotech`, senha = código temporário exibido na janela do PC, não é a senha do sistema original.
+- **A página abre, mas não aparecem paletes reais:** conferir status na barra superior; a API pode estar indisponível, exigir autenticação ou retornar estrutura que precise mapeamento.
+- **Paletes em atendimento aparecem vermelhos, mas deveriam verdes:** a cor só é confirmada quando a fonte de dados informa liberação; não inferimos a autorização pela idade do palete.
+- **Arrastar não altera o sistema da Selene:** é intencional; somente leitura. O fluxo oficial de escrita não foi integrado.
+
+Para encerrar, pressione Ctrl+C na janela do servidor no PC.
