@@ -1,0 +1,12 @@
+{
+  "serverBase": "https://selene-hml.empresa.exemplo",
+  "routePending": "/api/pending",
+  "routeAttendance": "/api/attendance",
+  "routeMovement": "/api/movements",
+  "routeHealth": "/health",
+  "codGrupo": "PREENCHER",
+  "codEmp": "PREENCHER",
+  "enabled": true,
+  "timeoutSeconds": 5,
+  "retries": 2
+}

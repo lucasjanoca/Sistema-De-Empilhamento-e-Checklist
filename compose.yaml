@@ -1,0 +1,84 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Defina o nome do banco}
+      POSTGRES_USER: ${POSTGRES_OWNER:?Defina a conta de migration}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina a senha de migration}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [private]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+  app:
+    image: ${SELENE_IMAGE:-site-selene:local}
+    build: .
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:?Defina production ou staging}
+      DATABASE_URL: ${DATABASE_URL:?Defina a conexão da aplicação sem privilégios administrativos}
+      SESSION_SECRET: ${SESSION_SECRET:?Defina um segredo aleatório}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Defina a origem HTTPS oficial}
+      SECURE_COOKIES: "true"
+      FORWARDED_ALLOW_IPS: ${TRUSTED_PROXY_IPS:?Defina somente os endereços do proxy confiável}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_MFA_ACR: ${OIDC_MFA_ACR:-}
+      REQUIRE_ADMIN_MFA: ${REQUIRE_ADMIN_MFA:-false}
+      INTEGRATION_ALLOWED_HOSTS: ${INTEGRATION_ALLOWED_HOSTS:-}
+      INTEGRATION_ADAPTER: ${INTEGRATION_ADAPTER:-}
+      INTEGRATION_AUTH_MODE: ${INTEGRATION_AUTH_MODE:-none}
+      INTEGRATION_BEARER_TOKEN: ${INTEGRATION_BEARER_TOKEN:-}
+      INTEGRATION_API_KEY_NAME: ${INTEGRATION_API_KEY_NAME:-X-API-Key}
+      INTEGRATION_API_KEY_SECRET: ${INTEGRATION_API_KEY_SECRET:-}
+      INTEGRATION_BASIC_USERNAME: ${INTEGRATION_BASIC_USERNAME:-}
+      INTEGRATION_BASIC_PASSWORD: ${INTEGRATION_BASIC_PASSWORD:-}
+      BACKUP_DIRECTORY: /backups
+      BACKUP_EXTERNAL_DIRECTORY: /backups-external
+      BACKUP_PUBLIC_KEY: /keys/backup-public.pem
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_MAX_AGE_HOURS: ${BACKUP_MAX_AGE_HOURS:-26}
+      BACKUP_SCHEDULE_MANAGED: ${BACKUP_SCHEDULE_MANAGED:-false}
+    ports: ["127.0.0.1:8000:8000"]
+    volumes:
+      - ${BACKUP_DIRECTORY:?Defina diretório privado de backup}:/backups
+      - ${BACKUP_EXTERNAL_DIRECTORY:?Defina diretório externo/imutável de backup}:/backups-external
+      - ${BACKUP_PUBLIC_KEY:?Defina caminho da chave pública}:/keys/backup-public.pem:ro
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3).read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+  migrate:
+    image: ${SELENE_IMAGE:-site-selene:local}
+    build: .
+    profiles: [maintenance]
+    command: [python, -m, alembic, upgrade, head]
+    environment:
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?Defina a conexão da conta proprietária de migrations}
+    networks: [private]
+    depends_on:
+      db: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
+volumes:
+  pgdata:
+networks:
+  private:
+    driver: bridge

@@ -1,0 +1,86 @@
+from functools import lru_cache
+from typing import Literal
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
+
+from pydantic import SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=None, extra="ignore")
+    environment: Literal["development", "test", "preview", "staging", "production"] = "production"
+    database_url: SecretStr
+    session_secret: SecretStr
+    public_origin: str
+    secure_cookies: bool = True
+    timezone: str = "America/Sao_Paulo"
+    idle_seconds: int = 900
+    absolute_seconds: int = 28800
+    lease_seconds: int = 180
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: SecretStr = SecretStr("")
+    oidc_mfa_acr: str = ""
+    require_admin_mfa: bool = False
+    integration_adapter: str = ""
+    integration_allowed_hosts: str = ""
+    integration_auth_mode: Literal["none", "bearer", "api-key", "basic"] = "none"
+    integration_bearer_token: SecretStr = SecretStr("")
+    integration_api_key_name: str = "X-API-Key"
+    integration_api_key_secret: SecretStr = SecretStr("")
+    integration_basic_username: str = ""
+    integration_basic_password: SecretStr = SecretStr("")
+    backup_directory: str = ""
+    backup_external_directory: str = ""
+    backup_public_key: str = ""
+    backup_retention_days: int = 30
+    backup_max_age_hours: int = 26
+    backup_schedule_managed: bool = False
+
+    @model_validator(mode="after")
+    def validate_runtime(self):
+        if not self.database_url.get_secret_value().startswith("postgresql+psycopg://"):
+            raise ValueError("DATABASE_URL deve usar PostgreSQL/psycopg.")
+        if len(self.session_secret.get_secret_value()) < 32:
+            raise ValueError("SESSION_SECRET deve conter pelo menos 32 caracteres aleatórios.")
+        origin = urlsplit(self.public_origin)
+        if not origin.hostname or origin.username or origin.password or origin.query or origin.fragment or origin.path not in ("", "/"):
+            raise ValueError("PUBLIC_ORIGIN inválido.")
+        if self.environment in ("preview", "staging", "production"):
+            if origin.scheme != "https" or not self.secure_cookies:
+                raise ValueError("Ambiente operacional exige HTTPS e cookies Secure.")
+        elif origin.scheme != "https" and origin.hostname not in ("localhost", "127.0.0.1", "testserver"):
+            raise ValueError("HTTP somente em loopback/teste.")
+        if self.idle_seconds < 60 or self.absolute_seconds < self.idle_seconds or self.lease_seconds < 30:
+            raise ValueError("Política de sessão inválida.")
+        ZoneInfo(self.timezone)
+        if self.oidc_issuer and not self.oidc_issuer.startswith("https://"):
+            raise ValueError("OIDC exige HTTPS.")
+        oidc_values = (self.oidc_issuer, self.oidc_client_id, self.oidc_client_secret.get_secret_value())
+        if any(oidc_values) and not all(oidc_values):
+            raise ValueError("OIDC exige issuer, client ID e client secret completos.")
+        if self.require_admin_mfa and not (self.oidc_issuer and self.oidc_mfa_acr):
+            raise ValueError("MFA administrativo exige OIDC e ACR homologados.")
+        if self.integration_adapter:
+            if self.integration_adapter != "http-json-v1" or not self.integration_allowed_hosts.strip():
+                raise ValueError("Adaptador de integração ou allowlist inválidos.")
+            secrets_by_mode = {
+                "bearer": bool(self.integration_bearer_token.get_secret_value()),
+                "api-key": bool(self.integration_api_key_name and self.integration_api_key_secret.get_secret_value()),
+                "basic": bool(self.integration_basic_username and self.integration_basic_password.get_secret_value()),
+            }
+            if self.integration_auth_mode != "none" and not secrets_by_mode[self.integration_auth_mode]:
+                raise ValueError("Credencial da integração incompleta.")
+        if self.backup_retention_days < 1 or self.backup_max_age_hours < 1:
+            raise ValueError("Política de backup inválida.")
+        return self
+
+    @property
+    def cookie_name(self):
+        return "__Host-SiteSeleneSession" if self.secure_cookies else "SiteSeleneDevSession"
+
+
+@lru_cache
+def settings():
+    return Settings()

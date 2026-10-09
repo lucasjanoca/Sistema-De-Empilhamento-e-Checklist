@@ -1,43 +1,33 @@
-# Sistema de Empilhamento e Checklist
+# Site Selene 2.2.0-rc.4
 
-Sistema operacional da InfoTech.io para gestão de paletes e acesso integrado ao Checklist.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lucasjanoca/Sistema-De-Empilhamento-e-Checklist/tree/integracao-producao-main)
 
-## Empilhadores
+Aplicação operacional do Empilhamento e Checklist, preparada para homologação com uma única fonte de verdade em PostgreSQL. O backend FastAPI decide autenticação, permissões, transições, autorizações, locks, timers, códigos temporários e auditoria. O navegador não armazena dados corporativos nem possui fallback operacional local.
 
-- Login por número do crachá + senha usando Supabase Auth.
-- Perfis Emp, Encarregado e TI.
-- Usuários centralizados no Supabase.
-- Nome do operador usado nas requisições, movimentações, histórico e auditoria.
-- Seleção manual de equipamento cadastrado a cada sessão.
-- Paletes para baixar e subir, confirmação de movimentação, cancelamento e histórico.
-- EXP-PIC com tratamento prioritário e regra operacional de retorno.
-- Requisições de produção por usuário.
-- Corredores, busca, filtros, relatórios e exportações.
-- Locks centrais para impedir movimentação simultânea do mesmo palete.
-- Estado operacional sincronizado pelo Supabase entre computadores/tablets.
-- Auditoria administrativa central.
-- Backup diário do snapshot operacional anterior no Supabase.
+Desenvolvimento inicial: **Lucas Janoca / InfoTech.io**. A evolução técnica mantém o crédito, os fluxos e a identidade visual do Site 2.0.
 
-## Checklist
+## Conteúdo
 
-O acesso ao Checklist usa código de 6 dígitos gerado no Sistema de Empilhadores, válido por 2 minutos e de uso único. A validação é feita pelo backend Supabase, permitindo gerar em um aparelho e usar em outro.
+- `app/`: API, regras operacionais, segurança, backup, manutenção e observabilidade.
+- `migrations/`: migrations Alembic e política de integridade PostgreSQL.
+- `public/empilhadores/` e `public/checklist/`: interfaces conectadas exclusivamente à API.
+- `tests/`: testes em PostgreSQL real, sem SQLite ou mocks de persistência.
+- `deploy/`, `Dockerfile`, `compose.yaml`: base reproduzível para homologação da TI.
+- `docs/`: arquitetura, instalação, operação, segurança, backup, API e validação.
 
-## Integração com o sistema oficial da empresa
+## Estado da entrega
 
-O Site Selene funciona como aplicação operacional independente. A integração automática com a API/sistema interno da empresa continua protegida até a TI fornecer e homologar:
-- URL/servidor oficial;
-- autenticação/sessão;
-- rotas de leitura;
-- rota de escrita para descer/subir;
-- parâmetros/payloads e retornos;
-- origem oficial do EXP-PIC.
+Esta branch reconciliou a arquitetura transacional da PR #2 com a evolução posterior da `main`, mantendo o backend autoritativo e as melhorias de interface compatíveis. O software deve ser validado com PostgreSQL 17 antes de cada entrega.
 
-Nenhuma credencial corporativa deve ser colocada no frontend público.
+A entrada em produção corporativa depende dos valores e da homologação listados em [PENDENCIAS-TI.md](PENDENCIAS-TI.md). Nenhum hostname, certificado, segredo, endpoint interno ou credencial foi inventado.
 
-## Publicação
+Comece por [docs/IMPLEMENTACAO-EMPRESA.md](docs/IMPLEMENTACAO-EMPRESA.md) e [docs/INSTALACAO.md](docs/INSTALACAO.md), depois execute `python scripts/homologate.py` no ambiente configurado. O roteiro operacional está em [docs/PILOTO-CONTROLADO.md](docs/PILOTO-CONTROLADO.md), e os gates desta candidata estão em [docs/HOMOLOGACAO-2.2.0.md](docs/HOMOLOGACAO-2.2.0.md).
 
-Empilhadores:
-https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/empilhadores/
+Para uma demonstração pública descartável, sem dados reais e sem integração Selene, siga [docs/TESTE-PUBLICO.md](docs/TESTE-PUBLICO.md). Esse preview gratuito não substitui o staging corporativo.
 
-Checklist:
-https://lucasjanoca.github.io/Sistema-De-Empilhamento-e-Checklist/checklist/
+## Limites deliberados
+
+- GitHub Pages não é um ambiente suportado para esta versão: autenticação, concorrência, Checklist e dados operacionais dependem do FastAPI e do PostgreSQL.
+- O adaptador e a entrega transacional Selene/EXP-PIC estão implementados, mas permanecem desabilitados até a TI fornecer e homologar o contrato real.
+- Dados do snapshot Supabase não são importados automaticamente; consulte [docs/MIGRACAO-SUPABASE.md](docs/MIGRACAO-SUPABASE.md).
+- O inventário seguro do legado pode ser repetido com `scripts/plan_supabase_migration.py`; ele não escreve no banco e bloqueia suposições sobre campos ausentes.

@@ -1,0 +1,28 @@
+{
+  "backup": {
+    "file": "selene-exercise.selene",
+    "createdAt": "2026-10-08T22:52:31.362533+00:00",
+    "bytes": 2301348,
+    "sha256": "c64b663920746e2ef0b7b1ad922c74f6a5292aa389e1551874524d26d774c426",
+    "format": "PostgreSQL custom / AES-256-GCM / RSA-OAEP-SHA256"
+  },
+  "restore": "verified_in_disposable_database",
+  "restoreDatabase": "selene_restore_test",
+  "tableCounts": {
+    "users": 906,
+    "audit_log": 4531,
+    "operational_history": 1347,
+    "pallet_requests": 237,
+    "pallet_movements": 255,
+    "integration_outbox": 12,
+    "checklist_records": 70,
+    "checklist_answers": 70,
+    "equipment": 161,
+    "battery_swaps": 46,
+    "alembic_version": "0002_integration_outbox"
+  },
+  "auditHeadMatches": true,
+  "auditChainValidAfterRestore": true,
+  "externalCopyMatches": true,
+  "refusesNonEmptyTarget": true
+}
