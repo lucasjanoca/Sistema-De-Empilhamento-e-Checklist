@@ -2009,13 +2009,16 @@ const Operation = (() => {
   }
   function init(){
     // A interação por arraste reutiliza o fluxo de operação, sem alterar as regras existentes.
-    document.addEventListener('selene:pallet-dropped-down', event => {
+    const receivePalletDrop = (event, requiredStatus) => {
       const id = Number(event.detail?.id);
       if (!Number.isSafeInteger(id)) return;
       const request = AppState.getData().requests.find(item => item.id === id);
-      if (!request || request.status !== 'waiting' || request.external) return;
+      if (!request || request.status !== requiredStatus || request.external) return;
+      // Reutiliza as validações e o temporizador de movimentação já existentes.
       moveRequest(id);
-    });
+    };
+    document.addEventListener('selene:pallet-dropped-down', event => receivePalletDrop(event, 'waiting'));
+    document.addEventListener('selene:pallet-dropped-up', event => receivePalletDrop(event, 'ready'));
     document.addEventListener('click', event => {
       const undo = event.target.closest('[data-undo]');
       if(undo){
