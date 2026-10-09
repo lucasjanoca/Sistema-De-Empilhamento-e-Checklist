@@ -12,7 +12,33 @@ const cfg=configFromEnv({
 });
 assert.equal(cfg.bindHost,'0.0.0.0');
 assert.equal(cfg.lanEnabled,true);
-assert.ok(cfg.accessCode.length>=16);
+assert.ok(cfg.accessCode.length>=12);
+assert.equal(cfg.customAccessCode,true);
+const chosenPassword='SenhaEscolhida!';
+const chosenConfig=configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/reqempilhadeira-api.prd',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',SELENE_ALLOW_LAN:'1',
+  SELENE_TEST_ACCESS_CODE:chosenPassword,SELENE_TEST_PORT:'0'
+});
+assert.equal(chosenConfig.accessCode,chosenPassword,'Deve aceitar senha escolhida de 12+ caracteres');
+assert.equal(chosenConfig.customAccessCode,true);
+assert.throws(()=>configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/api',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',SELENE_ALLOW_LAN:'1',
+  SELENE_TEST_ACCESS_CODE:'curta',SELENE_TEST_PORT:'0'
+}),/pelo menos 12/);
+const generatedConfig=configFromEnv({
+  SELENE_API_BASE:'http://127.0.0.1:33333/api',
+  SELENE_COD_GRUPO:'1',SELENE_COD_EMP:'emp1',SELENE_ALLOW_LAN:'1',SELENE_TEST_PORT:'0'
+});
+assert.equal(generatedConfig.customAccessCode,false);
+assert.ok(generatedConfig.accessCode.length>=16);
+const starter=fs.readFileSync('teste-interno/INICIAR-PC-E-TABLETS.bat','utf8');
+const starterScript=fs.readFileSync('teste-interno/INICIAR-PC-E-TABLETS.ps1','utf8');
+assert.match(starter,/INICIAR-PC-E-TABLETS\.ps1/);
+assert.match(starterScript,/Read-Host.*-AsSecureString/);
+assert.match(starterScript,/SELENE_TEST_ACCESS_CODE/);
+assert.match(starterScript,/ZeroFreeBSTR/);
 assert.equal(isPrivateIPv4('192.168.112.3'),true);
 assert.equal(isPrivateIPv4('172.20.10.1'),true);
 assert.equal(isPrivateIPv4('8.8.8.8'),false);
