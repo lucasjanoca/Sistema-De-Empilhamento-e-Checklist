@@ -1274,7 +1274,7 @@ const Operation = (() => {
     return SeleneIntegration.currentRequests().filter(request =>
       data.selectedCorridors.includes(request.corridor) &&
       (!query || (String(request.address)+' '+String(request.operator)).toLowerCase().includes(query)) &&
-      (status === 'all' || request.status === status)
+      (status === 'all' || request.status === status || pendingMovements.has(request.id) || ['lowering','returning'].includes(request.status))
     ).sort(compareAddresses);
   }
   function picMarkup(request){
