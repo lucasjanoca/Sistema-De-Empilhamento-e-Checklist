@@ -7,6 +7,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
+const {createTestMovements}=require('./test-movements');
 
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_BASE = 'http://192.168.112.3/reqempilhadeira-api.prd';
@@ -166,16 +167,34 @@ function createHandler(cfg,options={}){
   let pendingSnapshot=null;
   let lastRead={ok:false,checkedAt:null,pending:0,attendance:0,error:'Ainda não foi feita consulta.'};
   let lastPrinted='';
+  const testMovements=createTestMovements();
   const root = options.root || ROOT;
   return async (req,res)=>{
     if(!allowedBrowserRequest(req))return json(res,403,{ok:false,error:'Acesso fora da rede interna ou de outra origem bloqueado.'});
     if(!authenticated(req,cfg))return requireAuthentication(res);
-    if(req.method!=='GET' && req.method!=='HEAD')return json(res,405,{ok:false,error:'Este servidor é somente leitura.'});
     let pathname;
     try{pathname=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname);}
     catch{return json(res,400,{ok:false,error:'Caminho inválido.'});}
+    if(req.method==='POST' && ['/api/selene-test/move','/api/selene-test/undo'].includes(pathname)){
+      // Escreve APENAS no simulador em memória deste PC, nunca na API original.
+      const chunks=[];
+      let size=0;
+      for await(const chunk of req){
+        size+=chunk.length;
+        if(size>2048)return json(res,413,{ok:false,error:'Requisição muito grande.'});
+        chunks.push(chunk);
+      }
+      let input;
+      try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+      catch{return json(res,400,{ok:false,error:'Requisição JSON inválida.'});}
+      const action=pathname.endsWith('/undo')?'undo':input?.direction;
+      const result=testMovements.act(input?.id,action,cfg.accessUsername||'Operador de teste');
+      return json(res,result.ok?200:result.status,result);
+    }
+    if(req.method!=='GET' && req.method!=='HEAD')
+      return json(res,405,{ok:false,error:'A escrita na API oficial da Selene está desativada.'});
     if(pathname==='/api/selene-read/status')
-      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pollMs:5000,writeEnabled:false,read:lastRead});
+      return json(res,200,{ok:true,mode:'local-interno-readonly',codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pollMs:3000,writeEnabled:false,testMoveEnabled:true,read:lastRead});
     if(pathname==='/api/selene-read/snapshot'){
       try{
         if(!pendingSnapshot){
@@ -192,6 +211,7 @@ function createHandler(cfg,options={}){
               }
               return Number.isFinite(Number(list?.Count)) ? Number(list.Count) : 0;
             }
+            testMovements.update(pending,attendance);
             lastRead={
               ok:true,checkedAt:new Date().toISOString(),
               pending:count(pending),attendance:count(attendance),error:null
@@ -206,7 +226,8 @@ function createHandler(cfg,options={}){
               codGrupo:cfg.codGrupo,codEmp:cfg.codEmp,pending,attendance,feedback:null,addresses:null};
           })().finally(()=>{pendingSnapshot=null;});
         }
-        return json(res,200,await pendingSnapshot);
+        const current=await pendingSnapshot;
+        return json(res,200,{...current,testMode:true,testMovements:testMovements.snapshot()});
       }catch(error){
         lastRead={ok:false,checkedAt:new Date().toISOString(),pending:0,attendance:0,
           error:String(error?.message||'Falha desconhecida').slice(0,240)};
@@ -219,7 +240,7 @@ function createHandler(cfg,options={}){
           codGrupo:cfg.codGrupo,codEmp:cfg.codEmp});
       }
     }
-    if(pathname.startsWith('/api/'))return json(res,404,{ok:false,error:'Rota indisponível (somente leitura).'});
+    if(pathname.startsWith('/api/'))return json(res,404,{ok:false,error:'Rota indisponível; simulação limitada à memória do servidor.'});
     if(pathname==='/') pathname='/empilhadores/';
     if(pathname.endsWith('/')) pathname+='index.html';
     const target=path.resolve(root,'.'+pathname);
@@ -260,7 +281,8 @@ if(require.main===module){
       console.log('AVISO: HTTP na LAN nao e criptografado. Uso temporario em rede isolada.');
     }
     console.log('Grupo: '+cfg.codGrupo+' | Empilhadeira: '+cfg.codEmp);
-    console.log('Somente consultas GET; movimentacoes oficiais DESATIVADAS.');
+    console.log('Consultas oficiais: somente GET. Arraste de teste sincroniza PC/tablets em memoria.');
+    console.log('Movimentacoes oficiais da Selene continuam DESATIVADAS.');
     console.log('Pressione Ctrl+C para encerrar.');
     console.log('');
   });
