@@ -25,6 +25,9 @@ jobs:
           node --check tests/internal-lan.test.js
           node --check teste-interno/official-operations.js
           node --check tests/official-operations.test.js
+          node --check tests/central-sync-race.test.js
+      - name: Testar sincronização entre PC e tablet com concorrência
+        run: node --test tests/central-sync-race.test.js
       - name: Simular o movimento com mouse
         run: node tests/pallet-drag.test.js
       - name: Testar histórico e controle de acesso
