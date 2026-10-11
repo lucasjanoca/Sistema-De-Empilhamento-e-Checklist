@@ -3272,7 +3272,7 @@ const DataSync = (() => {
   function init(){
     document.addEventListener('app:state-saved',schedulePush);
     UI.$('forceCentralSync')?.addEventListener('click',forceSync);
-    initialize();
+    return initialize();
   }
 
   async function reconnect(){
