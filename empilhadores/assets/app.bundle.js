@@ -714,7 +714,12 @@ const TabletManager = (() => {
     }
     // Revalidar sessão após a chamada remota; logout no meio da consulta
     // não pode transformar uma resposta tardia em seleção ativa.
-    if(AppState.getUser()?.matricula!==user.matricula) return false;
+    if(AppState.getUser()?.matricula!==user.matricula){
+      if(lease) try{
+        await globalThis.InfoTechSupabaseAccounts.releaseDevice({deviceId:device.id,leaseId:lease.leaseId});
+      }catch{}
+      return false;
+    }
     const now=Date.now();
     if(previous?.name && previous.name.toLowerCase()!==device.name.toLowerCase()){
       const old=assignmentFor(previous.name);
@@ -1223,7 +1228,7 @@ const Auth=(()=>{
         UI.toast('Aguarde ou cancele a movimentação de 10 segundos antes de sair.');
         return;
       }
-      TabletManager.releaseCurrent('logout');
+      await TabletManager.releaseCurrent('logout');
       if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Logout realizado','Sessão encerrada.',{category:'acesso'});
       await SecurityApi.logout();AppState.clearUser();AppState.clearTablet();location.reload();
     });
