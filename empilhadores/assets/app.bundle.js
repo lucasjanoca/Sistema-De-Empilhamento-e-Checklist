@@ -3061,6 +3061,8 @@ const DataSync = (() => {
   let pollTimer=null;
   let lastRemoteUpdatedAt=0;
   let lastRemoteRevision=null;
+  let pushInFlight=null;
+  let localDirty=false;
 
   function cloud(){return typeof SecurityApi!=='undefined'&&SecurityApi.isAccountCloud();}
 
@@ -3094,8 +3096,15 @@ const DataSync = (() => {
     return response.status===204?null:response.json();
   }
 
-  async function push(){
-    if(!connected || applyingRemote || AppState.getData().settings?.centralSyncEnabled===false) return;
+  function push(){
+    if(!connected || applyingRemote || AppState.getData().settings?.centralSyncEnabled===false) return Promise.resolve();
+    // Só uma gravação central por vez. Uma edição durante a gravação será
+    // enviada depois, com a revisão já confirmada pelo servidor.
+    if(pushInFlight) return pushInFlight;
+    clearTimeout(pushTimer);
+    pushTimer=null;
+    localDirty=false;
+    pushInFlight=(async()=>{
     try{
       const snapshot=AppState.exportOperationalSnapshot();
       const result=await request('/snapshot',{method:'PUT',body:JSON.stringify(snapshot)});
@@ -3103,9 +3112,13 @@ const DataSync = (() => {
       lastRemoteUpdatedAt=at;
       lastRemoteRevision=Number(result?.revision ?? lastRemoteRevision ?? 0);
       AppState.getData().meta=AppState.getData().meta||{};
-      AppState.getData().meta.updatedAt=at;
       AppState.getData().meta.cloudInitialized=true;
-      try{localStorage.setItem('empilhamento_2_0_state_entrega_v2',JSON.stringify(AppState.getData()));}catch{}
+      // Uma alteração ocorrida enquanto a rede respondia não pode perder
+      // seu timestamp para o snapshot anterior.
+      if(!localDirty){
+        AppState.getData().meta.updatedAt=at;
+        try{localStorage.setItem('empilhamento_2_0_state_entrega_v2',JSON.stringify(AppState.getData()));}catch{}
+      }
       setStatus('online',cloud()?'Supabase sincronizado':'Dados centralizados');
       return result;
     }catch(error){
@@ -3121,10 +3134,19 @@ const DataSync = (() => {
       console.warn('Falha ao enviar dados ao servidor central:',error);
       throw error;
     }
+    })();
+    return pushInFlight.finally(()=>{
+      pushInFlight=null;
+      if(localDirty && connected){
+        clearTimeout(pushTimer);
+        pushTimer=setTimeout(()=>push().catch(()=>{}),500);
+      }
+    });
   }
 
   function schedulePush(){
     if(applyingRemote || !connected) return;
+    localDirty=true;
     clearTimeout(pushTimer);
     pushTimer=setTimeout(()=>push().catch(()=>{}),500);
   }
@@ -3151,15 +3173,24 @@ const DataSync = (() => {
   }
 
   async function pull(initial=false){
-    if(!connected || AppState.getData().settings?.centralSyncEnabled===false) return;
+    if(!connected || localDirty || pushInFlight || AppState.getData().settings?.centralSyncEnabled===false) return;
     try{
+      const previousRevision=lastRemoteRevision;
       const remote=await request('/snapshot');
+      // A consulta pode ter começado antes de uma edição neste dispositivo.
+      // Nunca importar uma resposta antiga sobre uma alteração ainda pendente.
+      if(localDirty || pushInFlight) return;
       if(!remote?.snapshot){
         if(initial) await push();
         return;
       }
       const remoteUpdatedAt=Number(remote.updatedAt || remote.snapshot.updatedAt || 0);
-      lastRemoteRevision=Number(remote.revision ?? lastRemoteRevision ?? 0);
+      const incomingRevision=remote.revision==null ? null : Number(remote.revision);
+      if(incomingRevision!==null && (!Number.isSafeInteger(incomingRevision) || incomingRevision<0))
+        throw new Error('Revisão central inválida.');
+      // Resposta antiga nunca deve reduzir a revisão reconhecida.
+      if(incomingRevision!==null && lastRemoteRevision!==null && incomingRevision<lastRemoteRevision) return;
+      if(incomingRevision!==null) lastRemoteRevision=incomingRevision;
       const localUpdatedAt=Number(AppState.getData().meta?.updatedAt || 0);
       const remoteInitialized=Boolean(remote.cloudInitialized||remote.snapshot?.data?.meta?.cloudInitialized);
       lastRemoteUpdatedAt=Math.max(lastRemoteUpdatedAt,remoteUpdatedAt);
@@ -3176,7 +3207,10 @@ const DataSync = (() => {
         return;
       }
 
-      if(remoteUpdatedAt>localUpdatedAt+50){
+      // Em aparelhos com relógios diferentes, a revisão do Supabase é mais
+      // confiável que comparar Date.now() do PC com Date.now() do tablet.
+      const newerRevision=incomingRevision!==null && previousRevision!==null && incomingRevision>previousRevision;
+      if(newerRevision || remoteUpdatedAt>localUpdatedAt+50){
         await applyRemote(remote,remoteUpdatedAt);
         setStatus('online',cloud()?'Dados atualizados do Supabase':'Dados atualizados do servidor');
       }
@@ -3217,17 +3251,28 @@ const DataSync = (() => {
     }
     if(!connected) await initialize();
     if(connected){
-      await pull(false);
-      await push();
-      UI.toast(cloud()?'Sincronização com Supabase concluída.':'Sincronização concluída.');
-      AppState.addAudit('Sincronização manual',cloud()?'Dados enviados e recebidos do Supabase.':'Dados enviados e recebidos do servidor local.',{category:'integracao'});
+      try{
+        if(pushInFlight) await pushInFlight;
+        if(localDirty){
+          const result=await push();
+          if(result?.conflict) return;
+        }else{
+          // Clicar em "Sincronizar agora" sem mudanças locais consulta o
+          // servidor, mas não sobrescreve a operação de outro equipamento.
+          await pull(false);
+        }
+        UI.toast(cloud()?'Sincronização com Supabase concluída.':'Sincronização concluída.');
+        AppState.addAudit('Sincronização manual',cloud()?'Consulta central concluída.':'Consulta ao servidor concluída.',{category:'integracao',save:false});
+      }catch(error){
+        UI.toast('Não foi possível sincronizar: '+String(error?.message||'erro de conexão'));
+      }
     }
   }
 
   function init(){
     document.addEventListener('app:state-saved',schedulePush);
     UI.$('forceCentralSync')?.addEventListener('click',forceSync);
-    initialize();
+    return initialize();
   }
 
   async function reconnect(){
