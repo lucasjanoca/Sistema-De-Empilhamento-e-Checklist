@@ -167,6 +167,19 @@
   async function deleteUser(matricula){return invokeEmp('delete-user',{matricula})}
   async function getOperationalState(){return invokeEmp('state-get')}
   async function saveOperationalState(snapshot,expectedRevision=null){return invokeEmp('state-save',{snapshot,expectedRevision})}
+  // CONTRATO PENDENTE DE IMPLEMENTAÇÃO NA EDGE FUNCTION:
+  // device-claim, device-renew e device-release devem usar uma transação
+  // atômica por equipamento, com usuário derivado do JWT (nunca do payload).
+  // Se não existirem, a interface recusa a seleção em vez de fingir exclusividade.
+  async function claimDevice({deviceId,previousDeviceId='',previousLeaseId=''}) {
+    return invokeEmp('device-claim',{deviceId:String(deviceId),previousDeviceId:String(previousDeviceId),previousLeaseId:String(previousLeaseId)});
+  }
+  async function renewDevice({deviceId,leaseId}) {
+    return invokeEmp('device-renew',{deviceId:String(deviceId),leaseId:String(leaseId)});
+  }
+  async function releaseDevice({deviceId,leaseId}) {
+    return invokeEmp('device-release',{deviceId:String(deviceId),leaseId:String(leaseId)});
+  }
   async function acquirePalletLock(request,direction,deviceName=''){
     return invokeEmp('lock-acquire',{
       address:String(request?.address||request?.id||''),
@@ -241,6 +254,7 @@
     deleteUser,
     getOperationalState,
     saveOperationalState,
+    claimDevice, renewDevice, releaseDevice,
     acquirePalletLock,
     releasePalletLock,
     addAudit,
