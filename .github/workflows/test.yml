@@ -1,5 +1,8 @@
 name: test
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     branches: [main]
@@ -9,9 +12,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Obter arquivos
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Conferir sintaxe do JavaScript
         run: |
           node --check empilhadores/assets/app.bundle.js
@@ -25,6 +29,7 @@ jobs:
           node --check tests/internal-lan.test.js
           node --check teste-interno/official-operations.js
           node --check tests/official-operations.test.js
+          node --check tests/official-api-failure.test.js
       - name: Simular o movimento com mouse
         run: node tests/pallet-drag.test.js
       - name: Testar histórico e controle de acesso
@@ -37,6 +42,8 @@ jobs:
         run: node tests/internal-lan.test.js
       - name: Validar escrita oficial obrigatoria
         run: node tests/official-operations.test.js
+      - name: Rejeitar falha explicita na API oficial (HTTP 200)
+        run: node tests/official-api-failure.test.js
       - name: Validar regras operacionais e vinculação de arquivos
         run: |
           node <<'NODE'
