@@ -25,12 +25,16 @@ jobs:
           node --check tests/internal-lan.test.js
           node --check teste-interno/official-operations.js
           node --check tests/official-operations.test.js
+          node --check shared/supabase-accounts.js
+          node --check tests/device-exclusivity.test.js
       - name: Simular o movimento com mouse
         run: node tests/pallet-drag.test.js
       - name: Testar histórico e controle de acesso
         run: node tests/pallet-details.test.js
       - name: Testar movimentação imediata e lock atrasado
         run: node tests/pallet-pending.test.js
+      - name: Testar exclusividade de equipamentos com duas sessões
+        run: node --test tests/device-exclusivity.test.js
       - name: Validar modo somente oficial
         run: node tests/official-only.test.js
       - name: Testar acesso PC e tablet na LAN
