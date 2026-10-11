@@ -5,6 +5,11 @@ const fs=require('node:fs');
 const path=require('node:path');
 
 function records(payload){
+  // HTTP 200 não significa sucesso operacional. Um erro com lista vazia
+  // nunca pode ser confundido com paletes movimentados/concluídos.
+  if(payload?.Success===false || payload?.success===false ||
+     payload?.Error===true || payload?.error===true)
+    throw new Error('A API oficial sinalizou falha na consulta de paletes.');
   if(Array.isArray(payload))return payload;
   for(const value of [payload?.Response,payload?.response,payload?.Data,payload?.data,payload?.items]){
     if(Array.isArray(value))return value;
