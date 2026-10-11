@@ -105,7 +105,8 @@ async function readUpstream(cfg,entry){
     try{parsed=JSON.parse(body);}catch{throw new Error('API retornou JSON inválido.');}
     if(!Array.isArray(parsed) && (!parsed || typeof parsed!=='object'))
       throw new Error('Formato da resposta inesperado.');
-    if(parsed?.Success===false || parsed?.Error===true)
+    if(parsed?.Success===false || parsed?.success===false ||
+       parsed?.Error===true || parsed?.error===true)
       throw new Error('API retornou falha na consulta '+route.split('/').pop());
     return parsed;
   }
