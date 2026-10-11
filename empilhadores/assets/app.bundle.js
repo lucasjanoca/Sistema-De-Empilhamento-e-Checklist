@@ -557,6 +557,27 @@ const TabletManager = (() => {
   const ACTIVE_WINDOW_MS = 10 * 60 * 1000;
   let heartbeatTimer = null;
   let forceSelection = false;
+  let selecting = false;
+  let renewing = false;
+  function cloudDeviceLease(){
+    return SecurityApi.isAccountCloud();
+  }
+  // O resultado remoto é autoritativo somente se trouxer uma concessão
+  // verificada pelo servidor. Um snapshot local nunca concede exclusividade.
+  function validLease(result,device,user,leaseId=''){
+    return Boolean(result?.ok===true &&
+      String(result.deviceId||'')===String(device.id) &&
+      String(result.matricula||'')===String(user.matricula) &&
+      typeof result.leaseId==='string' && result.leaseId.length>=16 &&
+      (!leaseId || result.leaseId===leaseId) &&
+      Number.isFinite(Number(result.expiresAt)) && Number(result.expiresAt)>Date.now());
+  }
+  function revokeSelection(message){
+    AppState.clearTablet();
+    updateBadge();
+    if(message) UI.toast(message);
+    openSelector({force:true});
+  }
   function normalizeName(value){
     return String(value || '').trim().replace(/\s+/g,' ');
   }
@@ -641,7 +662,10 @@ const TabletManager = (() => {
     UI.toast(`${device.name} removido.`);
     return true;
   }
-  function select(name, options={}){
+  async function select(name, options={}){
+    if(selecting) return false;
+    selecting=true;
+    try{
     const user=AppState.getUser();
     if(!user) return false;
     if(typeof Operation!=='undefined' && Operation.hasActiveMovement?.(user)){
@@ -662,8 +686,38 @@ const TabletManager = (() => {
     const data=AppState.getData();
     const previous=AppState.getTablet();
     const existing=assignmentFor(device.name);
-    if(existing && isActive(existing) && existing.userMatricula!==user.matricula){
+    if(!cloudDeviceLease() && existing && isActive(existing) && existing.userMatricula!==user.matricula){
       UI.toast(`${device.name} está em uso por ${existing.userName||existing.userMatricula}. Escolha outro equipamento.`);
+      return false;
+    }
+    let lease=null;
+    if(cloudDeviceLease()){
+      // A exclusividade não pode ser decidida pelo navegador: a Edge Function
+      // deve reservar o equipamento atomicamente e rejeitar disputa (HTTP 409).
+      try{
+        const claim=await globalThis.InfoTechSupabaseAccounts.claimDevice({
+          deviceId:device.id,
+          previousDeviceId:previous?.id||'',
+          previousLeaseId:previous?.leaseId||''
+        });
+        if(!validLease(claim,device,user)){
+          UI.toast('Reserva do equipamento não confirmada pelo servidor. Tente novamente.');
+          return false;
+        }
+        lease=claim;
+      }catch(error){
+        UI.toast(error?.status===409
+          ? 'Equipamento em uso por outro funcionário. Selecione outro.'
+          : 'Não foi possível verificar a ocupação no servidor. Nenhum equipamento foi reservado.');
+        return false;
+      }
+    }
+    // Revalidar sessão após a chamada remota; logout no meio da consulta
+    // não pode transformar uma resposta tardia em seleção ativa.
+    if(AppState.getUser()?.matricula!==user.matricula){
+      if(lease) try{
+        await globalThis.InfoTechSupabaseAccounts.releaseDevice({deviceId:device.id,leaseId:lease.leaseId});
+      }catch{}
       return false;
     }
     const now=Date.now();
@@ -687,28 +741,63 @@ const TabletManager = (() => {
     entry.active=true;
     entry.endedAt=null;
     data.productionRequests.filter(item=>item.userMatricula===user.matricula && item.status==='open').forEach(item=>{ item.tabletName=device.name; });
-    AppState.setTablet({id:device.id,name:device.name,selectedAt:now});
+    AppState.setTablet({id:device.id,name:device.name,selectedAt:now,
+      ...(lease?{leaseId:lease.leaseId,expiresAt:Number(lease.expiresAt),leaseOwner:user.matricula}:{})});
     AppState.addAudit(previous?.name && previous.name!==device.name ? 'Tablet alterado' : 'Tablet selecionado', `${user.nome} → ${device.name}${replaced ? ` (substituiu ${replaced})` : ''}.`,{category:'acesso',save:false});
     AppState.save({source:'tablet'});
     updateBadge();
     renderAdminPanel();
     if(!options.silent) UI.toast(`${device.name} vinculado a ${user.nome}.`);
     return true;
+    }finally{selecting=false;}
   }
-  function releaseCurrent(reason='troca'){
+  async function releaseCurrent(reason='troca'){
     const user=AppState.getUser();
     const tablet=AppState.getTablet();
     if(!user || !tablet?.name) return;
+    if(cloudDeviceLease() && tablet.leaseId){
+      // Logout/troca apenas libera a concessão da sessão atual.
+      // O servidor deve validar dono e leaseId antes de liberar.
+      try{
+        await globalThis.InfoTechSupabaseAccounts.releaseDevice({deviceId:tablet.id,leaseId:tablet.leaseId});
+      }catch(error){
+        console.warn('Liberação remota indisponível; a concessão deve expirar no servidor.',error);
+      }
+    }
     const entry=assignmentFor(tablet.name);
     if(entry && entry.userMatricula===user.matricula){
       entry.active=false; entry.lastSeen=Date.now(); entry.endedAt=Date.now();
       AppState.save({source:'tablet'});
     }
   }
-  function heartbeat(){
+  async function heartbeat(){
     const user=AppState.getUser();
     const tablet=AppState.getTablet();
-    if(!user || !tablet?.name) return;
+    if(!user || !tablet?.name || renewing) return;
+    if(cloudDeviceLease()){
+      if(!tablet.leaseId || tablet.leaseOwner!==user.matricula){
+        revokeSelection('Equipamento sem reserva válida. Selecione novamente.');
+        return;
+      }
+      renewing=true;
+      try{
+        const device=deviceFor(tablet.name);
+        if(!device || !canUseDevice(user,device)){
+          revokeSelection('Equipamento indisponível. Selecione outro.');
+          return;
+        }
+        const result=await globalThis.InfoTechSupabaseAccounts.renewDevice({deviceId:tablet.id,leaseId:tablet.leaseId});
+        if(!validLease(result,device,user,tablet.leaseId)){
+          revokeSelection('Sua reserva expirou ou foi encerrada. Selecione novamente.');
+          return;
+        }
+        if(AppState.getTablet()?.leaseId!==tablet.leaseId || AppState.getUser()?.matricula!==user.matricula) return;
+        AppState.setTablet({...tablet,expiresAt:Number(result.expiresAt)});
+      }catch(error){
+        revokeSelection('Não foi possível confirmar sua reserva no servidor. Selecione novamente quando a conexão voltar.');
+        return;
+      }finally{renewing=false;}
+    }
     const currentDevice=deviceFor(tablet.name);
     if(!currentDevice || !canUseDevice(user,currentDevice)){
       AppState.clearTablet();
@@ -757,7 +846,7 @@ const TabletManager = (() => {
     if(!dialog.open) dialog.showModal();
     setTimeout(()=>input.focus(),50);
   }
-  function ensureSelected(options={}){
+  async function ensureSelected(options={}){
     const user=AppState.getUser();
     if(!user) return;
     const current=AppState.getTablet();
@@ -766,7 +855,29 @@ const TabletManager = (() => {
     if(options.force || !current?.name || !currentDevice || !canUseDevice(user,currentDevice)){
       if(current?.name && (!currentDevice || !canUseDevice(user,currentDevice))) AppState.clearTablet();
       openSelector({force:true});
-    }else heartbeat();
+      return;
+    }
+    if(cloudDeviceLease()){
+      // Após recarregar a página, nunca tratar sessionStorage como prova.
+      // Limpar a seleção enquanto a concessão é revalidada no servidor.
+      AppState.clearTablet();
+      updateBadge();
+      if(!current.leaseId || current.leaseOwner!==user.matricula){
+        openSelector({force:true});
+        return;
+      }
+      try{
+        const renewed=await globalThis.InfoTechSupabaseAccounts.renewDevice({deviceId:current.id,leaseId:current.leaseId});
+        if(!validLease(renewed,currentDevice,user,current.leaseId) || AppState.getUser()?.matricula!==user.matricula)
+          throw new Error('Concessão de equipamento inválida.');
+        AppState.setTablet({...current,expiresAt:Number(renewed.expiresAt)});
+        updateBadge();
+      }catch{
+        openSelector({force:true});
+      }
+      return;
+    }
+    heartbeat();
   }
   function formatAgo(time){
     const diff=Math.max(0,Date.now()-Number(time||Date.now()));
@@ -827,12 +938,17 @@ const TabletManager = (() => {
     renderDeviceOptions();
     UI.$('currentTabletBadge')?.addEventListener('click',()=>openSelector({force:false}));
     UI.$('tabletCancelButton')?.addEventListener('click',()=>UI.$('tabletDialog')?.close());
-    UI.$('tabletForm')?.addEventListener('submit',event=>{
+    UI.$('tabletForm')?.addEventListener('submit',async event=>{
       event.preventDefault();
-      if(select(UI.$('tabletNameInput').value)){
-        forceSelection=false;
-        UI.$('tabletDialog').close();
-      }
+      const form=UI.$('tabletForm');
+      const submit=form?.querySelector('button[type="submit"]');
+      if(submit) submit.disabled=true;
+      try{
+        if(await select(UI.$('tabletNameInput').value)){
+          forceSelection=false;
+          UI.$('tabletDialog').close();
+        }
+      }finally{if(submit)submit.disabled=false;}
     });
     UI.$('tabletDialog')?.addEventListener('cancel',event=>{
       if(forceSelection || !AppState.getTablet()?.name) event.preventDefault();
@@ -854,7 +970,7 @@ const TabletManager = (() => {
       if(event.detail.name==='painel') renderAdminPanel();
       if(event.detail.name==='configuracoes') renderDeviceAdmin();
     });
-    heartbeatTimer=setInterval(heartbeat,60000);
+    heartbeatTimer=setInterval(()=>heartbeat().catch(error=>console.warn('Falha no heartbeat do equipamento:',error)),60000);
     updateBadge();
     renderDeviceAdmin();
   }
@@ -1112,7 +1228,7 @@ const Auth=(()=>{
         UI.toast('Aguarde ou cancele a movimentação de 10 segundos antes de sair.');
         return;
       }
-      TabletManager.releaseCurrent('logout');
+      await TabletManager.releaseCurrent('logout');
       if(!SecurityApi.isServerMode()&&!SecurityApi.isAccountCloud())AppState.addAudit('Logout realizado','Sessão encerrada.',{category:'acesso'});
       await SecurityApi.logout();AppState.clearUser();AppState.clearTablet();location.reload();
     });
