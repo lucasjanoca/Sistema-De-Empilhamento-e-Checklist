@@ -3101,6 +3101,8 @@ const DataSync = (() => {
     // Só uma gravação central por vez. Uma edição durante a gravação será
     // enviada depois, com a revisão já confirmada pelo servidor.
     if(pushInFlight) return pushInFlight;
+    clearTimeout(pushTimer);
+    pushTimer=null;
     localDirty=false;
     pushInFlight=(async()=>{
     try{
