@@ -108,13 +108,14 @@ function createClient(backend) {
   const api = vm.runInNewContext(source + '\nDataSync;', context, {
     filename: 'data-sync-extracted.js', timeout: 2000
   });
+  const ready = api.init();
   const fireTimers = () => {
     const callbacks = [...timers.values()];
     timers.clear();
     return callbacks.map(callback => callback());
   };
   return {
-    api, toasts,
+    api, ready, toasts,
     get state() { return state; },
     get imported() { return imported; },
     poll() { assert.equal(typeof poll, 'function'); return poll(); },
@@ -133,8 +134,8 @@ test('PC e tablet recebem mudanças por revisão, mesmo com relógio remoto atra
   const backend = makeBackend();
   const pc = createClient(backend);
   const tablet = createClient(backend);
-  await pc.api.reconnect();
-  await tablet.api.reconnect();
+  await pc.ready;
+  await tablet.ready;
   assert.equal(pc.state.registeredDevices.length, 1);
   const oldTimestamp = pc.state.meta.updatedAt;
   backend.remote.revision = 2;
@@ -152,7 +153,7 @@ test('PC e tablet recebem mudanças por revisão, mesmo com relógio remoto atra
 test('consulta iniciada antes de uma edição não pode sobrescrever essa edição', async () => {
   const backend = makeBackend();
   const pc = createClient(backend);
-  await pc.api.reconnect();
+  await pc.ready;
   const oldRead = backend.read;
   const pending = deferred();
   backend.read = () => pending.promise;
@@ -171,7 +172,7 @@ test('consulta iniciada antes de uma edição não pode sobrescrever essa ediç�
 test('alterações durante a primeira gravação são enviadas em uma segunda revisão', async () => {
   const backend = makeBackend();
   const tablet = createClient(backend);
-  await tablet.api.reconnect();
+  await tablet.ready;
   const first = deferred();
   const realSave = backend.save.bind(backend);
   let calls = 0;
@@ -209,7 +210,7 @@ test('alterações durante a primeira gravação são enviadas em uma segunda re
 test('botão Sincronizar agora consulta a central sem gravar estado antigo', async () => {
   const backend = makeBackend();
   const pc = createClient(backend);
-  await pc.api.reconnect();
+  await pc.ready;
   const originalWrites = backend.writes.length;
   const originalReads = backend.reads;
   await pc.api.forceSync();
@@ -221,7 +222,7 @@ test('botão Sincronizar agora consulta a central sem gravar estado antigo', asy
 test('botão Sincronizar agora envia mudanças locais pendentes', async () => {
   const backend = makeBackend();
   const pc = createClient(backend);
-  await pc.api.reconnect();
+  await pc.ready;
   pc.change(state => state.registeredDevices.push({
     id: 'tablet-04', name: 'Tablet 04', active: true
   }));
